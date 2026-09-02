@@ -1,5 +1,12 @@
 # BIBLIOTECA PALLANTHIR
-Um sistema de biblioteca criado para ajudar estudantes
+Um sistema de biblioteca criado para ajudar estudantes de diversas áreas.
+Os usuários podem avaliar os livros lidos, 
+e os livros com melhor avaliação são mais recomendados,
+ajudando alunos novos a encontrar mais facilmente as melhores opções para estudo.
+Também existe uma aba de favoritos para o estudante salvar os livros que mais gostar 
+O sistema não oferece os livros digitalmente, apenas reservas e compras para buscar em uma biblioteca física.
+
+
 
 ## TECNOLOGIAS UTILIZADAS
 Java: É uma linguagem de programação usada para o Back-end, oferece recursos adequados para o desenvolvimento de aplicações robustas, escaláveis e orientadas a objetos.
