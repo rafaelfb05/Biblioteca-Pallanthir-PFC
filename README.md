@@ -1,7 +1,7 @@
-#BIBLIOTECA PALLANTHIR
+# BIBLIOTECA PALLANTHIR
 Um sistema de biblioteca criado para ajudar estudantes
 
-##TECNOLOGIAS UTILIZADAS
+## TECNOLOGIAS UTILIZADAS
 Java: É uma linguagem de programação usada para o Back-end, oferece recursos adequados para o desenvolvimento de aplicações robustas, escaláveis e orientadas a objetos.
 
 Spring Boot: É um framework usado para desenvolvimento de aplicações Java ele fornece uma infraestrutura para criação de aplicações web e APIs facilitando a organização do projeto, além de oferecer diversas dependências que ajudam muito no desenvolvimento do projeto.
