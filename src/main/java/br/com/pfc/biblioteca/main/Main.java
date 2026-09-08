@@ -1,6 +1,7 @@
 package br.com.pfc.biblioteca.main;
 
 import br.com.pfc.biblioteca.dto.DadosLivro;
+import br.com.pfc.biblioteca.model.Livro;
 import br.com.pfc.biblioteca.service.ConsumoApi;
 import br.com.pfc.biblioteca.service.ConverteDados;
 
@@ -31,10 +32,17 @@ public class Main {
 
                   switch (opcao) {
                         case 1:
-
+                              pesquisarLivrosNaApi();
                   }
             }
       }
+
+      private void pesquisarLivrosNaApi() {
+            DadosLivro dados = getDadosLivro();
+            Livro livro = new Livro(dados);
+            System.out.println(dados);
+      }
+
       private DadosLivro getDadosLivro() {
             System.out.println("Digite o nome do livro: ");
             var nomeLivro = scanner.nextLine();
