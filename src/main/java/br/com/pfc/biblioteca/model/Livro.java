@@ -4,6 +4,8 @@ import br.com.pfc.biblioteca.dto.DadosLivro;
 import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.persistence.*;
 
+import java.util.List;
+
 @Entity
 @Table(name = "livros")
 public class Livro {
@@ -11,8 +13,8 @@ public class Livro {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     private String titulo;
-    private String autor;
-    private int anoLancamento;
+    private List<String> autores;
+    private String anoLancamento;
     private int numeroPagina;
     private double avaliacao;
 
@@ -20,7 +22,7 @@ public class Livro {
 
     public Livro(DadosLivro dadosLivro){
         this.titulo=dadosLivro.titulo();
-        this.autor=dadosLivro.autor();
+        this.autores=dadosLivro.autores();
         this.anoLancamento=dadosLivro.anoLancamento();
         this.numeroPagina=dadosLivro.numeroPagina();
         this.avaliacao=dadosLivro.avalliacao();
@@ -42,19 +44,19 @@ public class Livro {
         this.titulo = titulo;
     }
 
-    public String getAutor() {
-        return autor;
+    public List<String> getAutores() {
+        return autores;
     }
 
-    public void setAutor(String autor) {
-        this.autor = autor;
+    public void setAutores(List<String> autores) {
+        this.autores = autores;
     }
 
-    public int getAnoLancamento() {
+    public String getAnoLancamento() {
         return anoLancamento;
     }
 
-    public void setAnoLancamento(int anoLancamento) {
+    public void setAnoLancamento(String anoLancamento) {
         this.anoLancamento = anoLancamento;
     }
 
@@ -77,7 +79,7 @@ public class Livro {
     @Override
     public String toString() {
         return "Livro = " + titulo + '\'' +
-                ", autor = " + autor + '\'' +
+                ", autor = " + autores + '\'' +
                 ", anoLancamento = " + anoLancamento +
                 ", numeroPagina = " + numeroPagina +
                 ", avaliacao = " + avaliacao;

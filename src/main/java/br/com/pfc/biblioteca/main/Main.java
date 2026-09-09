@@ -1,5 +1,6 @@
 package br.com.pfc.biblioteca.main;
 
+import br.com.pfc.biblioteca.dto.DadosBusca;
 import br.com.pfc.biblioteca.dto.DadosLivro;
 import br.com.pfc.biblioteca.model.Livro;
 import br.com.pfc.biblioteca.service.ConsumoApi;
@@ -40,15 +41,15 @@ public class Main {
       private void pesquisarLivrosNaApi() {
             DadosLivro dados = getDadosLivro();
             Livro livro = new Livro(dados);
-            System.out.println(dados);
+            System.out.println(livro);
       }
 
       private DadosLivro getDadosLivro() {
             System.out.println("Digite o nome do livro: ");
             var nomeLivro = scanner.nextLine();
-            var json = consumo.obterDados(ENDERECO + nomeLivro.replace(" ", "+" + API_KEY));
-            DadosLivro dados = conversor.obterDados(json, DadosLivro.class);
-            return dados;
+            var json = consumo.obterDados(ENDERECO + nomeLivro.replace(" ", "+") + "&key=" + API_KEY);
+            DadosBusca dadosBusca = conversor.obterDados(json, DadosBusca.class);
+            return dadosBusca.items().get(0).volumeInfo();
       }
 
 }
