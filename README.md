@@ -37,4 +37,4 @@ Vercel: Será utilizada para realizar a hospedagem e disponibilização do front
 
 Render: Utilizado para hospedar o back-end desenvolvido em Java com Spring Boot.
 
-Supabase: Será utilizado para hospedar o banco de dados PostgreSQL.
+Supabase: Utilizado para hospedar o banco de dados PostgreSQL.
