@@ -16,16 +16,27 @@ public class Livro {
     private List<String> autores;
     private String anoLancamento;
     private int numeroPagina;
+    private String capaUrl;
     private double avaliacao;
 
     public Livro(){}
 
-    public Livro(DadosLivro dadosLivro){
-        this.titulo=dadosLivro.titulo();
-        this.autores=dadosLivro.autores();
-        this.anoLancamento=dadosLivro.anoLancamento();
-        this.numeroPagina=dadosLivro.numeroPagina();
-        this.avaliacao=dadosLivro.avalliacao();
+    public Livro(DadosLivro dados){
+        this.titulo=dados.titulo();
+        if (dados.autores() == null || dados.autores().isEmpty()) {
+            this.autores = List.of("Autor desconhecido");
+        } else {
+            this.autores = dados.autores();
+        }
+        this.anoLancamento=dados.anoLancamento();
+        this.numeroPagina=dados.numeroPagina();
+        if (dados.imagem() == null) {
+            System.out.println("Capa não encontrada");
+            this.capaUrl = null;
+        } else {
+            this.capaUrl = dados.imagem().capaUrl();
+        }
+        this.avaliacao=dados.avalliacao();
     }
 
     public Long getId() {
@@ -76,12 +87,21 @@ public class Livro {
         this.avaliacao = avaliacao;
     }
 
+    public String getCapaUrl() {
+        return capaUrl;
+    }
+
+    public void setCapaUrl(String capaUrl) {
+        this.capaUrl = capaUrl;
+    }
+
     @Override
     public String toString() {
         return "Livro = " + titulo + '\'' +
                 ", autor = " + autores + '\'' +
                 ", anoLancamento = " + anoLancamento +
                 ", numeroPagina = " + numeroPagina +
+                ", capa = " + capaUrl +
                 ", avaliacao = " + avaliacao;
     }
 }
