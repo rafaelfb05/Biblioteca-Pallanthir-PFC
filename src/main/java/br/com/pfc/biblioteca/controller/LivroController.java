@@ -20,5 +20,4 @@ public class LivroController {
         return ResponseEntity.ok(new LivroDTO(livro));
     }
 
-    @GetMapping()
 }
