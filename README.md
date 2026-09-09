@@ -35,4 +35,6 @@ BCrypt: Algoritmo utilizado para gerar hashes das senhas dos usuários, permitin
 
 Vercel: Será utilizada para realizar a hospedagem e disponibilização do front-end.
 
-Render: Utilizado para hospedar o back-end desenvolvido em Java com Spring Boot e o PostgreSQL.
+Render: Utilizado para hospedar o back-end desenvolvido em Java com Spring Boot.
+
+Supabase: Será utilizado para hospedar o banco de dados PostgreSQL.
