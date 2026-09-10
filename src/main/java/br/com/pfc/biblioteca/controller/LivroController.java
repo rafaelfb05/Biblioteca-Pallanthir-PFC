@@ -1,5 +1,6 @@
 package br.com.pfc.biblioteca.controller;
 
+import br.com.pfc.biblioteca.dto.AtualizarLivroRequest;
 import br.com.pfc.biblioteca.dto.LivroDTO;
 import br.com.pfc.biblioteca.model.Livro;
 import br.com.pfc.biblioteca.service.LivroService;
@@ -25,6 +26,12 @@ public class LivroController {
     @GetMapping
     public List<LivroDTO> obterLivros(){
         return service.obterTodosOsLivros();
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<LivroDTO> atualizarLivro(@PathVariable Long id, @RequestBody AtualizarLivroRequest request) {
+        Livro livro = service.atualizarLivro(id, request);
+        return ResponseEntity.ok(new LivroDTO(livro));
     }
 
 }

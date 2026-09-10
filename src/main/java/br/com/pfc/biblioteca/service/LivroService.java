@@ -1,5 +1,6 @@
 package br.com.pfc.biblioteca.service;
 
+import br.com.pfc.biblioteca.dto.AtualizarLivroRequest;
 import br.com.pfc.biblioteca.dto.DadosLivro;
 import br.com.pfc.biblioteca.dto.LivroDTO;
 import br.com.pfc.biblioteca.model.Livro;
@@ -45,5 +46,17 @@ public class LivroService {
                         s.getAnoLancamento(), s.getNumeroPagina(),
                         s.getCapaUrl(), s.getAvaliacao()))
                 .collect(Collectors.toList());
+    }
+
+    public Livro atualizarLivro(Long id, AtualizarLivroRequest request) {
+        Livro livro = repository.findById(id).orElse(null);
+
+        livro.setTitulo(request.titulo());
+        livro.setAutores(request.autores());
+        livro.setAnoLancamento(request.anoLancamento());
+        livro.setNumeroPagina(request.NumeroPagina());
+        livro.setAvaliacao(request.avaliacao());
+
+        return repository.save(livro);
     }
 }
