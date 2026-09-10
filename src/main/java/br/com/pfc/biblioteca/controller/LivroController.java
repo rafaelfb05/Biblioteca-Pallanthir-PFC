@@ -28,7 +28,7 @@ public class LivroController {
         return service.obterTodosOsLivros();
     }
 
-    @PutMapping("/{id}")
+    @PutMapping("/atualizar/{id}")
     public ResponseEntity<LivroDTO> atualizarLivro(@PathVariable Long id, @RequestBody AtualizarLivroRequest request) {
         Livro livro = service.atualizarLivro(id, request);
         return ResponseEntity.ok(new LivroDTO(livro));

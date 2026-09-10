@@ -51,12 +51,21 @@ public class LivroService {
     public Livro atualizarLivro(Long id, AtualizarLivroRequest request) {
         Livro livro = repository.findById(id).orElse(null);
 
-        livro.setTitulo(request.titulo());
-        livro.setAutores(request.autores());
-        livro.setAnoLancamento(request.anoLancamento());
-        livro.setNumeroPagina(request.NumeroPagina());
-        livro.setAvaliacao(request.avaliacao());
-
+        if(request.titulo() != null) {
+            livro.setTitulo(request.titulo());
+        }
+        if(request.autores() != null) {
+            livro.setAutores(request.autores());
+        }
+        if(request.anoLancamento() != null) {
+            livro.setAnoLancamento(request.anoLancamento());
+        }
+        if(request.numeroPagina() != null) {
+            livro.setNumeroPagina(request.numeroPagina());
+        }
+        if(request.avaliacao() != null) {
+            livro.setAvaliacao(request.avaliacao());
+        }
         return repository.save(livro);
     }
 }

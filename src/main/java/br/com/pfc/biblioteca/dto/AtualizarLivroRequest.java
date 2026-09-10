@@ -5,6 +5,6 @@ import java.util.List;
 public record AtualizarLivroRequest(String titulo,
                                     List<String> autores,
                                     String anoLancamento,
-                                    Integer NumeroPagina,
+                                    Integer numeroPagina,
                                     Double avaliacao) {
 }

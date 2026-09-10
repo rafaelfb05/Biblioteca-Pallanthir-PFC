@@ -12,7 +12,7 @@ public record DadosLivro(
         @JsonAlias("authors") List<String> autores,
         @JsonAlias("publishedDate") String anoLancamento,
         @JsonAlias("pageCount") int numeroPagina,
-        @JsonAlias("ImageLinks") ImagemLivro imagem,
+        @JsonAlias("imageLinks") ImagemLivro imagem,
         double avalliacao
 ) {
     @JsonIgnoreProperties(ignoreUnknown = true)
