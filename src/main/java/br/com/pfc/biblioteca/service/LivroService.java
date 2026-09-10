@@ -68,4 +68,11 @@ public class LivroService {
         }
         return repository.save(livro);
     }
+
+    public void deletarLivro(Long id) {
+        if(!repository.existsById(id)){
+            throw new RuntimeException("livro não encontrado");
+        }
+        repository.deleteById(id);
+    }
 }
