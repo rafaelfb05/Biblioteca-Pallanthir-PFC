@@ -1,7 +1,9 @@
 package br.com.pfc.biblioteca.controller;
 
 import br.com.pfc.biblioteca.dto.AtualizarLivroRequest;
+import br.com.pfc.biblioteca.dto.CadastroLivroRequest;
 import br.com.pfc.biblioteca.dto.LivroDTO;
+import br.com.pfc.biblioteca.enums.Materia;
 import br.com.pfc.biblioteca.model.Livro;
 import br.com.pfc.biblioteca.service.LivroService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,8 +20,8 @@ public class LivroController {
     public LivroService service;
 
     @PostMapping("/cadastro")
-    public ResponseEntity<LivroDTO> salvarLivro (@RequestBody String nomeLivro) {
-        Livro livro = service.salvarLivro(nomeLivro);
+    public ResponseEntity<LivroDTO> salvarLivro (@RequestBody CadastroLivroRequest request) {
+        Livro livro = service.salvarLivro(request.titulo(), request.materia());
         return ResponseEntity.ok(new LivroDTO(livro));
     }
 
@@ -34,10 +36,22 @@ public class LivroController {
         return ResponseEntity.ok(new LivroDTO(livro));
     }
 
-    @DeleteMapping("/deletar/id")
+    @DeleteMapping("/deletar/{id}")
     public ResponseEntity<Void> deletarLivro(@PathVariable Long id){
         service.deletarLivro(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{materia}")
+    public List<LivroDTO> filtarPorMateria(@PathVariable Materia materia){
+        return service.filtarPorMateria(materia);
+    }
+
+    @GetMapping("/titulo/{titulo}")
+    public ResponseEntity<LivroDTO> buscarPorTitulo(@PathVariable String titulo){
+        return service.buscarPorNome(titulo)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
 }

@@ -1,6 +1,7 @@
 package br.com.pfc.biblioteca.model;
 
 import br.com.pfc.biblioteca.dto.DadosLivro;
+import br.com.pfc.biblioteca.enums.Materia;
 import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.persistence.*;
 
@@ -17,6 +18,8 @@ public class Livro {
     private String anoLancamento;
     private int numeroPagina;
     private String capaUrl;
+    @Enumerated(EnumType.STRING)
+    private Materia materia;
     private double avaliacao;
 
     public Livro(){}
@@ -95,6 +98,14 @@ public class Livro {
         this.capaUrl = capaUrl;
     }
 
+    public Materia getMateria() {
+        return materia;
+    }
+
+    public void setMateria(Materia materia) {
+        this.materia = materia;
+    }
+
     @Override
     public String toString() {
         return "Livro = " + titulo + '\'' +
@@ -102,6 +113,7 @@ public class Livro {
                 ", anoLancamento = " + anoLancamento +
                 ", numeroPagina = " + numeroPagina +
                 ", capa = " + capaUrl +
+                ", matéria = " + materia +
                 ", avaliacao = " + avaliacao;
     }
 }

@@ -3,12 +3,14 @@ package br.com.pfc.biblioteca.service;
 import br.com.pfc.biblioteca.dto.AtualizarLivroRequest;
 import br.com.pfc.biblioteca.dto.DadosLivro;
 import br.com.pfc.biblioteca.dto.LivroDTO;
+import br.com.pfc.biblioteca.enums.Materia;
 import br.com.pfc.biblioteca.model.Livro;
 import br.com.pfc.biblioteca.repository.LivroRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -22,8 +24,8 @@ public class LivroService {
     private final String API_KEY = System.getenv("BOOK_API");
 
 
-    public Livro salvarLivro(String nomeLivro) {
-        var json = consumo.obterDados(ENDERECO + nomeLivro.replace(" ", "+") + "&key=" + API_KEY);
+    public Livro salvarLivro(String titulo, Materia materia) {
+        var json = consumo.obterDados(ENDERECO + titulo.replace(" ", "+") + "&key=" + API_KEY);
         DadosLivro.DadosBusca dadosBusca = conversor.obterDados(json, DadosLivro.DadosBusca.class);
 
         if(dadosBusca.items() == null || dadosBusca.items().isEmpty()){
@@ -31,7 +33,7 @@ public class LivroService {
         }
         DadosLivro dados = dadosBusca.items().get(0).volumeInfo();
         Livro livro = new Livro(dados);
-
+        livro.setMateria(materia);
         return repository.save(livro);
     }
 
@@ -43,8 +45,8 @@ public class LivroService {
     private List<LivroDTO> converterDados(List<Livro> livro) {
         return livro.stream()
                 .map(s -> new LivroDTO(s.getId(), s.getTitulo(), s.getAutores(),
-                        s.getAnoLancamento(), s.getNumeroPagina(),
-                        s.getCapaUrl(), s.getAvaliacao()))
+                                        s.getAnoLancamento(), s.getNumeroPagina(),
+                                        s.getCapaUrl(), s.getMateria(), s.getAvaliacao()))
                 .collect(Collectors.toList());
     }
 
@@ -66,6 +68,9 @@ public class LivroService {
         if(request.avaliacao() != null) {
             livro.setAvaliacao(request.avaliacao());
         }
+        if(request.materia() != null){
+            livro.setMateria(request.materia());
+        }
         return repository.save(livro);
     }
 
@@ -74,5 +79,15 @@ public class LivroService {
             throw new RuntimeException("livro não encontrado");
         }
         repository.deleteById(id);
+    }
+
+    public List<LivroDTO> filtarPorMateria(Materia materia) {
+        return converterDados(repository.findByMateria(materia));
+    }
+
+    public Optional<LivroDTO> buscarPorNome(String titulo) {
+        return repository.findByTituloContainingIgnoreCase(titulo)
+                .map(LivroDTO::new);
+
     }
 }
