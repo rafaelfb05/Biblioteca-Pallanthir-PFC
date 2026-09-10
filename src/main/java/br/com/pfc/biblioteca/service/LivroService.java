@@ -1,10 +1,14 @@
 package br.com.pfc.biblioteca.service;
 
 import br.com.pfc.biblioteca.dto.DadosLivro;
+import br.com.pfc.biblioteca.dto.LivroDTO;
 import br.com.pfc.biblioteca.model.Livro;
 import br.com.pfc.biblioteca.repository.LivroRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class LivroService {
@@ -28,5 +32,18 @@ public class LivroService {
         Livro livro = new Livro(dados);
 
         return repository.save(livro);
+    }
+
+    public List<LivroDTO> obterTodosOsLivros() {
+        return converterDados(repository.findAll());
+
+    }
+
+    private List<LivroDTO> converterDados(List<Livro> livro) {
+        return livro.stream()
+                .map(s -> new LivroDTO(s.getId(), s.getTitulo(), s.getAutores(),
+                        s.getAnoLancamento(), s.getNumeroPagina(),
+                        s.getCapaUrl(), s.getAvaliacao()))
+                .collect(Collectors.toList());
     }
 }

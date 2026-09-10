@@ -7,6 +7,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/pallanthir")
 public class LivroController {
@@ -18,6 +20,11 @@ public class LivroController {
     public ResponseEntity<LivroDTO> salvarLivro (@RequestBody String nomeLivro) {
         Livro livro = service.salvarLivro(nomeLivro);
         return ResponseEntity.ok(new LivroDTO(livro));
+    }
+
+    @GetMapping
+    public List<LivroDTO> obterLivros(){
+        return service.obterTodosOsLivros();
     }
 
 }
