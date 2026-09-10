@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/pallanthir")
+@RequestMapping("https://biblioteca-pallanthir-pfc.onrender.com")
 public class LivroController {
 
     @Autowired
