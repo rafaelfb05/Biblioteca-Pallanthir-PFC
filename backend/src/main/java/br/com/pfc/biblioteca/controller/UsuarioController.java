@@ -17,7 +17,7 @@ public class UsuarioController {
     @Autowired
     public UsuarioService service;
 
-    @PutMapping("/cadastro")
+    @PostMapping("/cadastro")
     public ResponseEntity<UsuarioDTO> cadastrarUsuario(@RequestBody UsuarioRequest request) {
         Usuario usuario = service.cadastrarUsuario(request);
         return ResponseEntity.ok(new UsuarioDTO(usuario));
