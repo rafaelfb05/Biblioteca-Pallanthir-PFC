@@ -16,7 +16,7 @@ public class HomeController {
                 "version", "0.0.1-SNAPSHOT",
                 "status", "online",
                 "docs", "/swagger-ui.html",
-                "github", "https://github.com/rafaelfb05/Biblioteca-Pallanthir-PFC.git",
+                "github", "https://github.com/rafaelfb05/Biblioteca-Pallanthir-PFC",
                 "team", "Projeto Final de Curso — UMC 2026"
         );
     }
