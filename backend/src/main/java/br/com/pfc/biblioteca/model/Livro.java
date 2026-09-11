@@ -20,6 +20,7 @@ public class Livro {
     private String capaUrl;
     @Enumerated(EnumType.STRING)
     private Materia materia;
+    private double preco;
     private double avaliacao;
 
     public Livro(){}
@@ -39,7 +40,6 @@ public class Livro {
         } else {
             this.capaUrl = dados.imagem().capaUrl();
         }
-        this.avaliacao=dados.avalliacao();
     }
 
     public Long getId() {
@@ -106,6 +106,14 @@ public class Livro {
         this.materia = materia;
     }
 
+    public double getPreco() {
+        return preco;
+    }
+
+    public void setPreco(double preco) {
+        this.preco = preco;
+    }
+
     @Override
     public String toString() {
         return "Livro = " + titulo + '\'' +
@@ -114,6 +122,7 @@ public class Livro {
                 ", numeroPagina = " + numeroPagina +
                 ", capa = " + capaUrl +
                 ", matéria = " + materia +
+                ", preço = " + preco +
                 ", avaliacao = " + avaliacao;
     }
 }

@@ -23,8 +23,6 @@ public enum Materia {
     @JsonCreator
     public static Materia fromString(String text){
         for(Materia materia : Materia.values()) {
-            // Aceita tanto o rotulo ("Veterinaria") quanto o nome da constante ("VETERINARIA"),
-            // assim o front-end pode usar sempre o nome do enum.
             if(materia.materiaLivro.equalsIgnoreCase(text) || materia.name().equalsIgnoreCase(text)) {
                 return materia;
             }

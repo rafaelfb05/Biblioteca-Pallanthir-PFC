@@ -26,7 +26,7 @@ public class LivroService {
     private final String API_KEY = System.getenv("BOOK_API");
 
 
-    public Livro salvarLivro(String titulo, Materia materia) {
+    public Livro salvarLivro(String titulo, Materia materia, Double preco) {
         var json = consumo.obterDados(ENDERECO + titulo.replace(" ", "+") + "&key=" + API_KEY);
         DadosLivro.DadosBusca dadosBusca = conversor.obterDados(json, DadosLivro.DadosBusca.class);
 
@@ -36,6 +36,7 @@ public class LivroService {
         DadosLivro dados = dadosBusca.items().get(0).volumeInfo();
         Livro livro = new Livro(dados);
         livro.setMateria(materia);
+        livro.setPreco(preco);
         return repository.save(livro);
     }
 
@@ -48,7 +49,7 @@ public class LivroService {
         return livro.stream()
                 .map(s -> new LivroDTO(s.getId(), s.getTitulo(), s.getAutores(),
                         s.getAnoLancamento(), s.getNumeroPagina(),
-                        s.getCapaUrl(), s.getMateria(), s.getAvaliacao()))
+                        s.getCapaUrl(), s.getMateria(), s.getPreco(), s.getAvaliacao()))
                 .collect(Collectors.toList());
     }
 
@@ -72,6 +73,9 @@ public class LivroService {
         }
         if (request.materia() != null) {
             livro.setMateria(request.materia());
+        }
+        if (request.preco() != null){
+            livro.setPreco(request.preco());
         }
         return repository.save(livro);
     }
