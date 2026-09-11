@@ -5,10 +5,12 @@ import br.com.pfc.biblioteca.dto.UsuarioRequest;
 import br.com.pfc.biblioteca.model.Usuario;
 import br.com.pfc.biblioteca.repository.UsuarioRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.stream.Collectors;
 
+@Service
 public class UsuarioService {
 
     @Autowired
