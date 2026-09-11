@@ -3,6 +3,7 @@ package br.com.pfc.biblioteca.controller;
 import br.com.pfc.biblioteca.dto.AtualizarLivroRequest;
 import br.com.pfc.biblioteca.dto.CadastroLivroRequest;
 import br.com.pfc.biblioteca.dto.LivroDTO;
+import br.com.pfc.biblioteca.dto.MateriaDTO;
 import br.com.pfc.biblioteca.enums.Materia;
 import br.com.pfc.biblioteca.model.Livro;
 import br.com.pfc.biblioteca.service.LivroService;
@@ -40,6 +41,11 @@ public class LivroController {
     public ResponseEntity<Void> deletarLivro(@PathVariable Long id) {
         service.deletarLivro(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/materias")
+    public List<MateriaDTO> listarMaterias() {
+        return service.listarMaterias();
     }
 
     @GetMapping("/{materia}")

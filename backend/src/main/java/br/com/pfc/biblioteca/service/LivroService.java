@@ -3,12 +3,14 @@ package br.com.pfc.biblioteca.service;
 import br.com.pfc.biblioteca.dto.AtualizarLivroRequest;
 import br.com.pfc.biblioteca.dto.DadosLivro;
 import br.com.pfc.biblioteca.dto.LivroDTO;
+import br.com.pfc.biblioteca.dto.MateriaDTO;
 import br.com.pfc.biblioteca.enums.Materia;
 import br.com.pfc.biblioteca.model.Livro;
 import br.com.pfc.biblioteca.repository.LivroRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -79,6 +81,12 @@ public class LivroService {
             throw new RuntimeException("livro não encontrado");
         }
         repository.deleteById(id);
+    }
+
+    public List<MateriaDTO> listarMaterias() {
+        return Arrays.stream(Materia.values())
+                .map(m -> new MateriaDTO(m.name(), m.getMateriaLivro(), repository.countByMateria(m)))
+                .collect(Collectors.toList());
     }
 
     public List<LivroDTO> filtarPorMateria(Materia materia) {

@@ -9,6 +9,7 @@ import br.com.pfc.biblioteca.repository.LivroRepository;
 import br.com.pfc.biblioteca.repository.UsuarioRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -58,6 +59,7 @@ public class UsuarioService {
         }
         repository.deleteById(id);
     }
+    @Transactional
     public void adicionarFavorito(Long usuarioId, Long livroId){
         Usuario usuario = repository.findById(usuarioId)
                 .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
@@ -65,12 +67,18 @@ public class UsuarioService {
         Livro livro = livroRepository.findById(livroId)
                 .orElseThrow(() -> new RuntimeException("Livro não encontrado!"));
 
-        if (!usuario.getFavoritos().contains(livro)) {
+        // Livro nao sobrescreve equals/hashCode, entao contains() comparava por
+        // referencia e deixava o mesmo livro ser favoritado varias vezes.
+        boolean jaFavoritado = usuario.getFavoritos().stream()
+                .anyMatch(l -> l.getId().equals(livro.getId()));
+
+        if (!jaFavoritado) {
             usuario.getFavoritos().add(livro);
             repository.save(usuario);
         }
     }
 
+    @Transactional
     public void removerFavorito(Long usuarioId, Long livroId) {
         Usuario usuario = repository.findById(usuarioId)
                 .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));

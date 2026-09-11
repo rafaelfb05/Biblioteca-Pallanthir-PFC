@@ -13,5 +13,7 @@ public interface LivroRepository extends JpaRepository<Livro, Long> {
 
     List<Livro> findByMateria(Materia materia);
 
+    long countByMateria(Materia materia);
+
     Optional<Livro> findByTituloContainingIgnoreCase(String titulo);
 }

@@ -22,6 +22,7 @@ async function request(caminho, opcoes = {}) {
 
 export const livrosApi = {
   listar: () => request("/livros"),
+  listarMaterias: () => request("/livros/materias"),
   buscarPorTitulo: (titulo) => request(`/livros/titulo/${encodeURIComponent(titulo)}`),
   filtrarPorMateria: (materia) => request(`/livros/${encodeURIComponent(materia)}`),
   cadastrar: (titulo, materia) =>
