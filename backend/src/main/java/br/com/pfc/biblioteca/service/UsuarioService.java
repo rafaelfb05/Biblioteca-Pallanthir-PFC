@@ -67,8 +67,6 @@ public class UsuarioService {
         Livro livro = livroRepository.findById(livroId)
                 .orElseThrow(() -> new RuntimeException("Livro não encontrado!"));
 
-        // Livro nao sobrescreve equals/hashCode, entao contains() comparava por
-        // referencia e deixava o mesmo livro ser favoritado varias vezes.
         boolean jaFavoritado = usuario.getFavoritos().stream()
                 .anyMatch(l -> l.getId().equals(livro.getId()));
 
