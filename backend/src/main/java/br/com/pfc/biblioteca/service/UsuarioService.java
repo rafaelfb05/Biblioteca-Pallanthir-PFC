@@ -31,4 +31,25 @@ public class UsuarioService {
     public List<UsuarioDTO> obterUsuarios() {
         return converteDados(repository.findAll());
     }
+
+    public Usuario atualizarUsuario(Long id, UsuarioRequest request) {
+        Usuario usuario = repository.findById(id).orElse(null);
+        if(request.nome() != null){
+            usuario.setNome(request.nome());
+        }
+        if(request.email() != null){
+            usuario.setEmail(request.email());
+        }
+        if(request.senha() != null){
+            usuario.setSenha(request.senha());
+        }
+        return repository.save(usuario);
+    }
+
+    public void deletarUsuario(Long id) {
+        if(!repository.existsById(id)){
+            throw new RuntimeException("livro não encontrado");
+        }
+        repository.deleteById(id);
+    }
 }
