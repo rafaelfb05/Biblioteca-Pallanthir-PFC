@@ -1,5 +1,6 @@
 package br.com.pfc.biblioteca.controller;
 
+import br.com.pfc.biblioteca.dto.LivroDTO;
 import br.com.pfc.biblioteca.dto.UsuarioDTO;
 import br.com.pfc.biblioteca.dto.UsuarioRequest;
 import br.com.pfc.biblioteca.model.Usuario;
@@ -38,5 +39,21 @@ public class UsuarioController {
     public ResponseEntity<Void> deletarUsuario(@PathVariable Long id) {
         service.deletarUsuario(id);
         return ResponseEntity.noContent().build();
+    }
+    @PostMapping("/{usuarioId}/favoritar/{livroId}")
+    public ResponseEntity<Void> adicionarFavorito(@PathVariable Long usuarioId, @PathVariable Long livroId){
+        service.adicionarFavorito(usuarioId, livroId);
+        return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/{usuarioId}/favoritos")
+    public List<LivroDTO> listarFavoritos(@PathVariable Long usuarioId){
+        return service.listarFavoritos(usuarioId);
+    }
+
+    @DeleteMapping("/{usuarioId}/favoritar/{livroId}")
+    public ResponseEntity<Void> removerFavorito(@PathVariable Long usuarioId, @PathVariable Long livroId){
+        service.removerFavorito(usuarioId, livroId);
+        return ResponseEntity.ok().build();
     }
 }

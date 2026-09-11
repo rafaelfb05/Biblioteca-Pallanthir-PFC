@@ -1,8 +1,11 @@
 package br.com.pfc.biblioteca.service;
 
+import br.com.pfc.biblioteca.dto.LivroDTO;
 import br.com.pfc.biblioteca.dto.UsuarioDTO;
 import br.com.pfc.biblioteca.dto.UsuarioRequest;
+import br.com.pfc.biblioteca.model.Livro;
 import br.com.pfc.biblioteca.model.Usuario;
+import br.com.pfc.biblioteca.repository.LivroRepository;
 import br.com.pfc.biblioteca.repository.UsuarioRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -15,6 +18,8 @@ public class UsuarioService {
 
     @Autowired
     private UsuarioRepository repository;
+    @Autowired
+    private LivroRepository livroRepository;
 
     private List<UsuarioDTO> converteDados(List<Usuario> usuario){
         return usuario.stream()
@@ -52,5 +57,34 @@ public class UsuarioService {
             throw new RuntimeException("livro não encontrado");
         }
         repository.deleteById(id);
+    }
+    public void adicionarFavorito(Long usuarioId, Long livroId){
+        Usuario usuario = repository.findById(usuarioId)
+                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+
+        Livro livro = livroRepository.findById(livroId)
+                .orElseThrow(() -> new RuntimeException("Livro não encontrado!"));
+
+        if (!usuario.getFavoritos().contains(livro)) {
+            usuario.getFavoritos().add(livro);
+            repository.save(usuario);
+        }
+    }
+
+    public void removerFavorito(Long usuarioId, Long livroId) {
+        Usuario usuario = repository.findById(usuarioId)
+                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+        usuario.getFavoritos().removeIf(l -> l.getId().equals(livroId));
+        repository.save(usuario);
+
+    }
+
+    public List<LivroDTO> listarFavoritos(Long usuarioId) {
+        Usuario usuario = repository.findById(usuarioId)
+                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+
+        return usuario.getFavoritos().stream()
+                .map(LivroDTO::new)
+                .collect(Collectors.toList());
     }
 }

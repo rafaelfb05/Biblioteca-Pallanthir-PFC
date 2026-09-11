@@ -35,4 +35,4 @@ O sistema não oferece os livros digitalmente, apenas reservas e compras para bu
 - **Vercel** — Utilizada para hospedar e disponibilizar o front-end.
 - **Render** — Utilizado para hospedar o back-end desenvolvido em Java com Spring Boot.
 - **Supabase** — Utilizado para hospedar o banco de dados PostgreSQL.
- 
+
