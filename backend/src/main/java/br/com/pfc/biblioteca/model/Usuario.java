@@ -1,5 +1,6 @@
 package br.com.pfc.biblioteca.model;
 
+import br.com.pfc.biblioteca.dto.UsuarioRequest;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -25,10 +26,10 @@ public class Usuario {
 
     public Usuario(){}
 
-    public Usuario(String nome, String email, String senha){
-        this.nome=nome;
-        this.email=email;
-        this.senha=senha;
+    public Usuario(UsuarioRequest request){
+        this.nome= request.nome();
+        this.email= request.email();
+        this.senha= request.senha();
     }
 
     public Long getId() {
