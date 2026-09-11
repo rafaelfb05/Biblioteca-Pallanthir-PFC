@@ -14,7 +14,7 @@ public class OpenApiConfig {
     public OpenAPI pallanthirOpenAPI() {
         return new OpenAPI()
                 .info(new Info()
-                        .title("Biblioteca Pallanthir API")
+                        .title("Biblioteca Pallanthir")
                         .description("Back-end do sistema Pallanthir — biblioteca para estudantes, com avaliações, favoritos, reservas e compras.")
                         .version("0.0.1-SNAPSHOT")
                         .license(new License().name("MIT").url("https://opensource.org/licenses/MIT")))
