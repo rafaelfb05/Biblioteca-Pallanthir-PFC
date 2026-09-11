@@ -1,9 +1,7 @@
-/* eslint-disable jsx-a11y/anchor-is-valid */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import "./App.css";
 import { livrosApi, usuariosApi } from "./services/api";
 
-// Icone exibido em cada categoria, por nome da constante do enum Materia.
 const ICONES_MATERIA = {
   TI: "💻",
   DIREITO: "⚖️",
@@ -16,12 +14,16 @@ const ICONES_MATERIA = {
   BIOLOGIA: "🧬",
 };
 
-const FORM_LIVRO_VAZIO = { titulo: "", materia: "" };
+const FORM_LIVRO_VAZIO = { titulo: "", materia: "", preco: "" };
 const FORM_USUARIO_VAZIO = { nome: "", email: "", senha: "" };
 
+const formatarPreco = (valor) =>
+  Number(valor || 0).toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  });
+
 function App() {
-  // Acervo completo: e sempre a base dos destaques e do ranking, por isso a
-  // busca e o filtro por materia nao mexem nesta lista.
   const [livros, setLivros] = useState([]);
   const [materias, setMaterias] = useState([]);
   const [carregando, setCarregando] = useState(true);
@@ -29,7 +31,6 @@ function App() {
   const [aviso, setAviso] = useState(null);
 
   const [busca, setBusca] = useState("");
-  // filtro.tipo: "todos" | "busca" | "materia" | "favoritos"
   const [filtro, setFiltro] = useState({ tipo: "todos" });
   const [resultado, setResultado] = useState([]);
 
@@ -37,7 +38,8 @@ function App() {
   const [favoritos, setFavoritos] = useState([]);
   const [favoritoEmEdicao, setFavoritoEmEdicao] = useState(null);
 
-  const [livroSelecionado, setLivroSelecionado] = useState(null);
+  const [livroAbertoId, setLivroAbertoId] = useState(null);
+  const [formEdicao, setFormEdicao] = useState(null);
   const [formLivro, setFormLivro] = useState(FORM_LIVRO_VAZIO);
   const [mostrarCadastroLivro, setMostrarCadastroLivro] = useState(false);
   const [mostrarCadastroUsuario, setMostrarCadastroUsuario] = useState(false);
@@ -49,8 +51,6 @@ function App() {
     [favoritos]
   );
 
-  // O back-end serializa a materia pelo rotulo ("Veterinária"), mas as rotas e
-  // os formularios trabalham com o nome da constante ("VETERINARIA").
   const nomeDaMateria = useCallback(
     (rotulo) => {
       const encontrada = materias.find(
@@ -84,8 +84,6 @@ function App() {
     }
   }, []);
 
-  // Ainda nao existe tela de login, entao o primeiro usuario cadastrado e
-  // usado como usuario logado para os favoritos.
   const carregarUsuario = useCallback(async () => {
     try {
       const usuarios = await usuariosApi.listar();
@@ -115,13 +113,26 @@ function App() {
     setErro(null);
   };
 
+  const abrirLivro = (livro) => {
+    setLivroAbertoId(livro.id);
+    setFormEdicao({ ...livro });
+    setErro(null);
+    window.scrollTo({ top: 0 });
+  };
+
+  const voltarParaInicio = () => {
+    setLivroAbertoId(null);
+    setFormEdicao(null);
+    setErro(null);
+    window.scrollTo({ top: 0 });
+  };
+
   const alternarFavorito = async (livro) => {
     if (!usuarioId) {
       setErro("Cadastre um usuário para poder favoritar livros.");
       setMostrarCadastroUsuario(true);
       return;
     }
-    // Evita que um clique duplo dispare dois POST e favorite o mesmo livro duas vezes.
     if (favoritoEmEdicao === livro.id) {
       return;
     }
@@ -136,7 +147,6 @@ function App() {
         await usuariosApi.favoritar(usuarioId, livro.id);
       }
 
-      // Relê a lista no servidor para que a tela reflita exatamente o que foi gravado.
       setFavoritos(await usuariosApi.listarFavoritos(usuarioId));
     } catch (e) {
       setErro("Não foi possível atualizar os favoritos.");
@@ -172,6 +182,8 @@ function App() {
 
   const filtrarPorMateria = async (materia) => {
     try {
+      setLivroAbertoId(null);
+      setFormEdicao(null);
       setCarregando(true);
       setErro(null);
       setBusca("");
@@ -198,11 +210,12 @@ function App() {
       setErro(null);
       const livro = await livrosApi.cadastrar(
         formLivro.titulo.trim(),
-        formLivro.materia
+        formLivro.materia,
+        Number(String(formLivro.preco).replace(",", ".")) || 0
       );
       setFormLivro(FORM_LIVRO_VAZIO);
       setMostrarCadastroLivro(false);
-      setAviso(`"${livro.titulo}" foi cadastrado.`);
+      setAviso('"' + livro.titulo + '" foi cadastrado.');
       await Promise.all([carregarLivros(), carregarMaterias()]);
       limparFiltro();
     } catch (e) {
@@ -217,25 +230,27 @@ function App() {
 
   const atualizarLivro = async (evento) => {
     evento.preventDefault();
-    const livro = livroSelecionado;
 
     try {
       setSalvando(true);
       setErro(null);
-      const atualizado = await livrosApi.atualizar(livro.id, {
-        titulo: livro.titulo,
-        anoLancamento: livro.anoLancamento,
-        numeroPagina: Number(livro.numeroPagina) || 0,
-        materia: nomeDaMateria(livro.materia) || null,
-        avaliacao: Number(livro.avalliacao) || 0,
+      const atualizado = await livrosApi.atualizar(formEdicao.id, {
+        titulo: formEdicao.titulo,
+        anoLancamento: formEdicao.anoLancamento,
+        numeroPagina: Number(formEdicao.numeroPagina) || 0,
+        materia: nomeDaMateria(formEdicao.materia) || null,
+        preco: Number(String(formEdicao.preco).replace(",", ".")) || 0,
+        avaliacao: Number(formEdicao.avalliacao) || 0,
       });
-      setLivroSelecionado(null);
-      setAviso(`"${atualizado.titulo}" foi atualizado.`);
+      setAviso('"' + atualizado.titulo + '" foi atualizado.');
+      setFormEdicao({ ...atualizado });
+      setResultado((atual) =>
+        atual.map((item) => (item.id === atualizado.id ? atualizado : item))
+      );
       await Promise.all([carregarLivros(), carregarMaterias()]);
       if (usuarioId) {
         setFavoritos(await usuariosApi.listarFavoritos(usuarioId));
       }
-      limparFiltro();
     } catch (e) {
       setErro("Não foi possível atualizar o livro.");
       console.error(e);
@@ -245,7 +260,7 @@ function App() {
   };
 
   const deletarLivro = async (livro) => {
-    if (!window.confirm(`Remover "${livro.titulo}" do acervo?`)) {
+    if (!window.confirm('Remover "' + livro.titulo + '" do acervo?')) {
       return;
     }
 
@@ -253,8 +268,9 @@ function App() {
       setSalvando(true);
       setErro(null);
       await livrosApi.deletar(livro.id);
-      setLivroSelecionado(null);
-      setAviso(`"${livro.titulo}" foi removido do acervo.`);
+      setLivroAbertoId(null);
+      setFormEdicao(null);
+      setAviso('"' + livro.titulo + '" foi removido do acervo.');
       await Promise.all([carregarLivros(), carregarMaterias()]);
       if (usuarioId) {
         setFavoritos(await usuariosApi.listarFavoritos(usuarioId));
@@ -298,15 +314,14 @@ function App() {
     filtro.tipo === "favoritos"
       ? "Meus favoritos"
       : filtro.tipo === "busca"
-      ? `Resultado para "${filtro.termo}"`
+      ? 'Resultado para "' + filtro.termo + '"'
       : filtro.tipo === "materia"
-      ? `Livros de ${filtro.rotulo}`
+      ? "Livros de " + filtro.rotulo
       : "Livros em destaque";
 
   const rotuloDaLista =
     filtro.tipo === "todos" ? "RECOMENDADOS" : "RESULTADO DA BUSCA";
 
-  // O ranking usa sempre o acervo completo, nunca o resultado da busca.
   const maisAvaliados = useMemo(
     () =>
       [...livros]
@@ -322,45 +337,456 @@ function App() {
       ? "Nenhum livro cadastrado ainda."
       : "Nenhum livro encontrado para este filtro.";
 
-  return (
-    <div className="app">
-      {/* HEADER */}
-      <header className="header">
-        <div className="logo">Pallanthir</div>
-        <nav className="nav">
-          <button
-            type="button"
-            className={"nav-link" + (filtro.tipo === "todos" ? " active" : "")}
-            onClick={limparFiltro}
-          >
-            Início
-          </button>
-          <a href="#livros">Livros</a>
-          <a href="#categorias">Categorias</a>
-          <a href="#plano">Plano de estudos</a>
-          <button
-            type="button"
-            className={
-              "nav-link" + (filtro.tipo === "favoritos" ? " active" : "")
-            }
-            onClick={() =>
-              setFiltro((atual) =>
-                atual.tipo === "favoritos" ? { tipo: "todos" } : { tipo: "favoritos" }
-              )
-            }
-          >
-            Favoritos ♡ {favoritos.length > 0 && `(${favoritos.length})`}
-          </button>
-        </nav>
+  const livroAberto =
+    livroAbertoId === null
+      ? null
+      : [...livros, ...favoritos, ...resultado].find(
+          (livro) => livro.id === livroAbertoId
+        ) || formEdicao;
+
+  const abrirCadastroLivro = () => {
+    setLivroAbertoId(null);
+    setFormEdicao(null);
+    setErro(null);
+    setMostrarCadastroLivro(true);
+  };
+
+  const cabecalho = (
+    <header className="header">
+      <button type="button" className="logo" onClick={voltarParaInicio}>
+        Pallanthir
+      </button>
+      <nav className="nav">
         <button
+          type="button"
+          className={
+            "nav-link" +
+            (livroAbertoId === null && filtro.tipo === "todos" ? " active" : "")
+          }
+          onClick={() => {
+            voltarParaInicio();
+            limparFiltro();
+          }}
+        >
+          Início
+        </button>
+        <button
+          type="button"
+          className="nav-link"
+          onClick={() => {
+            voltarParaInicio();
+            document
+              .getElementById("livros")
+              ?.scrollIntoView({ behavior: "smooth" });
+          }}
+        >
+          Livros
+        </button>
+        <button
+          type="button"
+          className="nav-link"
+          onClick={() => {
+            voltarParaInicio();
+            document
+              .getElementById("categorias")
+              ?.scrollIntoView({ behavior: "smooth" });
+          }}
+        >
+          Categorias
+        </button>
+        <button
+          type="button"
+          className={
+            "nav-link" +
+            (livroAbertoId === null && filtro.tipo === "favoritos"
+              ? " active"
+              : "")
+          }
+          onClick={() => {
+            voltarParaInicio();
+            setFiltro((atual) =>
+              atual.tipo === "favoritos"
+                ? { tipo: "todos" }
+                : { tipo: "favoritos" }
+            );
+          }}
+        >
+          Favoritos ♡ {favoritos.length > 0 && "(" + favoritos.length + ")"}
+        </button>
+      </nav>
+      <div className="header-actions">
+        <button
+          type="button"
+          className="cadastro-button"
+          onClick={abrirCadastroLivro}
+        >
+          + Cadastrar livro
+        </button>
+        <button
+          type="button"
           className="login-button"
           onClick={() => setMostrarCadastroUsuario(true)}
         >
           {usuarioId ? "Minha conta" : "Entrar"}
         </button>
-      </header>
+      </div>
+    </header>
+  );
 
-      {/* HERO */}
+  const rodape = (
+    <footer className="footer">
+      <div className="footer-logo">Pallanthir</div>
+      <div>
+        <h4>Sobre</h4>
+        <button type="button" className="link-button">Nossa história</button>
+        <button type="button" className="link-button">Como funciona</button>
+      </div>
+      <div>
+        <h4>Categorias</h4>
+        {materias.slice(0, 3).map((materia) => (
+          <button
+            type="button"
+            className="link-button"
+            key={materia.nome}
+            onClick={() => filtrarPorMateria(materia)}
+          >
+            {materia.rotulo}
+          </button>
+        ))}
+      </div>
+      <div>
+        <h4>Ajuda</h4>
+        <button type="button" className="link-button">Perguntas frequentes</button>
+        <button type="button" className="link-button">Privacidade</button>
+      </div>
+      <div>
+        <h4>Contato</h4>
+        <button type="button" className="link-button">contato@pallanthir.com</button>
+        <button type="button" className="link-button">(11) 99999-9999</button>
+      </div>
+    </footer>
+  );
+
+  const modalCadastroLivro = mostrarCadastroLivro && (
+    <div className="modal" onClick={() => setMostrarCadastroLivro(false)}>
+      <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3>Cadastrar livro</h3>
+          <button type="button" onClick={() => setMostrarCadastroLivro(false)}>
+            ✕
+          </button>
+        </div>
+        <p className="modal-sub">
+          Os dados do livro são buscados pelo título na API de livros do Google.
+        </p>
+
+        <form className="modal-form" onSubmit={cadastrarLivro}>
+          <label>
+            Título
+            <input
+              type="text"
+              placeholder="Título do livro"
+              value={formLivro.titulo}
+              onChange={(e) =>
+                setFormLivro({ ...formLivro, titulo: e.target.value })
+              }
+            />
+          </label>
+          <label>
+            Matéria
+            <select
+              value={formLivro.materia}
+              onChange={(e) =>
+                setFormLivro({ ...formLivro, materia: e.target.value })
+              }
+            >
+              <option value="">Selecione a matéria</option>
+              {materias.map((materia) => (
+                <option key={materia.nome} value={materia.nome}>
+                  {materia.rotulo}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Preço
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="0.00"
+              value={formLivro.preco}
+              onChange={(e) =>
+                setFormLivro({ ...formLivro, preco: e.target.value })
+              }
+            />
+          </label>
+
+          {erro && <p className="erro">{erro}</p>}
+
+          <div className="modal-actions">
+            <button type="submit" disabled={salvando}>
+              {salvando ? "Salvando..." : "Cadastrar"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+
+  const modalCadastroUsuario = mostrarCadastroUsuario && (
+    <div className="modal" onClick={() => setMostrarCadastroUsuario(false)}>
+      <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3>{usuarioId ? "Nova conta" : "Criar conta"}</h3>
+          <button type="button" onClick={() => setMostrarCadastroUsuario(false)}>
+            ✕
+          </button>
+        </div>
+        <p className="modal-sub">
+          Os favoritos usam o primeiro usuário cadastrado enquanto não há tela
+          de login.
+        </p>
+
+        <form className="modal-form" onSubmit={cadastrarUsuario}>
+          <label>
+            Nome
+            <input
+              type="text"
+              required
+              value={formUsuario.nome}
+              onChange={(e) =>
+                setFormUsuario({ ...formUsuario, nome: e.target.value })
+              }
+            />
+          </label>
+          <label>
+            E-mail
+            <input
+              type="email"
+              required
+              value={formUsuario.email}
+              onChange={(e) =>
+                setFormUsuario({ ...formUsuario, email: e.target.value })
+              }
+            />
+          </label>
+          <label>
+            Senha
+            <input
+              type="password"
+              required
+              value={formUsuario.senha}
+              onChange={(e) =>
+                setFormUsuario({ ...formUsuario, senha: e.target.value })
+              }
+            />
+          </label>
+
+          <div className="modal-actions">
+            <button type="submit" disabled={salvando}>
+              {salvando ? "Salvando..." : "Cadastrar"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+
+  if (livroAberto && formEdicao) {
+    const favoritado = idsFavoritos.has(livroAberto.id);
+
+    return (
+      <div className="app">
+        {cabecalho}
+
+        <section className="pagina-livro">
+          <button type="button" className="voltar" onClick={voltarParaInicio}>
+            ← Voltar para o acervo
+          </button>
+
+          {aviso && (
+            <p className="aviso" onAnimationEnd={() => setAviso(null)}>
+              {aviso}
+            </p>
+          )}
+          {erro && <p className="erro">{erro}</p>}
+
+          <div className="livro-topo">
+            <div className="livro-capa">
+              {livroAberto.capaUrl ? (
+                <img
+                  src={livroAberto.capaUrl}
+                  alt={"Capa de " + livroAberto.titulo}
+                />
+              ) : (
+                <span>📘</span>
+              )}
+            </div>
+
+            <div className="livro-dados">
+              <span className="book-category">
+                {livroAberto.materia || "Sem matéria"}
+              </span>
+              <h1>{livroAberto.titulo}</h1>
+              <p className="livro-autores">
+                {(livroAberto.autores || []).join(", ") || "Autor desconhecido"}
+              </p>
+
+              <div className="livro-atributos">
+                <div>
+                  <small>Ano de lançamento</small>
+                  <strong>{livroAberto.anoLancamento || "—"}</strong>
+                </div>
+                <div>
+                  <small>Páginas</small>
+                  <strong>{livroAberto.numeroPagina || 0}</strong>
+                </div>
+                <div>
+                  <small>Matéria</small>
+                  <strong>{livroAberto.materia || "Sem matéria"}</strong>
+                </div>
+                <div>
+                  <small>Preço</small>
+                  <strong>{formatarPreco(livroAberto.preco)}</strong>
+                </div>
+                <div>
+                  <small>Avaliação</small>
+                  <strong>
+                    ★ {Number(livroAberto.avalliacao || 0).toFixed(1)}
+                  </strong>
+                </div>
+                <div>
+                  <small>Código</small>
+                  <strong>#{livroAberto.id}</strong>
+                </div>
+              </div>
+
+              <div className="livro-acoes">
+                <button
+                  type="button"
+                  className={"favoritar-button" + (favoritado ? " ativo" : "")}
+                  onClick={() => alternarFavorito(livroAberto)}
+                  disabled={favoritoEmEdicao === livroAberto.id}
+                >
+                  {favoritado ? "♥ Remover dos favoritos" : "♡ Favoritar"}
+                </button>
+                <button
+                  type="button"
+                  className="perigo"
+                  onClick={() => deletarLivro(livroAberto)}
+                  disabled={salvando}
+                >
+                  Excluir livro
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="livro-edicao">
+            <span className="section-label">EDITAR</span>
+            <h2>Atualizar informações</h2>
+
+            <form className="modal-form" onSubmit={atualizarLivro}>
+              <label>
+                Título
+                <input
+                  type="text"
+                  value={formEdicao.titulo || ""}
+                  onChange={(e) =>
+                    setFormEdicao({ ...formEdicao, titulo: e.target.value })
+                  }
+                />
+              </label>
+              <label>
+                Matéria
+                <select
+                  value={nomeDaMateria(formEdicao.materia)}
+                  onChange={(e) =>
+                    setFormEdicao({ ...formEdicao, materia: e.target.value })
+                  }
+                >
+                  <option value="">Sem matéria</option>
+                  {materias.map((materia) => (
+                    <option key={materia.nome} value={materia.nome}>
+                      {materia.rotulo}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Ano de lançamento
+                <input
+                  type="text"
+                  value={formEdicao.anoLancamento || ""}
+                  onChange={(e) =>
+                    setFormEdicao({
+                      ...formEdicao,
+                      anoLancamento: e.target.value,
+                    })
+                  }
+                />
+              </label>
+              <label>
+                Páginas
+                <input
+                  type="number"
+                  min="0"
+                  value={formEdicao.numeroPagina || 0}
+                  onChange={(e) =>
+                    setFormEdicao({
+                      ...formEdicao,
+                      numeroPagina: e.target.value,
+                    })
+                  }
+                />
+              </label>
+              <label>
+                Preço
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formEdicao.preco || 0}
+                  onChange={(e) =>
+                    setFormEdicao({ ...formEdicao, preco: e.target.value })
+                  }
+                />
+              </label>
+              <label>
+                Avaliação
+                <input
+                  type="number"
+                  min="0"
+                  max="5"
+                  step="0.1"
+                  value={formEdicao.avalliacao || 0}
+                  onChange={(e) =>
+                    setFormEdicao({ ...formEdicao, avalliacao: e.target.value })
+                  }
+                />
+              </label>
+
+              <div className="modal-actions">
+                <button type="submit" disabled={salvando}>
+                  {salvando ? "Salvando..." : "Atualizar livro"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </section>
+
+        {rodape}
+        {modalCadastroLivro}
+        {modalCadastroUsuario}
+      </div>
+    );
+  }
+
+  return (
+    <div className="app">
+      {cabecalho}
+
       <section className="hero">
         <div className="hero-content">
           <div className="hero-tag">
@@ -376,7 +802,6 @@ function App() {
             para transformar seus estudos.
           </p>
 
-          {/* PESQUISA */}
           <form className="search" onSubmit={pesquisar}>
             <span className="search-icon">🔎</span>
             <input
@@ -390,7 +815,6 @@ function App() {
         </div>
       </section>
 
-      {/* CATEGORIAS */}
       <section className="section" id="categorias">
         <div className="section-header">
           <div>
@@ -429,7 +853,6 @@ function App() {
         </div>
       </section>
 
-      {/* LIVROS */}
       <section className="section" id="livros">
         <div className="section-header">
           <div>
@@ -439,8 +862,8 @@ function App() {
           <div className="section-actions">
             <button
               type="button"
-              className="link-button"
-              onClick={() => setMostrarCadastroLivro((atual) => !atual)}
+              className="cadastro-button"
+              onClick={abrirCadastroLivro}
             >
               + Cadastrar livro
             </button>
@@ -462,35 +885,6 @@ function App() {
           </p>
         )}
 
-        {mostrarCadastroLivro && (
-          <form className="painel-form" onSubmit={cadastrarLivro}>
-            <input
-              type="text"
-              placeholder="Título do livro"
-              value={formLivro.titulo}
-              onChange={(e) =>
-                setFormLivro({ ...formLivro, titulo: e.target.value })
-              }
-            />
-            <select
-              value={formLivro.materia}
-              onChange={(e) =>
-                setFormLivro({ ...formLivro, materia: e.target.value })
-              }
-            >
-              <option value="">Selecione a matéria</option>
-              {materias.map((materia) => (
-                <option key={materia.nome} value={materia.nome}>
-                  {materia.rotulo}
-                </option>
-              ))}
-            </select>
-            <button type="submit" disabled={salvando}>
-              {salvando ? "Salvando..." : "Cadastrar"}
-            </button>
-          </form>
-        )}
-
         <div className="main-content">
           <div className="books">
             {carregando && <p>Carregando livros...</p>}
@@ -501,7 +895,18 @@ function App() {
 
             {!carregando &&
               livrosExibidos.map((livro) => (
-                <div className="book-card" key={livro.id}>
+                <div
+                  className="book-card"
+                  key={livro.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => abrirLivro(livro)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      abrirLivro(livro);
+                    }
+                  }}
+                >
                   <div className="book-cover">
                     {livro.capaUrl ? (
                       <img src={livro.capaUrl} alt={"Capa de " + livro.titulo} />
@@ -513,7 +918,10 @@ function App() {
                       className={
                         "favorite" + (idsFavoritos.has(livro.id) ? " ativo" : "")
                       }
-                      onClick={() => alternarFavorito(livro)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        alternarFavorito(livro);
+                      }}
                       disabled={favoritoEmEdicao === livro.id}
                       aria-label={
                         idsFavoritos.has(livro.id)
@@ -533,10 +941,13 @@ function App() {
                       <small> {Number(livro.avalliacao || 0).toFixed(1)}</small>
                     </div>
                     <div className="book-footer">
-                      <strong>{livro.numeroPagina} páginas</strong>
+                      <strong>{formatarPreco(livro.preco)}</strong>
                       <button
                         type="button"
-                        onClick={() => setLivroSelecionado({ ...livro })}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          abrirLivro(livro);
+                        }}
                       >
                         Ver detalhes
                       </button>
@@ -546,7 +957,6 @@ function App() {
               ))}
           </div>
 
-          {/* MAIS BEM AVALIADOS */}
           <aside className="bestsellers">
             <div className="best-title">
               <span>♛</span>
@@ -559,7 +969,12 @@ function App() {
                 <p className="best-subtitle">Nenhum livro no acervo ainda.</p>
               )}
               {maisAvaliados.map((livro, indice) => (
-                <div className="rank" key={livro.id}>
+                <button
+                  type="button"
+                  className="rank"
+                  key={livro.id}
+                  onClick={() => abrirLivro(livro)}
+                >
                   <span className="number">
                     {String(indice + 1).padStart(2, "0")}
                   </span>
@@ -569,7 +984,7 @@ function App() {
                       nota {Number(livro.avalliacao || 0).toFixed(1)}
                     </small>
                   </div>
-                </div>
+                </button>
               ))}
             </div>
 
@@ -592,230 +1007,9 @@ function App() {
         </div>
       </section>
 
-      {/* PLANO DE ESTUDOS */}
-      <section className="study-section" id="plano">
-        <div className="study-text">
-          <span className="section-label">PLANO DE ESTUDOS</span>
-          <h2>
-            Transforme sua leitura
-            <strong> em conhecimento.</strong>
-          </h2>
-          <p>
-            Crie um plano de estudos personalizado e receba sugestões de livros
-            de acordo com seus objetivos.
-          </p>
-          <button
-            type="button"
-            onClick={() => {
-              setMostrarCadastroLivro(true);
-              document
-                .getElementById("livros")
-                ?.scrollIntoView({ behavior: "smooth" });
-            }}
-          >
-            Criar meu plano →
-          </button>
-        </div>
-
-        <div className="study-books">
-          📕
-          <span>📗</span>
-          <span>📘</span>
-        </div>
-      </section>
-
-      {/* FOOTER */}
-      <footer className="footer">
-        <div className="footer-logo">Pallanthir</div>
-        <div>
-          <h4>Sobre</h4>
-          <a href="#">Nossa história</a>
-          <a href="#">Como funciona</a>
-        </div>
-        <div>
-          <h4>Categorias</h4>
-          {materias.slice(0, 3).map((materia) => (
-            <button
-              type="button"
-              className="link-button"
-              key={materia.nome}
-              onClick={() => filtrarPorMateria(materia)}
-            >
-              {materia.rotulo}
-            </button>
-          ))}
-        </div>
-        <div>
-          <h4>Ajuda</h4>
-          <a href="#">Perguntas frequentes</a>
-          <a href="#">Privacidade</a>
-        </div>
-        <div>
-          <h4>Contato</h4>
-          <a href="#">contato@pallanthir.com</a>
-          <a href="#">(11) 99999-9999</a>
-        </div>
-      </footer>
-
-      {/* DETALHES / EDICAO DO LIVRO */}
-      {livroSelecionado && (
-        <div className="modal" onClick={() => setLivroSelecionado(null)}>
-          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>{livroSelecionado.titulo}</h3>
-              <button type="button" onClick={() => setLivroSelecionado(null)}>
-                ✕
-              </button>
-            </div>
-            <p className="modal-sub">
-              {(livroSelecionado.autores || []).join(", ")} ·{" "}
-              {livroSelecionado.anoLancamento}
-            </p>
-
-            <form className="modal-form" onSubmit={atualizarLivro}>
-              <label>
-                Título
-                <input
-                  type="text"
-                  value={livroSelecionado.titulo || ""}
-                  onChange={(e) =>
-                    setLivroSelecionado({
-                      ...livroSelecionado,
-                      titulo: e.target.value,
-                    })
-                  }
-                />
-              </label>
-              <label>
-                Matéria
-                <select
-                  value={nomeDaMateria(livroSelecionado.materia)}
-                  onChange={(e) =>
-                    setLivroSelecionado({
-                      ...livroSelecionado,
-                      materia: e.target.value,
-                    })
-                  }
-                >
-                  <option value="">Sem matéria</option>
-                  {materias.map((materia) => (
-                    <option key={materia.nome} value={materia.nome}>
-                      {materia.rotulo}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Páginas
-                <input
-                  type="number"
-                  min="0"
-                  value={livroSelecionado.numeroPagina || 0}
-                  onChange={(e) =>
-                    setLivroSelecionado({
-                      ...livroSelecionado,
-                      numeroPagina: e.target.value,
-                    })
-                  }
-                />
-              </label>
-              <label>
-                Avaliação
-                <input
-                  type="number"
-                  min="0"
-                  max="5"
-                  step="0.1"
-                  value={livroSelecionado.avalliacao || 0}
-                  onChange={(e) =>
-                    setLivroSelecionado({
-                      ...livroSelecionado,
-                      avalliacao: e.target.value,
-                    })
-                  }
-                />
-              </label>
-
-              <div className="modal-actions">
-                <button
-                  type="button"
-                  className="perigo"
-                  onClick={() => deletarLivro(livroSelecionado)}
-                  disabled={salvando}
-                >
-                  Excluir
-                </button>
-                <button type="submit" disabled={salvando}>
-                  {salvando ? "Salvando..." : "Salvar alterações"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* CADASTRO DE USUARIO */}
-      {mostrarCadastroUsuario && (
-        <div className="modal" onClick={() => setMostrarCadastroUsuario(false)}>
-          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>{usuarioId ? "Nova conta" : "Criar conta"}</h3>
-              <button
-                type="button"
-                onClick={() => setMostrarCadastroUsuario(false)}
-              >
-                ✕
-              </button>
-            </div>
-            <p className="modal-sub">
-              Os favoritos usam o primeiro usuário cadastrado enquanto não há
-              tela de login.
-            </p>
-
-            <form className="modal-form" onSubmit={cadastrarUsuario}>
-              <label>
-                Nome
-                <input
-                  type="text"
-                  required
-                  value={formUsuario.nome}
-                  onChange={(e) =>
-                    setFormUsuario({ ...formUsuario, nome: e.target.value })
-                  }
-                />
-              </label>
-              <label>
-                E-mail
-                <input
-                  type="email"
-                  required
-                  value={formUsuario.email}
-                  onChange={(e) =>
-                    setFormUsuario({ ...formUsuario, email: e.target.value })
-                  }
-                />
-              </label>
-              <label>
-                Senha
-                <input
-                  type="password"
-                  required
-                  value={formUsuario.senha}
-                  onChange={(e) =>
-                    setFormUsuario({ ...formUsuario, senha: e.target.value })
-                  }
-                />
-              </label>
-
-              <div className="modal-actions">
-                <button type="submit" disabled={salvando}>
-                  {salvando ? "Salvando..." : "Cadastrar"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {rodape}
+      {modalCadastroLivro}
+      {modalCadastroUsuario}
     </div>
   );
 }

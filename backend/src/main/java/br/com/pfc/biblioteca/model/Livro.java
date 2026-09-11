@@ -20,7 +20,7 @@ public class Livro {
     private String capaUrl;
     @Enumerated(EnumType.STRING)
     private Materia materia;
-    private double preco;
+    private Double preco = 0.0;
     private double avaliacao;
 
     public Livro(){}
@@ -107,11 +107,11 @@ public class Livro {
     }
 
     public double getPreco() {
-        return preco;
+        return preco == null ? 0.0 : preco;
     }
 
-    public void setPreco(double preco) {
-        this.preco = preco;
+    public void setPreco(Double preco) {
+        this.preco = preco == null ? 0.0 : preco;
     }
 
     @Override

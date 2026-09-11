@@ -1,6 +1,6 @@
-// URL do back-end. Em desenvolvimento vem do .env.development (localhost:8080)
-// e na Vercel vem da variavel de ambiente REACT_APP_API_URL.
-const API_URL = (process.env.REACT_APP_API_URL || "http://localhost:8080").replace(/\/$/, "");
+const API_URL = (
+  process.env.REACT_APP_API_URL || "http://localhost:8080"
+).replace(/\/$/, "");
 
 async function request(caminho, opcoes = {}) {
   const resposta = await fetch(`${API_URL}${caminho}`, {
@@ -12,23 +12,25 @@ async function request(caminho, opcoes = {}) {
     throw new Error(`Erro ${resposta.status} ao chamar ${caminho}`);
   }
 
-  // DELETE responde 204 sem corpo
   if (resposta.status === 204) {
     return null;
   }
 
-  return resposta.json();
+  const texto = await resposta.text();
+  return texto ? JSON.parse(texto) : null;
 }
 
 export const livrosApi = {
   listar: () => request("/livros"),
   listarMaterias: () => request("/livros/materias"),
-  buscarPorTitulo: (titulo) => request(`/livros/titulo/${encodeURIComponent(titulo)}`),
-  filtrarPorMateria: (materia) => request(`/livros/${encodeURIComponent(materia)}`),
-  cadastrar: (titulo, materia) =>
+  buscarPorTitulo: (titulo) =>
+    request(`/livros/titulo/${encodeURIComponent(titulo)}`),
+  filtrarPorMateria: (materia) =>
+    request(`/livros/${encodeURIComponent(materia)}`),
+  cadastrar: (titulo, materia, preco) =>
     request("/livros/cadastro", {
       method: "POST",
-      body: JSON.stringify({ titulo, materia }),
+      body: JSON.stringify({ titulo, materia, preco }),
     }),
   atualizar: (id, dados) =>
     request(`/livros/atualizar/${id}`, {
