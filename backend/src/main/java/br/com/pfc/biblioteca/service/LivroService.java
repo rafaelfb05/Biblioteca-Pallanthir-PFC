@@ -5,10 +5,16 @@ import br.com.pfc.biblioteca.dto.DadosLivro;
 import br.com.pfc.biblioteca.dto.LivroDTO;
 import br.com.pfc.biblioteca.dto.MateriaDTO;
 import br.com.pfc.biblioteca.enums.Materia;
+import br.com.pfc.biblioteca.enums.StatusReserva;
 import br.com.pfc.biblioteca.model.Livro;
 import br.com.pfc.biblioteca.repository.LivroRepository;
+import br.com.pfc.biblioteca.repository.ReservaRepository;
+import br.com.pfc.biblioteca.repository.UsuarioRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Arrays;
 import java.util.List;
@@ -20,6 +26,10 @@ public class LivroService {
 
     @Autowired
     private LivroRepository repository;
+    @Autowired
+    private ReservaRepository reservaRepository;
+    @Autowired
+    private UsuarioRepository usuarioRepository;
     private ConsumoApi consumo = new ConsumoApi();
     private ConverteDados conversor = new ConverteDados();
     private final String ENDERECO = "https://www.googleapis.com/books/v1/volumes?q=";
@@ -85,11 +95,24 @@ public class LivroService {
         return repository.save(livro);
     }
 
-    public void deletarLivro(Long id) {
-        if (!repository.existsById(id)) {
-            throw new RuntimeException("livro não encontrado");
+    @Transactional
+    public void deletarLivro(Long id, boolean confirmado) {
+        Livro livro = repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Livro não encontrado"));
+
+        if (!confirmado && reservaRepository.existsByLivroIdAndStatus(id, StatusReserva.RESERVADO)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Este livro possui reservas em aberto.");
         }
-        repository.deleteById(id);
+
+        usuarioRepository.buscarPorLivroFavoritado(id).forEach(usuario -> {
+            usuario.getFavoritos().removeIf(favorito -> favorito.getId().equals(id));
+            usuarioRepository.save(usuario);
+        });
+
+        reservaRepository.deleteAll(reservaRepository.findByLivroId(id));
+
+        repository.delete(livro);
     }
 
     public List<MateriaDTO> listarMaterias() {

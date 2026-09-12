@@ -9,7 +9,21 @@ async function request(caminho, opcoes = {}) {
   });
 
   if (!resposta.ok) {
-    throw new Error(`Erro ${resposta.status} ao chamar ${caminho}`);
+    const corpo = await resposta.text();
+    let mensagem = `Erro ${resposta.status} ao chamar ${caminho}`;
+    try {
+      const dados = JSON.parse(corpo);
+      if (dados && dados.message) {
+        mensagem = dados.message;
+      }
+    } catch (e) {
+      if (corpo) {
+        mensagem = corpo;
+      }
+    }
+    const erro = new Error(mensagem);
+    erro.status = resposta.status;
+    throw erro;
   }
 
   if (resposta.status === 204) {
@@ -37,7 +51,10 @@ export const livrosApi = {
       method: "PUT",
       body: JSON.stringify(dados),
     }),
-  deletar: (id) => request(`/livros/deletar/${id}`, { method: "DELETE" }),
+  deletar: (id, confirmado) =>
+    request(`/livros/deletar/${id}?confirmado=${confirmado ? "true" : "false"}`, {
+      method: "DELETE",
+    }),
 };
 
 export const usuariosApi = {

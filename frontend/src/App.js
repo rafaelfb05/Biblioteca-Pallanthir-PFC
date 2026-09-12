@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 import { livrosApi, reservasApi, usuariosApi } from "./services/api";
 
@@ -50,6 +50,199 @@ const formatarData = (valor) => {
   });
 };
 
+const ZOOM_CAPA_CARTAO = 2;
+const ZOOM_CAPA_PAGINA = 3;
+const ZOOM_CAPA_AMPLIADA = 0;
+const ESCALA_MINIMA = 1;
+const ESCALA_MAXIMA = 5;
+const PASSO_DA_ESCALA = 0.25;
+
+const capaNaResolucao = (url, zoom) => {
+  if (!url) {
+    return url;
+  }
+  try {
+    const endereco = new URL(url.replace(/^http:/, "https:"));
+    if (!endereco.searchParams.has("zoom")) {
+      return endereco.toString();
+    }
+    endereco.searchParams.set("zoom", String(zoom));
+    endereco.searchParams.delete("edge");
+    return endereco.toString();
+  } catch (e) {
+    return url;
+  }
+};
+
+const limitarEscala = (valor) =>
+  Math.min(
+    ESCALA_MAXIMA,
+    Math.max(ESCALA_MINIMA, Math.round(valor * 100) / 100)
+  );
+
+function VisualizadorDeCapa({ capaUrl, titulo, aoFechar }) {
+  const [escala, setEscala] = useState(1);
+  const [posicao, setPosicao] = useState({ x: 0, y: 0 });
+  const [fonte, setFonte] = useState(
+    capaNaResolucao(capaUrl, ZOOM_CAPA_AMPLIADA)
+  );
+  const arraste = useRef(null);
+
+  const restaurar = useCallback(() => {
+    setEscala(ESCALA_MINIMA);
+    setPosicao({ x: 0, y: 0 });
+  }, []);
+
+  const ajustarEscala = useCallback((passo) => {
+    setEscala((atual) => {
+      const proxima = limitarEscala(atual + passo);
+      if (proxima === ESCALA_MINIMA) {
+        setPosicao({ x: 0, y: 0 });
+      }
+      return proxima;
+    });
+  }, []);
+
+  useEffect(() => {
+    const aoTeclar = (evento) => {
+      if (evento.key === "Escape") {
+        aoFechar();
+      }
+      if (evento.key === "+" || evento.key === "=") {
+        ajustarEscala(PASSO_DA_ESCALA);
+      }
+      if (evento.key === "-" || evento.key === "_") {
+        ajustarEscala(-PASSO_DA_ESCALA);
+      }
+      if (evento.key === "0") {
+        restaurar();
+      }
+    };
+    window.addEventListener("keydown", aoTeclar);
+    const overflowAnterior = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", aoTeclar);
+      document.body.style.overflow = overflowAnterior;
+    };
+  }, [aoFechar, ajustarEscala, restaurar]);
+
+  const iniciarArraste = (evento) => {
+    if (escala === ESCALA_MINIMA) {
+      return;
+    }
+    evento.preventDefault();
+    arraste.current = {
+      x: evento.clientX - posicao.x,
+      y: evento.clientY - posicao.y,
+    };
+  };
+
+  const moverArraste = (evento) => {
+    if (!arraste.current) {
+      return;
+    }
+    setPosicao({
+      x: evento.clientX - arraste.current.x,
+      y: evento.clientY - arraste.current.y,
+    });
+  };
+
+  const encerrarArraste = () => {
+    arraste.current = null;
+  };
+
+  const aoGirarRoda = (evento) => {
+    ajustarEscala(evento.deltaY < 0 ? PASSO_DA_ESCALA : -PASSO_DA_ESCALA);
+  };
+
+  const aoClicarNoFundo = (evento) => {
+    if (evento.target === evento.currentTarget) {
+      aoFechar();
+    }
+  };
+
+  return (
+    <div
+      className="visualizador-capa"
+      role="dialog"
+      aria-label={"Capa de " + titulo}
+      onMouseDown={aoClicarNoFundo}
+      onMouseMove={moverArraste}
+      onMouseUp={encerrarArraste}
+      onMouseLeave={encerrarArraste}
+      onWheel={aoGirarRoda}
+    >
+      <div className="visualizador-barra">
+        <span className="visualizador-titulo">{titulo}</span>
+        <div className="visualizador-controles">
+          <button
+            type="button"
+            onClick={() => ajustarEscala(-PASSO_DA_ESCALA)}
+            disabled={escala <= ESCALA_MINIMA}
+            aria-label="Diminuir zoom"
+          >
+            −
+          </button>
+          <span className="visualizador-escala">
+            {Math.round(escala * 100)}%
+          </span>
+          <button
+            type="button"
+            onClick={() => ajustarEscala(PASSO_DA_ESCALA)}
+            disabled={escala >= ESCALA_MAXIMA}
+            aria-label="Aumentar zoom"
+          >
+            +
+          </button>
+          <button type="button" onClick={restaurar} aria-label="Restaurar zoom">
+            ⟳
+          </button>
+          <button
+            type="button"
+            className="visualizador-fechar"
+            onClick={aoFechar}
+            aria-label="Fechar"
+          >
+            ✕
+          </button>
+        </div>
+      </div>
+
+      <div className="visualizador-palco">
+        <img
+          className={
+            "visualizador-imagem" + (escala > ESCALA_MINIMA ? " movel" : "")
+          }
+          src={fonte}
+          alt={"Capa de " + titulo}
+          draggable="false"
+          onMouseDown={iniciarArraste}
+          onDoubleClick={() =>
+            escala > ESCALA_MINIMA ? restaurar() : ajustarEscala(1)
+          }
+          onError={() => setFonte(capaNaResolucao(capaUrl, ZOOM_CAPA_PAGINA))}
+          style={{
+            transform:
+              "translate(" +
+              posicao.x +
+              "px, " +
+              posicao.y +
+              "px) scale(" +
+              escala +
+              ")",
+          }}
+        />
+      </div>
+
+      <p className="visualizador-dica">
+        Role a roda do mouse ou use os botões para ampliar, arraste para mover
+        e pressione Esc para fechar.
+      </p>
+    </div>
+  );
+}
+
 const formatarPreco = (valor) =>
   Number(valor || 0).toLocaleString("pt-BR", {
     style: "currency",
@@ -75,6 +268,7 @@ function App() {
   const [reservaEmEdicao, setReservaEmEdicao] = useState(null);
 
   const [livroAbertoId, setLivroAbertoId] = useState(null);
+  const [capaAmpliada, setCapaAmpliada] = useState(null);
   const [formEdicao, setFormEdicao] = useState(null);
   const [formLivro, setFormLivro] = useState(FORM_LIVRO_VAZIO);
   const [mostrarCadastroLivro, setMostrarCadastroLivro] = useState(false);
@@ -491,17 +685,39 @@ function App() {
     try {
       setSalvando(true);
       setErro(null);
-      await livrosApi.deletar(livro.id);
+
+      try {
+        await livrosApi.deletar(livro.id, false);
+      } catch (conflito) {
+        if (conflito.status !== 409) {
+          throw conflito;
+        }
+        const seguir = window.confirm(
+          'O livro "' +
+            livro.titulo +
+            '" está reservado neste momento. Excluir agora também apaga as reservas ' +
+            "dele. Tem certeza de que deseja continuar?"
+        );
+        if (!seguir) {
+          return;
+        }
+        await livrosApi.deletar(livro.id, true);
+      }
+
       setLivroAbertoId(null);
       setFormEdicao(null);
+      setCapaAmpliada(null);
       setAviso('"' + livro.titulo + '" foi removido do acervo.');
       await Promise.all([carregarLivros(), carregarMaterias()]);
       if (usuarioId) {
-        setFavoritos(await usuariosApi.listarFavoritos(usuarioId));
+        await Promise.all([
+          carregarFavoritos(usuarioId),
+          carregarReservas(usuarioId),
+        ]);
       }
       limparFiltro();
     } catch (e) {
-      setErro("Não foi possível remover o livro.");
+      setErro(e.message || "Não foi possível remover o livro.");
       console.error(e);
     } finally {
       setSalvando(false);
@@ -586,7 +802,11 @@ function App() {
     >
       <div className="book-cover">
         {livro.capaUrl ? (
-          <img src={livro.capaUrl} alt={"Capa de " + livro.titulo} />
+          <img
+            src={capaNaResolucao(livro.capaUrl, ZOOM_CAPA_CARTAO)}
+            alt={"Capa de " + livro.titulo}
+            loading="lazy"
+          />
         ) : (
           <span>📘</span>
         )}
@@ -1123,10 +1343,23 @@ function App() {
           <div className="livro-topo">
             <div className="livro-capa">
               {livroAberto.capaUrl ? (
-                <img
-                  src={livroAberto.capaUrl}
-                  alt={"Capa de " + livroAberto.titulo}
-                />
+                <button
+                  type="button"
+                  className="capa-ampliar"
+                  onClick={() =>
+                    setCapaAmpliada({
+                      capaUrl: livroAberto.capaUrl,
+                      titulo: livroAberto.titulo,
+                    })
+                  }
+                  aria-label={"Ampliar a capa de " + livroAberto.titulo}
+                >
+                  <img
+                    src={capaNaResolucao(livroAberto.capaUrl, ZOOM_CAPA_PAGINA)}
+                    alt={"Capa de " + livroAberto.titulo}
+                  />
+                  <span className="capa-lupa">🔍 Ampliar</span>
+                </button>
               ) : (
                 <span>📘</span>
               )}
@@ -1324,6 +1557,14 @@ function App() {
             </form>
           </div>
         </section>
+
+        {capaAmpliada && (
+          <VisualizadorDeCapa
+            capaUrl={capaAmpliada.capaUrl}
+            titulo={capaAmpliada.titulo}
+            aoFechar={() => setCapaAmpliada(null)}
+          />
+        )}
 
         {modalCadastroLivro}
         {modalAutenticacao}
