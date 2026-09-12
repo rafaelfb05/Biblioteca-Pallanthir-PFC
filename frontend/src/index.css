@@ -78,6 +78,18 @@ a {
   background: #e51d2a;
 }
 
+.sessao {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sessao-nome {
+  color: #b8b8c0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
 .hero {
   min-height: 480px;
   display: flex;
@@ -335,20 +347,6 @@ a {
   font-size: 15px;
 }
 
-.book-footer button {
-  padding: 8px 12px;
-  border: 1px solid #39393f;
-  border-radius: 5px;
-  background: transparent;
-  color: white;
-  font-size: 11px;
-}
-
-.book-footer button:hover {
-  background: #e51d2a;
-  border-color: #e51d2a;
-}
-
 .bestsellers {
   align-self: start;
   padding: 25px;
@@ -421,37 +419,6 @@ a {
   font-size: 12px;
 }
 
-.footer {
-  display: grid;
-  grid-template-columns: 2fr repeat(4, 1fr);
-  gap: 40px;
-  padding: 55px 7%;
-  border-top: 1px solid #242429;
-  background: #0c0c0f;
-}
-
-.footer-logo {
-  color: #e51d2a;
-  font-size: 24px;
-  font-weight: 800;
-}
-
-.footer h4 {
-  margin-bottom: 15px;
-  font-size: 13px;
-}
-
-.footer a {
-  display: block;
-  margin-bottom: 9px;
-  color: #6f6f77;
-  font-size: 12px;
-}
-
-.footer a:hover {
-  color: #e51d2a;
-}
-
 @media (max-width: 1000px) {
   .nav {
     display: none;
@@ -466,10 +433,6 @@ a {
   }
 
   .books {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  .footer {
     grid-template-columns: repeat(2, 1fr);
   }
 }
@@ -505,10 +468,5 @@ a {
 
   .books {
     grid-template-columns: 1fr;
-  }
-
-  .footer {
-    grid-template-columns: 1fr 1fr;
-    padding: 40px 5%;
   }
 }

@@ -430,16 +430,34 @@
   cursor: wait;
 }
 
-.footer .link-button {
-  display: block;
-  margin-bottom: 9px;
-  color: #6f6f77;
-  font-size: 12px;
-  text-align: left;
+.abas-autenticacao {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 4px;
+  border-radius: 8px;
+  background: #17171c;
 }
 
-.footer .link-button:hover {
-  color: #e51d2a;
+.aba-autenticacao {
+  flex: 1;
+  padding: 9px 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #8a8a93;
+  font-size: 13px;
+  font-weight: 600;
+  transition: 0.2s;
+}
+
+.aba-autenticacao:hover {
+  color: #ffffff;
+}
+
+.aba-autenticacao.ativa {
+  background: #e51d2a;
+  color: #ffffff;
 }
 
 @media (max-width: 1000px) {

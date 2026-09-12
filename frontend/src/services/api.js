@@ -42,6 +42,11 @@ export const livrosApi = {
 
 export const usuariosApi = {
   listar: () => request("/usuarios"),
+  login: (email, senha) =>
+    request("/usuarios/login", {
+      method: "POST",
+      body: JSON.stringify({ email, senha }),
+    }),
   cadastrar: (dados) =>
     request("/usuarios/cadastro", {
       method: "POST",

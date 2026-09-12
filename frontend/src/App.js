@@ -16,6 +16,8 @@ const ICONES_MATERIA = {
 
 const FORM_LIVRO_VAZIO = { titulo: "", materia: "", preco: "" };
 const FORM_USUARIO_VAZIO = { nome: "", email: "", senha: "" };
+const FORM_LOGIN_VAZIO = { email: "", senha: "" };
+const CHAVE_SESSAO = "pallanthir:usuario";
 
 const formatarPreco = (valor) =>
   Number(valor || 0).toLocaleString("pt-BR", {
@@ -34,7 +36,7 @@ function App() {
   const [filtro, setFiltro] = useState({ tipo: "todos" });
   const [resultado, setResultado] = useState([]);
 
-  const [usuarioId, setUsuarioId] = useState(null);
+  const [usuario, setUsuario] = useState(null);
   const [favoritos, setFavoritos] = useState([]);
   const [favoritoEmEdicao, setFavoritoEmEdicao] = useState(null);
 
@@ -42,9 +44,13 @@ function App() {
   const [formEdicao, setFormEdicao] = useState(null);
   const [formLivro, setFormLivro] = useState(FORM_LIVRO_VAZIO);
   const [mostrarCadastroLivro, setMostrarCadastroLivro] = useState(false);
-  const [mostrarCadastroUsuario, setMostrarCadastroUsuario] = useState(false);
+  const [mostrarAutenticacao, setMostrarAutenticacao] = useState(false);
+  const [modoAutenticacao, setModoAutenticacao] = useState("login");
   const [formUsuario, setFormUsuario] = useState(FORM_USUARIO_VAZIO);
+  const [formLogin, setFormLogin] = useState(FORM_LOGIN_VAZIO);
   const [salvando, setSalvando] = useState(false);
+
+  const usuarioId = usuario ? usuario.id : null;
 
   const idsFavoritos = useMemo(
     () => new Set(favoritos.map((livro) => livro.id)),
@@ -84,27 +90,93 @@ function App() {
     }
   }, []);
 
-  const carregarUsuario = useCallback(async () => {
+  const carregarFavoritos = useCallback(async (id) => {
     try {
-      const usuarios = await usuariosApi.listar();
-      if (usuarios.length === 0) {
-        setUsuarioId(null);
-        setFavoritos([]);
-        return;
-      }
-      const usuario = usuarios[0];
-      setUsuarioId(usuario.id);
-      setFavoritos(await usuariosApi.listarFavoritos(usuario.id));
+      setFavoritos(await usuariosApi.listarFavoritos(id));
     } catch (e) {
       console.error(e);
     }
   }, []);
 
+  const restaurarSessao = useCallback(async () => {
+    try {
+      const salvo = localStorage.getItem(CHAVE_SESSAO);
+      if (!salvo) {
+        return;
+      }
+      const sessao = JSON.parse(salvo);
+      setUsuario(sessao);
+      await carregarFavoritos(sessao.id);
+    } catch (e) {
+      console.error(e);
+    }
+  }, [carregarFavoritos]);
+
   useEffect(() => {
     carregarLivros();
     carregarMaterias();
-    carregarUsuario();
-  }, [carregarLivros, carregarMaterias, carregarUsuario]);
+    restaurarSessao();
+  }, [carregarLivros, carregarMaterias, restaurarSessao]);
+
+  const abrirAutenticacao = (modo) => {
+    setModoAutenticacao(modo || "login");
+    setErro(null);
+    setMostrarAutenticacao(true);
+  };
+
+  const fecharAutenticacao = () => {
+    setMostrarAutenticacao(false);
+    setErro(null);
+  };
+
+  const iniciarSessao = async (autenticado) => {
+    const sessao = {
+      id: autenticado.id,
+      nome: autenticado.nome,
+      email: autenticado.email,
+    };
+    try {
+      localStorage.setItem(CHAVE_SESSAO, JSON.stringify(sessao));
+    } catch (e) {
+      console.error(e);
+    }
+    setUsuario(sessao);
+    setMostrarAutenticacao(false);
+    await carregarFavoritos(sessao.id);
+  };
+
+  const entrar = async (evento) => {
+    evento.preventDefault();
+
+    try {
+      setSalvando(true);
+      setErro(null);
+      const autenticado = await usuariosApi.login(
+        formLogin.email.trim(),
+        formLogin.senha
+      );
+      setFormLogin(FORM_LOGIN_VAZIO);
+      await iniciarSessao(autenticado);
+      setAviso("Bem-vindo(a), " + autenticado.nome + "!");
+    } catch (e) {
+      setErro("E-mail ou senha incorretos.");
+      console.error(e);
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  const sair = () => {
+    try {
+      localStorage.removeItem(CHAVE_SESSAO);
+    } catch (e) {
+      console.error(e);
+    }
+    setUsuario(null);
+    setFavoritos([]);
+    setFiltro((atual) => (atual.tipo === "favoritos" ? { tipo: "todos" } : atual));
+    setAviso("Você saiu da sua conta.");
+  };
 
   const limparFiltro = () => {
     setFiltro({ tipo: "todos" });
@@ -129,8 +201,8 @@ function App() {
 
   const alternarFavorito = async (livro) => {
     if (!usuarioId) {
-      setErro("Cadastre um usuário para poder favoritar livros.");
-      setMostrarCadastroUsuario(true);
+      setErro("Entre na sua conta para favoritar livros.");
+      abrirAutenticacao("login");
       return;
     }
     if (favoritoEmEdicao === livro.id) {
@@ -290,11 +362,13 @@ function App() {
     try {
       setSalvando(true);
       setErro(null);
-      await usuariosApi.cadastrar(formUsuario);
+      const criado = await usuariosApi.cadastrar({
+        ...formUsuario,
+        email: formUsuario.email.trim(),
+      });
       setFormUsuario(FORM_USUARIO_VAZIO);
-      setMostrarCadastroUsuario(false);
-      setAviso("Usuário cadastrado. Agora você pode favoritar livros.");
-      await carregarUsuario();
+      await iniciarSessao(criado);
+      setAviso("Conta criada. Agora você pode favoritar livros.");
     } catch (e) {
       setErro("Não foi possível cadastrar o usuário. O e-mail já pode existir.");
       console.error(e);
@@ -422,49 +496,24 @@ function App() {
         >
           + Cadastrar livro
         </button>
-        <button
-          type="button"
-          className="login-button"
-          onClick={() => setMostrarCadastroUsuario(true)}
-        >
-          {usuarioId ? "Minha conta" : "Entrar"}
-        </button>
-      </div>
-    </header>
-  );
-
-  const rodape = (
-    <footer className="footer">
-      <div className="footer-logo">Pallanthir</div>
-      <div>
-        <h4>Sobre</h4>
-        <button type="button" className="link-button">Nossa história</button>
-        <button type="button" className="link-button">Como funciona</button>
-      </div>
-      <div>
-        <h4>Categorias</h4>
-        {materias.slice(0, 3).map((materia) => (
+        {usuario ? (
+          <div className="sessao">
+            <span className="sessao-nome">{usuario.nome}</span>
+            <button type="button" className="login-button" onClick={sair}>
+              Sair
+            </button>
+          </div>
+        ) : (
           <button
             type="button"
-            className="link-button"
-            key={materia.nome}
-            onClick={() => filtrarPorMateria(materia)}
+            className="login-button"
+            onClick={() => abrirAutenticacao("login")}
           >
-            {materia.rotulo}
+            Entrar
           </button>
-        ))}
+        )}
       </div>
-      <div>
-        <h4>Ajuda</h4>
-        <button type="button" className="link-button">Perguntas frequentes</button>
-        <button type="button" className="link-button">Privacidade</button>
-      </div>
-      <div>
-        <h4>Contato</h4>
-        <button type="button" className="link-button">contato@pallanthir.com</button>
-        <button type="button" className="link-button">(11) 99999-9999</button>
-      </div>
-    </footer>
+    </header>
   );
 
   const modalCadastroLivro = mostrarCadastroLivro && (
@@ -534,61 +583,128 @@ function App() {
     </div>
   );
 
-  const modalCadastroUsuario = mostrarCadastroUsuario && (
-    <div className="modal" onClick={() => setMostrarCadastroUsuario(false)}>
+  const modalAutenticacao = mostrarAutenticacao && (
+    <div className="modal" onClick={fecharAutenticacao}>
       <div className="modal-box" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h3>{usuarioId ? "Nova conta" : "Criar conta"}</h3>
-          <button type="button" onClick={() => setMostrarCadastroUsuario(false)}>
+          <h3>{modoAutenticacao === "login" ? "Entrar" : "Criar conta"}</h3>
+          <button type="button" onClick={fecharAutenticacao}>
             ✕
           </button>
         </div>
+
+        <div className="abas-autenticacao">
+          <button
+            type="button"
+            className={
+              "aba-autenticacao" + (modoAutenticacao === "login" ? " ativa" : "")
+            }
+            onClick={() => {
+              setModoAutenticacao("login");
+              setErro(null);
+            }}
+          >
+            Entrar
+          </button>
+          <button
+            type="button"
+            className={
+              "aba-autenticacao" +
+              (modoAutenticacao === "cadastro" ? " ativa" : "")
+            }
+            onClick={() => {
+              setModoAutenticacao("cadastro");
+              setErro(null);
+            }}
+          >
+            Criar conta
+          </button>
+        </div>
+
         <p className="modal-sub">
-          Os favoritos usam o primeiro usuário cadastrado enquanto não há tela
-          de login.
+          {modoAutenticacao === "login"
+            ? "Informe seu e-mail e senha para acessar seus favoritos."
+            : "Crie sua conta para salvar seus livros favoritos."}
         </p>
 
-        <form className="modal-form" onSubmit={cadastrarUsuario}>
-          <label>
-            Nome
-            <input
-              type="text"
-              required
-              value={formUsuario.nome}
-              onChange={(e) =>
-                setFormUsuario({ ...formUsuario, nome: e.target.value })
-              }
-            />
-          </label>
-          <label>
-            E-mail
-            <input
-              type="email"
-              required
-              value={formUsuario.email}
-              onChange={(e) =>
-                setFormUsuario({ ...formUsuario, email: e.target.value })
-              }
-            />
-          </label>
-          <label>
-            Senha
-            <input
-              type="password"
-              required
-              value={formUsuario.senha}
-              onChange={(e) =>
-                setFormUsuario({ ...formUsuario, senha: e.target.value })
-              }
-            />
-          </label>
+        {modoAutenticacao === "login" ? (
+          <form className="modal-form" onSubmit={entrar}>
+            <label>
+              E-mail
+              <input
+                type="email"
+                required
+                value={formLogin.email}
+                onChange={(e) =>
+                  setFormLogin({ ...formLogin, email: e.target.value })
+                }
+              />
+            </label>
+            <label>
+              Senha
+              <input
+                type="password"
+                required
+                value={formLogin.senha}
+                onChange={(e) =>
+                  setFormLogin({ ...formLogin, senha: e.target.value })
+                }
+              />
+            </label>
 
-          <div className="modal-actions">
-            <button type="submit" disabled={salvando}>
-              {salvando ? "Salvando..." : "Cadastrar"}
-            </button>
-          </div>
-        </form>
+            {erro && <p className="erro">{erro}</p>}
+
+            <div className="modal-actions">
+              <button type="submit" disabled={salvando}>
+                {salvando ? "Entrando..." : "Entrar"}
+              </button>
+            </div>
+          </form>
+        ) : (
+          <form className="modal-form" onSubmit={cadastrarUsuario}>
+            <label>
+              Nome
+              <input
+                type="text"
+                required
+                value={formUsuario.nome}
+                onChange={(e) =>
+                  setFormUsuario({ ...formUsuario, nome: e.target.value })
+                }
+              />
+            </label>
+            <label>
+              E-mail
+              <input
+                type="email"
+                required
+                value={formUsuario.email}
+                onChange={(e) =>
+                  setFormUsuario({ ...formUsuario, email: e.target.value })
+                }
+              />
+            </label>
+            <label>
+              Senha
+              <input
+                type="password"
+                required
+                value={formUsuario.senha}
+                onChange={(e) =>
+                  setFormUsuario({ ...formUsuario, senha: e.target.value })
+                }
+              />
+            </label>
+
+            {erro && <p className="erro">{erro}</p>}
+
+            <div className="modal-actions">
+              <button type="submit" disabled={salvando}>
+                {salvando ? "Salvando..." : "Cadastrar"}
+              </button>
+            </div>
+          </form>
+        )}
       </div>
     </div>
   );
@@ -776,9 +892,8 @@ function App() {
           </div>
         </section>
 
-        {rodape}
         {modalCadastroLivro}
-        {modalCadastroUsuario}
+        {modalAutenticacao}
       </div>
     );
   }
@@ -942,15 +1057,6 @@ function App() {
                     </div>
                     <div className="book-footer">
                       <strong>{formatarPreco(livro.preco)}</strong>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          abrirLivro(livro);
-                        }}
-                      >
-                        Ver detalhes
-                      </button>
                     </div>
                   </div>
                 </div>
@@ -1007,9 +1113,8 @@ function App() {
         </div>
       </section>
 
-      {rodape}
       {modalCadastroLivro}
-      {modalCadastroUsuario}
+      {modalAutenticacao}
     </div>
   );
 }
