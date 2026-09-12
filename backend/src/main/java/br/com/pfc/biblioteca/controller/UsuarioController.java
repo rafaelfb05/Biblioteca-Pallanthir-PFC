@@ -1,6 +1,7 @@
 package br.com.pfc.biblioteca.controller;
 
 import br.com.pfc.biblioteca.dto.LivroDTO;
+import br.com.pfc.biblioteca.dto.LoginRequest;
 import br.com.pfc.biblioteca.dto.UsuarioDTO;
 import br.com.pfc.biblioteca.dto.UsuarioRequest;
 import br.com.pfc.biblioteca.model.Usuario;
@@ -55,5 +56,11 @@ public class UsuarioController {
     public ResponseEntity<Void> removerFavorito(@PathVariable Long usuarioId, @PathVariable Long livroId){
         service.removerFavorito(usuarioId, livroId);
         return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<UsuarioDTO> login(@RequestBody LoginRequest request){
+        UsuarioDTO usuario = service.login(request);
+        return ResponseEntity.ok(usuario);
     }
 }

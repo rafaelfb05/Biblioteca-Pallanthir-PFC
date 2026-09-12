@@ -20,6 +20,7 @@ public class Livro {
     private String capaUrl;
     @Enumerated(EnumType.STRING)
     private Materia materia;
+    private Integer estoque = 1;
     private Double preco = 0.0;
     private double avaliacao;
 
@@ -107,11 +108,23 @@ public class Livro {
     }
 
     public double getPreco() {
-        return preco == null ? 0.0 : preco;
+        if (preco == null){
+            return 0.0;
+        } else {
+            return preco;
+        }
     }
 
     public void setPreco(Double preco) {
-        this.preco = preco == null ? 0.0 : preco;
+        this.preco=preco;
+    }
+
+    public Integer getEstoque() {
+        return estoque;
+    }
+
+    public void setEstoque(Integer estoque) {
+        this.estoque = estoque;
     }
 
     @Override
@@ -123,6 +136,7 @@ public class Livro {
                 ", capa = " + capaUrl +
                 ", matéria = " + materia +
                 ", preço = " + preco +
+                ", quantidade em estooque = " + estoque +
                 ", avaliacao = " + avaliacao;
     }
 }

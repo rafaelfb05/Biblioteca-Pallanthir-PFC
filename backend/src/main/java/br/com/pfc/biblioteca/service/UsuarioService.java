@@ -1,6 +1,7 @@
 package br.com.pfc.biblioteca.service;
 
 import br.com.pfc.biblioteca.dto.LivroDTO;
+import br.com.pfc.biblioteca.dto.LoginRequest;
 import br.com.pfc.biblioteca.dto.UsuarioDTO;
 import br.com.pfc.biblioteca.dto.UsuarioRequest;
 import br.com.pfc.biblioteca.model.Livro;
@@ -92,5 +93,12 @@ public class UsuarioService {
         return usuario.getFavoritos().stream()
                 .map(LivroDTO::new)
                 .collect(Collectors.toList());
+    }
+
+    public UsuarioDTO login(LoginRequest request){
+        Usuario usuario = repository.findByEmailAndSenha(request.email(), request.senha())
+                .orElseThrow(() -> new RuntimeException("Email ou senha incorretos"));
+
+        return new UsuarioDTO(usuario);
     }
 }

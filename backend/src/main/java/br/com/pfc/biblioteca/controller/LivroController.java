@@ -22,7 +22,7 @@ public class LivroController {
 
     @PostMapping("/cadastro")
     public ResponseEntity<LivroDTO> salvarLivro(@RequestBody CadastroLivroRequest request) {
-        Livro livro = service.salvarLivro(request.titulo(), request.materia(), request.preco());
+        Livro livro = service.salvarLivro(request.titulo(), request.materia(), request.preco(), request.estoque());
         return ResponseEntity.ok(new LivroDTO(livro));
     }
 
