@@ -67,7 +67,7 @@ public class ReservaService {
         livro.setEstoque(livro.getEstoque() + 1);
         livroRepository.save(livro);
 
-        reserva.setStatus(StatusReserva.DEVOVIDO);
+        reserva.setStatus(StatusReserva.DEVOLVIDO);
         repository.save(reserva);
     }
 

@@ -66,4 +66,14 @@ export const usuariosApi = {
     request(`/usuarios/${usuarioId}/favoritar/${livroId}`, { method: "DELETE" }),
 };
 
+export const reservasApi = {
+  listarPorUsuario: (usuarioId) => request(`/reservas/usuario/${usuarioId}`),
+  reservar: (usuarioId, livroId) =>
+    request(`/reservas/${usuarioId}/${livroId}`, { method: "POST" }),
+  cancelar: (reservaId) =>
+    request(`/reservas/${reservaId}/cancelar`, { method: "PUT" }),
+  devolver: (reservaId) =>
+    request(`/reservas/${reservaId}/devolver`, { method: "PUT" }),
+};
+
 export { API_URL };

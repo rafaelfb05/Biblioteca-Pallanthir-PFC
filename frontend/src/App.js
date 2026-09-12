@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import "./App.css";
-import { livrosApi, usuariosApi } from "./services/api";
+import { livrosApi, reservasApi, usuariosApi } from "./services/api";
 
 const ICONES_MATERIA = {
   TI: "💻",
@@ -27,6 +27,29 @@ const formatarEstoque = (quantidade) => {
   return total + (total === 1 ? " unidade" : " unidades");
 };
 
+const ROTULO_STATUS_RESERVA = {
+  RESERVADO: "Reservado",
+  DEVOLVIDO: "Devolvido",
+  CANCELADO: "Cancelado",
+};
+
+const formatarData = (valor) => {
+  if (!valor) {
+    return "—";
+  }
+  const data = new Date(valor);
+  if (Number.isNaN(data.getTime())) {
+    return "—";
+  }
+  return data.toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
 const formatarPreco = (valor) =>
   Number(valor || 0).toLocaleString("pt-BR", {
     style: "currency",
@@ -48,6 +71,8 @@ function App() {
   const [usuario, setUsuario] = useState(null);
   const [favoritos, setFavoritos] = useState([]);
   const [favoritoEmEdicao, setFavoritoEmEdicao] = useState(null);
+  const [reservas, setReservas] = useState([]);
+  const [reservaEmEdicao, setReservaEmEdicao] = useState(null);
 
   const [livroAbertoId, setLivroAbertoId] = useState(null);
   const [formEdicao, setFormEdicao] = useState(null);
@@ -107,6 +132,14 @@ function App() {
     }
   }, []);
 
+  const carregarReservas = useCallback(async (id) => {
+    try {
+      setReservas(await reservasApi.listarPorUsuario(id));
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
+
   const restaurarSessao = useCallback(async () => {
     try {
       const salvo = localStorage.getItem(CHAVE_SESSAO);
@@ -115,11 +148,14 @@ function App() {
       }
       const sessao = JSON.parse(salvo);
       setUsuario(sessao);
-      await carregarFavoritos(sessao.id);
+      await Promise.all([
+        carregarFavoritos(sessao.id),
+        carregarReservas(sessao.id),
+      ]);
     } catch (e) {
       console.error(e);
     }
-  }, [carregarFavoritos]);
+  }, [carregarFavoritos, carregarReservas]);
 
   useEffect(() => {
     carregarLivros();
@@ -151,7 +187,10 @@ function App() {
     }
     setUsuario(sessao);
     setMostrarAutenticacao(false);
-    await carregarFavoritos(sessao.id);
+    await Promise.all([
+      carregarFavoritos(sessao.id),
+      carregarReservas(sessao.id),
+    ]);
   };
 
   const entrar = async (evento) => {
@@ -183,7 +222,10 @@ function App() {
     }
     setUsuario(null);
     setFavoritos([]);
-    setPagina((atual) => (atual === "favoritos" ? "inicio" : atual));
+    setReservas([]);
+    setPagina((atual) =>
+      atual === "favoritos" || atual === "reservas" ? "inicio" : atual
+    );
     setAviso("Você saiu da sua conta.");
   };
 
@@ -223,6 +265,25 @@ function App() {
     window.scrollTo({ top: 0 });
   };
 
+  const irParaMaterias = () => {
+    setPagina("materias");
+    setLivroAbertoId(null);
+    setFormEdicao(null);
+    setErro(null);
+    window.scrollTo({ top: 0 });
+  };
+
+  const irParaReservas = async () => {
+    setPagina("reservas");
+    setLivroAbertoId(null);
+    setFormEdicao(null);
+    setErro(null);
+    window.scrollTo({ top: 0 });
+    if (usuarioId) {
+      await carregarReservas(usuarioId);
+    }
+  };
+
   const alternarFavorito = async (livro) => {
     if (!usuarioId) {
       setErro("Entre na sua conta para favoritar livros.");
@@ -249,6 +310,70 @@ function App() {
       console.error(e);
     } finally {
       setFavoritoEmEdicao(null);
+    }
+  };
+
+  const reservaAtivaDoLivro = useCallback(
+    (livro) =>
+      reservas.find(
+        (reserva) =>
+          reserva.status === "RESERVADO" && reserva.livroId === livro.id
+      ) || null,
+    [reservas]
+  );
+
+  const reservarLivro = async (livro) => {
+    if (!usuarioId) {
+      setErro("Entre na sua conta para reservar livros.");
+      abrirAutenticacao("login");
+      return;
+    }
+    if (Number(livro.estoque || 0) <= 0) {
+      setErro("Este livro está sem estoque no momento.");
+      return;
+    }
+
+    try {
+      setReservaEmEdicao(livro.id);
+      setErro(null);
+      await reservasApi.reservar(usuarioId, livro.id);
+      setAviso('"' + livro.titulo + '" foi reservado.');
+      await Promise.all([carregarLivros(), carregarReservas(usuarioId)]);
+    } catch (e) {
+      setErro("Não foi possível reservar o livro. Ele pode estar esgotado.");
+      console.error(e);
+    } finally {
+      setReservaEmEdicao(null);
+    }
+  };
+
+  const cancelarReserva = async (reserva) => {
+    try {
+      setReservaEmEdicao(reserva.id);
+      setErro(null);
+      await reservasApi.cancelar(reserva.id);
+      setAviso("Reserva de \"" + reserva.tituloLivro + "\" cancelada.");
+      await Promise.all([carregarLivros(), carregarReservas(usuarioId)]);
+    } catch (e) {
+      setErro("Não foi possível cancelar a reserva.");
+      console.error(e);
+    } finally {
+      setReservaEmEdicao(null);
+    }
+  };
+
+  const devolverLivro = async (reserva) => {
+    try {
+      setReservaEmEdicao(reserva.id);
+      setErro(null);
+      await reservasApi.devolver(reserva.id);
+      setAviso("\"" + reserva.tituloLivro + "\" foi devolvido.");
+      await Promise.all([carregarLivros(), carregarReservas(usuarioId)]);
+    } catch (e) {
+      setErro("Não foi possível registrar a devolução.");
+      console.error(e);
+    } finally {
+      setReservaEmEdicao(null);
     }
   };
 
@@ -424,6 +549,11 @@ function App() {
     [livros]
   );
 
+  const reservasAtivas = useMemo(
+    () => reservas.filter((reserva) => reserva.status === "RESERVADO"),
+    [reservas]
+  );
+
   const mensagemListaVazia =
     filtro.tipo === "todos"
       ? "Nenhum livro cadastrado ainda."
@@ -495,6 +625,19 @@ function App() {
             {formatarEstoque(livro.estoque)}
           </span>
         </div>
+        <button
+          type="button"
+          className="reservar-button"
+          onClick={(e) => {
+            e.stopPropagation();
+            reservarLivro(livro);
+          }}
+          disabled={
+            reservaEmEdicao === livro.id || Number(livro.estoque || 0) <= 0
+          }
+        >
+          {Number(livro.estoque || 0) <= 0 ? "Indisponível" : "Reservar"}
+        </button>
       </div>
     </div>
   );
@@ -529,15 +672,10 @@ function App() {
         </button>
         <button
           type="button"
-          className="nav-link"
-          onClick={() => {
-            voltarParaInicio();
-            document
-              .getElementById("categorias")
-              ?.scrollIntoView({ behavior: "smooth" });
-          }}
+          className={"nav-link" + (pagina === "materias" ? " active" : "")}
+          onClick={irParaMaterias}
         >
-          Categorias
+          Matérias
         </button>
         <button
           type="button"
@@ -547,6 +685,14 @@ function App() {
           onClick={irParaFavoritos}
         >
           Favoritos ♡ {favoritos.length > 0 && "(" + favoritos.length + ")"}
+        </button>
+        <button
+          type="button"
+          className={"nav-link" + (pagina === "reservas" ? " active" : "")}
+          onClick={irParaReservas}
+        >
+          Reservas{" "}
+          {reservasAtivas.length > 0 && "(" + reservasAtivas.length + ")"}
         </button>
       </nav>
       <div className="header-actions">
@@ -783,6 +929,137 @@ function App() {
     </div>
   );
 
+  if (pagina === "materias") {
+    return (
+      <div className="app">
+        {cabecalho}
+
+        <section className="section pagina-materias">
+          <div className="section-header">
+            <div>
+              <span className="section-label">EXPLORE</span>
+              <h2>Matérias</h2>
+            </div>
+            <button type="button" className="link-button" onClick={irParaInicio}>
+              Voltar ao acervo →
+            </button>
+          </div>
+
+          <p className="materias-sub">
+            Escolha uma matéria para ver os livros do acervo relacionados a ela.
+          </p>
+
+          {erro && <p className="erro">{erro}</p>}
+
+          <div className="categories">
+            {materias.length === 0 && <p>Carregando matérias...</p>}
+            {materias.map((materia) => (
+              <button
+                type="button"
+                key={materia.nome}
+                className={
+                  "category" +
+                  (filtro.tipo === "materia" && filtro.nome === materia.nome
+                    ? " ativa"
+                    : "")
+                }
+                onClick={() => filtrarPorMateria(materia)}
+              >
+                <div className="category-icon">
+                  {ICONES_MATERIA[materia.nome] || "📚"}
+                </div>
+                <h3>{materia.rotulo}</h3>
+                <p>
+                  {materia.quantidade}{" "}
+                  {materia.quantidade === 1 ? "livro" : "livros"}
+                </p>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        {modalCadastroLivro}
+        {modalAutenticacao}
+      </div>
+    );
+  }
+
+  if (pagina === "reservas") {
+    return (
+      <div className="app">
+        {cabecalho}
+
+        <section className="section pagina-reservas">
+          <div className="section-header">
+            <div>
+              <span className="section-label">SUAS RESERVAS</span>
+              <h2>Minhas reservas</h2>
+            </div>
+            <button type="button" className="link-button" onClick={irParaInicio}>
+              Voltar ao acervo →
+            </button>
+          </div>
+
+          {aviso && (
+            <p className="aviso" onAnimationEnd={() => setAviso(null)}>
+              {aviso}
+            </p>
+          )}
+          {erro && <p className="erro">{erro}</p>}
+
+          {!usuario && <p>Entre na sua conta para ver suas reservas.</p>}
+          {usuario && reservas.length === 0 && (
+            <p>Você ainda não reservou nenhum livro.</p>
+          )}
+
+          {usuario && reservas.length > 0 && (
+            <div className="reservas">
+              {reservas.map((reserva) => (
+                <div className="reserva-card" key={reserva.id}>
+                  <div className="reserva-info">
+                    <span
+                      className={
+                        "reserva-status " + reserva.status.toLowerCase()
+                      }
+                    >
+                      {ROTULO_STATUS_RESERVA[reserva.status] || reserva.status}
+                    </span>
+                    <h3>{reserva.tituloLivro}</h3>
+                    <small>Reservado em {formatarData(reserva.dataReserva)}</small>
+                  </div>
+
+                  {reserva.status === "RESERVADO" && (
+                    <div className="reserva-acoes">
+                      <button
+                        type="button"
+                        className="reservar-button"
+                        onClick={() => devolverLivro(reserva)}
+                        disabled={reservaEmEdicao === reserva.id}
+                      >
+                        Devolver
+                      </button>
+                      <button
+                        type="button"
+                        className="reservar-button cancelar"
+                        onClick={() => cancelarReserva(reserva)}
+                        disabled={reservaEmEdicao === reserva.id}
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {modalCadastroLivro}
+        {modalAutenticacao}
+      </div>
+    );
+  }
+
   if (pagina === "favoritos") {
     return (
       <div className="app">
@@ -825,6 +1102,7 @@ function App() {
 
   if (pagina === "livro" && livroAberto && formEdicao) {
     const favoritado = idsFavoritos.has(livroAberto.id);
+    const reservaAberta = reservaAtivaDoLivro(livroAberto);
 
     return (
       <div className="app">
@@ -901,6 +1179,30 @@ function App() {
                 >
                   {favoritado ? "♥ Remover dos favoritos" : "♡ Favoritar"}
                 </button>
+                {reservaAberta ? (
+                  <button
+                    type="button"
+                    className="reservar-button cancelar"
+                    onClick={() => cancelarReserva(reservaAberta)}
+                    disabled={reservaEmEdicao === reservaAberta.id}
+                  >
+                    Cancelar reserva
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="reservar-button"
+                    onClick={() => reservarLivro(livroAberto)}
+                    disabled={
+                      reservaEmEdicao === livroAberto.id ||
+                      Number(livroAberto.estoque || 0) <= 0
+                    }
+                  >
+                    {Number(livroAberto.estoque || 0) <= 0
+                      ? "Sem estoque"
+                      : "Reservar livro"}
+                  </button>
+                )}
                 <button
                   type="button"
                   className="perigo"
@@ -1058,44 +1360,6 @@ function App() {
             />
             <button type="submit">Pesquisar</button>
           </form>
-        </div>
-      </section>
-
-      <section className="section" id="categorias">
-        <div className="section-header">
-          <div>
-            <span className="section-label">EXPLORE</span>
-            <h2>Categorias</h2>
-          </div>
-          <button type="button" className="link-button" onClick={limparFiltro}>
-            Ver todas →
-          </button>
-        </div>
-
-        <div className="categories">
-          {materias.length === 0 && <p>Carregando categorias...</p>}
-          {materias.map((materia) => (
-            <button
-              type="button"
-              key={materia.nome}
-              className={
-                "category" +
-                (filtro.tipo === "materia" && filtro.nome === materia.nome
-                  ? " ativa"
-                  : "")
-              }
-              onClick={() => filtrarPorMateria(materia)}
-            >
-              <div className="category-icon">
-                {ICONES_MATERIA[materia.nome] || "📚"}
-              </div>
-              <h3>{materia.rotulo}</h3>
-              <p>
-                {materia.quantidade}{" "}
-                {materia.quantidade === 1 ? "livro" : "livros"}
-              </p>
-            </button>
-          ))}
         </div>
       </section>
 
