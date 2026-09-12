@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Entity
@@ -21,8 +22,8 @@ public class Usuario {
     private String email;
     @NotBlank
     private String senha;
-    @ManyToMany
-    private List<Livro> favoritos;
+    @ManyToMany(fetch = FetchType.EAGER)
+    private List<Livro> favoritos = new ArrayList<>();
 
     public Usuario(){}
 

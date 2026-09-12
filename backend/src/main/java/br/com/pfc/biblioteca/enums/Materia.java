@@ -23,7 +23,7 @@ public enum Materia {
     @JsonCreator
     public static Materia fromString(String text){
         for(Materia materia : Materia.values()) {
-            if(materia.materiaLivro.equalsIgnoreCase(text)) {
+            if(materia.materiaLivro.equalsIgnoreCase(text) || materia.name().equalsIgnoreCase(text)) {
                 return materia;
             }
         }
