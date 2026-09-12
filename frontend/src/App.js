@@ -14,10 +14,18 @@ const ICONES_MATERIA = {
   BIOLOGIA: "🧬",
 };
 
-const FORM_LIVRO_VAZIO = { titulo: "", materia: "", preco: "" };
+const FORM_LIVRO_VAZIO = { titulo: "", materia: "", preco: "", estoque: "1" };
 const FORM_USUARIO_VAZIO = { nome: "", email: "", senha: "" };
 const FORM_LOGIN_VAZIO = { email: "", senha: "" };
 const CHAVE_SESSAO = "pallanthir:usuario";
+
+const formatarEstoque = (quantidade) => {
+  const total = Number(quantidade || 0);
+  if (total <= 0) {
+    return "Sem estoque";
+  }
+  return total + (total === 1 ? " unidade" : " unidades");
+};
 
 const formatarPreco = (valor) =>
   Number(valor || 0).toLocaleString("pt-BR", {
@@ -32,6 +40,7 @@ function App() {
   const [erro, setErro] = useState(null);
   const [aviso, setAviso] = useState(null);
 
+  const [pagina, setPagina] = useState("inicio");
   const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState({ tipo: "todos" });
   const [resultado, setResultado] = useState([]);
@@ -174,7 +183,7 @@ function App() {
     }
     setUsuario(null);
     setFavoritos([]);
-    setFiltro((atual) => (atual.tipo === "favoritos" ? { tipo: "todos" } : atual));
+    setPagina((atual) => (atual === "favoritos" ? "inicio" : atual));
     setAviso("Você saiu da sua conta.");
   };
 
@@ -186,6 +195,7 @@ function App() {
   };
 
   const abrirLivro = (livro) => {
+    setPagina("livro");
     setLivroAbertoId(livro.id);
     setFormEdicao({ ...livro });
     setErro(null);
@@ -193,6 +203,20 @@ function App() {
   };
 
   const voltarParaInicio = () => {
+    setPagina("inicio");
+    setLivroAbertoId(null);
+    setFormEdicao(null);
+    setErro(null);
+    window.scrollTo({ top: 0 });
+  };
+
+  const irParaInicio = () => {
+    voltarParaInicio();
+    limparFiltro();
+  };
+
+  const irParaFavoritos = () => {
+    setPagina("favoritos");
     setLivroAbertoId(null);
     setFormEdicao(null);
     setErro(null);
@@ -254,6 +278,7 @@ function App() {
 
   const filtrarPorMateria = async (materia) => {
     try {
+      setPagina("inicio");
       setLivroAbertoId(null);
       setFormEdicao(null);
       setCarregando(true);
@@ -283,7 +308,8 @@ function App() {
       const livro = await livrosApi.cadastrar(
         formLivro.titulo.trim(),
         formLivro.materia,
-        Number(String(formLivro.preco).replace(",", ".")) || 0
+        Number(String(formLivro.preco).replace(",", ".")) || 0,
+        Number(formLivro.estoque) || 0
       );
       setFormLivro(FORM_LIVRO_VAZIO);
       setMostrarCadastroLivro(false);
@@ -312,6 +338,7 @@ function App() {
         numeroPagina: Number(formEdicao.numeroPagina) || 0,
         materia: nomeDaMateria(formEdicao.materia) || null,
         preco: Number(String(formEdicao.preco).replace(",", ".")) || 0,
+        estoque: Number(formEdicao.estoque) || 0,
         avaliacao: Number(formEdicao.avalliacao) || 0,
       });
       setAviso('"' + atualizado.titulo + '" foi atualizado.');
@@ -377,17 +404,10 @@ function App() {
     }
   };
 
-  const livrosExibidos =
-    filtro.tipo === "favoritos"
-      ? favoritos
-      : filtro.tipo === "todos"
-      ? livros
-      : resultado;
+  const livrosExibidos = filtro.tipo === "todos" ? livros : resultado;
 
   const tituloDaLista =
-    filtro.tipo === "favoritos"
-      ? "Meus favoritos"
-      : filtro.tipo === "busca"
+    filtro.tipo === "busca"
       ? 'Resultado para "' + filtro.termo + '"'
       : filtro.tipo === "materia"
       ? "Livros de " + filtro.rotulo
@@ -405,9 +425,7 @@ function App() {
   );
 
   const mensagemListaVazia =
-    filtro.tipo === "favoritos"
-      ? "Você ainda não favoritou nenhum livro."
-      : filtro.tipo === "todos"
+    filtro.tipo === "todos"
       ? "Nenhum livro cadastrado ainda."
       : "Nenhum livro encontrado para este filtro.";
 
@@ -419,15 +437,71 @@ function App() {
         ) || formEdicao;
 
   const abrirCadastroLivro = () => {
-    setLivroAbertoId(null);
-    setFormEdicao(null);
     setErro(null);
     setMostrarCadastroLivro(true);
   };
 
+  const cartaoLivro = (livro) => (
+    <div
+      className="book-card"
+      key={livro.id}
+      role="button"
+      tabIndex={0}
+      onClick={() => abrirLivro(livro)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          abrirLivro(livro);
+        }
+      }}
+    >
+      <div className="book-cover">
+        {livro.capaUrl ? (
+          <img src={livro.capaUrl} alt={"Capa de " + livro.titulo} />
+        ) : (
+          <span>📘</span>
+        )}
+        <button
+          type="button"
+          className={"favorite" + (idsFavoritos.has(livro.id) ? " ativo" : "")}
+          onClick={(e) => {
+            e.stopPropagation();
+            alternarFavorito(livro);
+          }}
+          disabled={favoritoEmEdicao === livro.id}
+          aria-label={
+            idsFavoritos.has(livro.id)
+              ? "Remover dos favoritos"
+              : "Adicionar aos favoritos"
+          }
+        >
+          {idsFavoritos.has(livro.id) ? "♥" : "♡"}
+        </button>
+      </div>
+      <div className="book-info">
+        <span className="book-category">{livro.materia}</span>
+        <h3>{livro.titulo}</h3>
+        <p>{(livro.autores || []).join(", ")}</p>
+        <div className="rating">
+          ★★★★★
+          <small> {Number(livro.avalliacao || 0).toFixed(1)}</small>
+        </div>
+        <div className="book-footer">
+          <strong>{formatarPreco(livro.preco)}</strong>
+          <span
+            className={
+              "estoque" + (Number(livro.estoque || 0) <= 0 ? " esgotado" : "")
+            }
+          >
+            {formatarEstoque(livro.estoque)}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+
   const cabecalho = (
     <header className="header">
-      <button type="button" className="logo" onClick={voltarParaInicio}>
+      <button type="button" className="logo" onClick={irParaInicio}>
         Pallanthir
       </button>
       <nav className="nav">
@@ -435,12 +509,9 @@ function App() {
           type="button"
           className={
             "nav-link" +
-            (livroAbertoId === null && filtro.tipo === "todos" ? " active" : "")
+            (pagina === "inicio" && filtro.tipo === "todos" ? " active" : "")
           }
-          onClick={() => {
-            voltarParaInicio();
-            limparFiltro();
-          }}
+          onClick={irParaInicio}
         >
           Início
         </button>
@@ -471,19 +542,9 @@ function App() {
         <button
           type="button"
           className={
-            "nav-link" +
-            (livroAbertoId === null && filtro.tipo === "favoritos"
-              ? " active"
-              : "")
+            "nav-link" + (pagina === "favoritos" ? " active" : "")
           }
-          onClick={() => {
-            voltarParaInicio();
-            setFiltro((atual) =>
-              atual.tipo === "favoritos"
-                ? { tipo: "todos" }
-                : { tipo: "favoritos" }
-            );
-          }}
+          onClick={irParaFavoritos}
         >
           Favoritos ♡ {favoritos.length > 0 && "(" + favoritos.length + ")"}
         </button>
@@ -567,6 +628,19 @@ function App() {
               value={formLivro.preco}
               onChange={(e) =>
                 setFormLivro({ ...formLivro, preco: e.target.value })
+              }
+            />
+          </label>
+          <label>
+            Estoque
+            <input
+              type="number"
+              min="0"
+              step="1"
+              placeholder="Quantidade em estoque"
+              value={formLivro.estoque}
+              onChange={(e) =>
+                setFormLivro({ ...formLivro, estoque: e.target.value })
               }
             />
           </label>
@@ -709,7 +783,47 @@ function App() {
     </div>
   );
 
-  if (livroAberto && formEdicao) {
+  if (pagina === "favoritos") {
+    return (
+      <div className="app">
+        {cabecalho}
+
+        <section className="section pagina-favoritos">
+          <div className="section-header">
+            <div>
+              <span className="section-label">SUA LISTA</span>
+              <h2>Meus favoritos</h2>
+            </div>
+            <button type="button" className="link-button" onClick={irParaInicio}>
+              Voltar ao acervo →
+            </button>
+          </div>
+
+          {aviso && (
+            <p className="aviso" onAnimationEnd={() => setAviso(null)}>
+              {aviso}
+            </p>
+          )}
+          {erro && <p className="erro">{erro}</p>}
+
+          <div className="books">
+            {!usuario && (
+              <p>Entre na sua conta para ver os livros que você favoritou.</p>
+            )}
+            {usuario && favoritos.length === 0 && (
+              <p>Você ainda não favoritou nenhum livro.</p>
+            )}
+            {usuario && favoritos.map(cartaoLivro)}
+          </div>
+        </section>
+
+        {modalCadastroLivro}
+        {modalAutenticacao}
+      </div>
+    );
+  }
+
+  if (pagina === "livro" && livroAberto && formEdicao) {
     const favoritado = idsFavoritos.has(livroAberto.id);
 
     return (
@@ -773,8 +887,8 @@ function App() {
                   </strong>
                 </div>
                 <div>
-                  <small>Código</small>
-                  <strong>#{livroAberto.id}</strong>
+                  <small>Estoque</small>
+                  <strong>{formatarEstoque(livroAberto.estoque)}</strong>
                 </div>
               </div>
 
@@ -866,6 +980,23 @@ function App() {
                   value={formEdicao.preco || 0}
                   onChange={(e) =>
                     setFormEdicao({ ...formEdicao, preco: e.target.value })
+                  }
+                />
+              </label>
+              <label>
+                Estoque
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={
+                    formEdicao.estoque === undefined ||
+                    formEdicao.estoque === null
+                      ? 0
+                      : formEdicao.estoque
+                  }
+                  onChange={(e) =>
+                    setFormEdicao({ ...formEdicao, estoque: e.target.value })
                   }
                 />
               </label>
@@ -1008,59 +1139,7 @@ function App() {
               <p>{mensagemListaVazia}</p>
             )}
 
-            {!carregando &&
-              livrosExibidos.map((livro) => (
-                <div
-                  className="book-card"
-                  key={livro.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => abrirLivro(livro)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      abrirLivro(livro);
-                    }
-                  }}
-                >
-                  <div className="book-cover">
-                    {livro.capaUrl ? (
-                      <img src={livro.capaUrl} alt={"Capa de " + livro.titulo} />
-                    ) : (
-                      <span>📘</span>
-                    )}
-                    <button
-                      type="button"
-                      className={
-                        "favorite" + (idsFavoritos.has(livro.id) ? " ativo" : "")
-                      }
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        alternarFavorito(livro);
-                      }}
-                      disabled={favoritoEmEdicao === livro.id}
-                      aria-label={
-                        idsFavoritos.has(livro.id)
-                          ? "Remover dos favoritos"
-                          : "Adicionar aos favoritos"
-                      }
-                    >
-                      {idsFavoritos.has(livro.id) ? "♥" : "♡"}
-                    </button>
-                  </div>
-                  <div className="book-info">
-                    <span className="book-category">{livro.materia}</span>
-                    <h3>{livro.titulo}</h3>
-                    <p>{(livro.autores || []).join(", ")}</p>
-                    <div className="rating">
-                      ★★★★★
-                      <small> {Number(livro.avalliacao || 0).toFixed(1)}</small>
-                    </div>
-                    <div className="book-footer">
-                      <strong>{formatarPreco(livro.preco)}</strong>
-                    </div>
-                  </div>
-                </div>
-              ))}
+            {!carregando && livrosExibidos.map(cartaoLivro)}
           </div>
 
           <aside className="bestsellers">

@@ -430,6 +430,22 @@
   cursor: wait;
 }
 
+.pagina-favoritos .books {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+@media (max-width: 1000px) {
+  .pagina-favoritos .books {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .pagina-favoritos .books {
+    grid-template-columns: 1fr;
+  }
+}
+
 .abas-autenticacao {
   display: flex;
   gap: 8px;

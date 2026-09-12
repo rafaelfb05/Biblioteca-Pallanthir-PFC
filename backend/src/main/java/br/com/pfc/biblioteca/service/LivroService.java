@@ -79,6 +79,9 @@ public class LivroService {
         if (request.preco() != null){
             livro.setPreco(request.preco());
         }
+        if (request.estoque() != null) {
+            livro.setEstoque(request.estoque());
+        }
         return repository.save(livro);
     }
 

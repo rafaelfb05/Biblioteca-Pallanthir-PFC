@@ -27,10 +27,10 @@ export const livrosApi = {
     request(`/livros/titulo/${encodeURIComponent(titulo)}`),
   filtrarPorMateria: (materia) =>
     request(`/livros/${encodeURIComponent(materia)}`),
-  cadastrar: (titulo, materia, preco) =>
+  cadastrar: (titulo, materia, preco, estoque) =>
     request("/livros/cadastro", {
       method: "POST",
-      body: JSON.stringify({ titulo, materia, preco }),
+      body: JSON.stringify({ titulo, materia, preco, estoque }),
     }),
   atualizar: (id, dados) =>
     request(`/livros/atualizar/${id}`, {
