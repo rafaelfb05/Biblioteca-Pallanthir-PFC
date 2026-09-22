@@ -2,6 +2,8 @@ package br.com.pfc.biblioteca.service;
 
 import br.com.pfc.biblioteca.dto.ReservaDTO;
 import br.com.pfc.biblioteca.enums.StatusReserva;
+import br.com.pfc.biblioteca.infra.exception.ConflitoException;
+import br.com.pfc.biblioteca.infra.exception.RecursoNaoEncontradoException;
 import br.com.pfc.biblioteca.model.Livro;
 import br.com.pfc.biblioteca.model.Reserva;
 import br.com.pfc.biblioteca.model.Usuario;
@@ -28,13 +30,13 @@ public class ReservaService {
     @Transactional
     public Reserva reservarLivro(Long usuarioId, Long livroId){
         Usuario usuario = usuarioRepository.findById(usuarioId)
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado"));
 
         Livro livro = livroRepository.buscarComLock(livroId)
-                .orElseThrow(() -> new RuntimeException("Livro não encontrado"));
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Livro não encontrado"));
 
         if(livro.getEstoque() == null || livro.getEstoque() <= 0){
-            throw new RuntimeException("Livro esgotado no momento!");
+            throw new ConflitoException("Livro esgotado no momento!");
         }
         livro.setEstoque(livro.getEstoque() -1);
         livroRepository.save(livro);
@@ -46,7 +48,7 @@ public class ReservaService {
     @Transactional
     public void cancelarReserva(Long reservaId){
         Reserva reserva = repository.findById(reservaId)
-                .orElseThrow(() -> new RuntimeException("Reserva não encontrada!"));
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Reserva não encontrada!"));
 
         if(reserva.getStatus() == StatusReserva.RESERVADO){
             Livro livro = reserva.getLivro();
@@ -61,7 +63,7 @@ public class ReservaService {
     @Transactional
     public void devolverLivro(Long reservaId){
         Reserva reserva = repository.findById(reservaId)
-                .orElseThrow(() -> new RuntimeException("Reserva não encontrada!"));
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Reserva não encontrada!"));
 
         Livro livro = reserva.getLivro();
         livro.setEstoque(livro.getEstoque() + 1);

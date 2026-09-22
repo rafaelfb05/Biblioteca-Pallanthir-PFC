@@ -9,7 +9,11 @@ import java.util.Optional;
 
 public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
 
-    Optional<Usuario> findByEmailAndSenha(String email, String senha);
+    List<Usuario> findByAtivoTrue();
+
+    Optional<Usuario> findByEmailAndAtivoTrue(String email);
+
+    Optional<Usuario> findByEmailAndSenhaAndAtivoTrue(String email, String senha);
 
     @Query("SELECT u FROM Usuario u JOIN u.favoritos f WHERE f.id = :livroId")
     List<Usuario> buscarPorLivroFavoritado(Long livroId);

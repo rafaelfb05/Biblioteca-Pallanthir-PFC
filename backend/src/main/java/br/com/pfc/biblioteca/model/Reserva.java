@@ -2,8 +2,6 @@ package br.com.pfc.biblioteca.model;
 
 import br.com.pfc.biblioteca.enums.StatusReserva;
 import jakarta.persistence.*;
-
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity

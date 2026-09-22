@@ -1,4 +1,6 @@
 package br.com.pfc.biblioteca.dto;
 
-public record UsuarioRequest(String nome, String email, String senha) {
+import br.com.pfc.biblioteca.enums.TipoUsuario;
+
+public record UsuarioRequest(String nome, String email, String senha, TipoUsuario tipo, String codigoAcesso) {
 }
