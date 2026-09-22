@@ -1,6 +1,7 @@
 package br.com.pfc.biblioteca.model;
 
 import br.com.pfc.biblioteca.dto.UsuarioRequest;
+import br.com.pfc.biblioteca.enums.TipoUsuario;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -18,19 +19,22 @@ public class Usuario {
     private String nome;
     @Email
     @NotBlank
-    @Column(unique = true)
     private String email;
     @NotBlank
     private String senha;
+    @Enumerated(EnumType.STRING)
+    private TipoUsuario tipo;
     @ManyToMany(fetch = FetchType.EAGER)
     private List<Livro> favoritos = new ArrayList<>();
+    private boolean ativo = true;
 
     public Usuario(){}
 
     public Usuario(UsuarioRequest request){
-        this.nome= request.nome();
-        this.email= request.email();
-        this.senha= request.senha();
+        this.nome=request.nome();
+        this.email=request.email();
+        this.senha=request.senha();
+        this.tipo=request.tipo();
     }
 
     public Long getId() {
@@ -65,12 +69,28 @@ public class Usuario {
         this.senha = senha;
     }
 
+    public TipoUsuario getTipo() {
+        return tipo;
+    }
+
+    public void setTipo(TipoUsuario tipo) {
+        this.tipo = tipo;
+    }
+
     public List<Livro> getFavoritos() {
         return favoritos;
     }
 
     public void setFavoritos(List<Livro> favoritos) {
         this.favoritos = favoritos;
+    }
+
+    public boolean isAtivo() {
+        return ativo;
+    }
+
+    public void setAtivo(boolean ativo) {
+        this.ativo = ativo;
     }
 
     @Override

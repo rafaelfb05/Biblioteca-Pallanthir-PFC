@@ -2,7 +2,6 @@ package br.com.pfc.biblioteca.model;
 
 import br.com.pfc.biblioteca.dto.DadosLivro;
 import br.com.pfc.biblioteca.enums.Materia;
-import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.persistence.*;
 
 import java.util.List;
@@ -23,6 +22,7 @@ public class Livro {
     private Integer estoque = 1;
     private Double preco = 0.0;
     private double avaliacao;
+    private boolean ativo = true;
 
     public Livro(){}
 
@@ -105,6 +105,14 @@ public class Livro {
 
     public void setMateria(Materia materia) {
         this.materia = materia;
+    }
+
+    public boolean isAtivo() {
+        return ativo;
+    }
+
+    public void setAtivo(boolean ativo) {
+        this.ativo = ativo;
     }
 
     public double getPreco() {

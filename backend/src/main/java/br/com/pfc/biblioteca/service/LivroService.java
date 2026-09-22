@@ -6,15 +6,15 @@ import br.com.pfc.biblioteca.dto.LivroDTO;
 import br.com.pfc.biblioteca.dto.MateriaDTO;
 import br.com.pfc.biblioteca.enums.Materia;
 import br.com.pfc.biblioteca.enums.StatusReserva;
+import br.com.pfc.biblioteca.infra.exception.ConflitoException;
+import br.com.pfc.biblioteca.infra.exception.RecursoNaoEncontradoException;
 import br.com.pfc.biblioteca.model.Livro;
 import br.com.pfc.biblioteca.repository.LivroRepository;
 import br.com.pfc.biblioteca.repository.ReservaRepository;
 import br.com.pfc.biblioteca.repository.UsuarioRepository;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Arrays;
 import java.util.List;
@@ -41,7 +41,7 @@ public class LivroService {
         DadosLivro.DadosBusca dadosBusca = conversor.obterDados(json, DadosLivro.DadosBusca.class);
 
         if (dadosBusca.items() == null || dadosBusca.items().isEmpty()) {
-            throw new RuntimeException("Livro não encontrado na API");
+            throw new RecursoNaoEncontradoException("Livro não encontrado na API do Google Books");
         }
         DadosLivro dados = dadosBusca.items().get(0).volumeInfo();
         Livro livro = new Livro(dados);
@@ -52,7 +52,7 @@ public class LivroService {
     }
 
     public List<LivroDTO> obterTodosOsLivros() {
-        return converterDados(repository.findAll());
+        return converterDados(repository.findByAtivoTrue());
 
     }
 
@@ -98,11 +98,10 @@ public class LivroService {
     @Transactional
     public void deletarLivro(Long id, boolean confirmado) {
         Livro livro = repository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Livro não encontrado"));
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Livro não encontrado"));
 
         if (!confirmado && reservaRepository.existsByLivroIdAndStatus(id, StatusReserva.RESERVADO)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "Este livro possui reservas em aberto.");
+            throw new ConflitoException("Este livro possui reservas em aberto.");
         }
 
         usuarioRepository.buscarPorLivroFavoritado(id).forEach(usuario -> {
@@ -110,9 +109,8 @@ public class LivroService {
             usuarioRepository.save(usuario);
         });
 
-        reservaRepository.deleteAll(reservaRepository.findByLivroId(id));
-
-        repository.delete(livro);
+        livro.setAtivo(false);
+        repository.save(livro);
     }
 
     public List<MateriaDTO> listarMaterias() {
@@ -122,11 +120,11 @@ public class LivroService {
     }
 
     public List<LivroDTO> filtarPorMateria(Materia materia) {
-        return converterDados(repository.findByMateria(materia));
+        return converterDados(repository.findByMateriaAndAtivoTrue(materia));
     }
 
     public Optional<LivroDTO> buscarPorNome(String titulo) {
-        return repository.findByTituloContainingIgnoreCase(titulo)
+        return repository.findByTituloContainingIgnoreCaseAndAtivoTrue(titulo)
                 .map(LivroDTO::new);
 
     }

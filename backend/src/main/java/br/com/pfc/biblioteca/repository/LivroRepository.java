@@ -13,12 +13,13 @@ import java.util.Optional;
 
 public interface LivroRepository extends JpaRepository<Livro, Long> {
 
+    List<Livro> findByAtivoTrue();
 
-    List<Livro> findByMateria(Materia materia);
+    List<Livro> findByMateriaAndAtivoTrue(Materia materia);
 
     long countByMateria(Materia materia);
 
-    Optional<Livro> findByTituloContainingIgnoreCase(String titulo);
+    Optional<Livro> findByTituloContainingIgnoreCaseAndAtivoTrue(String titulo);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT l FROM Livro l WHERE l.id = :id")

@@ -4,6 +4,11 @@ import br.com.pfc.biblioteca.dto.LivroDTO;
 import br.com.pfc.biblioteca.dto.LoginRequest;
 import br.com.pfc.biblioteca.dto.UsuarioDTO;
 import br.com.pfc.biblioteca.dto.UsuarioRequest;
+import br.com.pfc.biblioteca.enums.TipoUsuario;
+import br.com.pfc.biblioteca.infra.exception.ConflitoException;
+import br.com.pfc.biblioteca.infra.exception.CredenciaisInvalidasException;
+import br.com.pfc.biblioteca.infra.exception.RecursoNaoEncontradoException;
+import br.com.pfc.biblioteca.infra.exception.RegraDeNegocioException;
 import br.com.pfc.biblioteca.model.Livro;
 import br.com.pfc.biblioteca.model.Usuario;
 import br.com.pfc.biblioteca.repository.LivroRepository;
@@ -27,17 +32,31 @@ public class UsuarioService {
         return usuario.stream()
                 .map(u -> new UsuarioDTO(
                         u.getId(), u.getNome(),
-                        u.getEmail(), u.getSenha()))
+                        u.getEmail(), u.getSenha(), u.getTipo()))
                 .collect(Collectors.toList());
     }
 
     public Usuario cadastrarUsuario(UsuarioRequest request) {
+
+        boolean emailExiste = repository.findByEmailAndAtivoTrue(request.email()).isPresent();
+        if(emailExiste){
+            throw new ConflitoException("Já existe um usuário ativo com esse email");
+        }
+
+        if(request.tipo() == TipoUsuario.FUNCIONARIO){
+            String codigoCorreto = System.getenv("CODIGO_FUNCIONARIO");
+
+            if(request.codigoAcesso() == null || !request.codigoAcesso().equals(codigoCorreto)){
+                throw new RegraDeNegocioException("Código inválido para cadastro de funcionário");
+            }
+        }
+
         Usuario usuario = new Usuario(request);
         return repository.save(usuario);
     }
 
     public List<UsuarioDTO> obterUsuarios() {
-        return converteDados(repository.findAll());
+        return converteDados(repository.findByAtivoTrue());
     }
 
     public Usuario atualizarUsuario(Long id, UsuarioRequest request) {
@@ -55,18 +74,19 @@ public class UsuarioService {
     }
 
     public void deletarUsuario(Long id) {
-        if(!repository.existsById(id)){
-            throw new RuntimeException("livro não encontrado");
-        }
-        repository.deleteById(id);
+        Usuario usuario = repository.findById(id)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado"));
+
+        usuario.setAtivo(false);
+        repository.save(usuario);
     }
     @Transactional
     public void adicionarFavorito(Long usuarioId, Long livroId){
         Usuario usuario = repository.findById(usuarioId)
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado"));
 
         Livro livro = livroRepository.findById(livroId)
-                .orElseThrow(() -> new RuntimeException("Livro não encontrado!"));
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Livro não encontrado!"));
 
         boolean jaFavoritado = usuario.getFavoritos().stream()
                 .anyMatch(l -> l.getId().equals(livro.getId()));
@@ -80,7 +100,7 @@ public class UsuarioService {
     @Transactional
     public void removerFavorito(Long usuarioId, Long livroId) {
         Usuario usuario = repository.findById(usuarioId)
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado"));
         usuario.getFavoritos().removeIf(l -> l.getId().equals(livroId));
         repository.save(usuario);
 
@@ -88,7 +108,7 @@ public class UsuarioService {
 
     public List<LivroDTO> listarFavoritos(Long usuarioId) {
         Usuario usuario = repository.findById(usuarioId)
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado"));
 
         return usuario.getFavoritos().stream()
                 .map(LivroDTO::new)
@@ -96,8 +116,8 @@ public class UsuarioService {
     }
 
     public UsuarioDTO login(LoginRequest request){
-        Usuario usuario = repository.findByEmailAndSenha(request.email(), request.senha())
-                .orElseThrow(() -> new RuntimeException("Email ou senha incorretos"));
+        Usuario usuario = repository.findByEmailAndSenhaAndAtivoTrue(request.email(), request.senha())
+                .orElseThrow(() -> new CredenciaisInvalidasException("Email ou senha incorretos"));
 
         return new UsuarioDTO(usuario);
     }
