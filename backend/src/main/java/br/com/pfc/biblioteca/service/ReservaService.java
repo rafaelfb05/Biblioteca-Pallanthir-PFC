@@ -4,6 +4,7 @@ import br.com.pfc.biblioteca.dto.ReservaDTO;
 import br.com.pfc.biblioteca.enums.StatusReserva;
 import br.com.pfc.biblioteca.infra.exception.ConflitoException;
 import br.com.pfc.biblioteca.infra.exception.RecursoNaoEncontradoException;
+import br.com.pfc.biblioteca.infra.exception.RegraDeNegocioException;
 import br.com.pfc.biblioteca.model.Livro;
 import br.com.pfc.biblioteca.model.Reserva;
 import br.com.pfc.biblioteca.model.Usuario;
@@ -12,6 +13,8 @@ import br.com.pfc.biblioteca.repository.ReservaRepository;
 import br.com.pfc.biblioteca.repository.UsuarioRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -47,8 +50,14 @@ public class ReservaService {
 
     @Transactional
     public void cancelarReserva(Long reservaId){
+        String emailLogado = SecurityContextHolder.getContext().getAuthentication().getName();
+
         Reserva reserva = repository.findById(reservaId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Reserva não encontrada!"));
+
+        if(!reserva.getUsuario().getEmail().equals(emailLogado)){
+            throw new RegraDeNegocioException("Reserva não encontrada");
+        }
 
         if(reserva.getStatus() == StatusReserva.RESERVADO){
             Livro livro = reserva.getLivro();
@@ -74,6 +83,20 @@ public class ReservaService {
     }
 
     public List<ReservaDTO> listarReservasPorUsuario(Long usuarioId) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        String emailLogado = auth.getName();
+        boolean ehFuncionario = auth.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_FUNCIONARIO"));
+
+        if(!ehFuncionario) {
+            Usuario usuarioLogado = usuarioRepository.findByEmailAndAtivoTrue(emailLogado)
+                    .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado"));
+
+            if(!usuarioLogado.getId().equals(usuarioId)){
+                throw new RegraDeNegocioException("Você só pode ver suas próprias reservas");
+            }
+        }
+
         return repository.findByUsuarioId(usuarioId).stream()
                 .map(ReservaDTO::new)
                 .collect(Collectors.toList());

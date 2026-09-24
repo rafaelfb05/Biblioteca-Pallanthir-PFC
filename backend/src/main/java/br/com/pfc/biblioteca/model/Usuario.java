@@ -6,6 +6,7 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -24,9 +25,11 @@ public class Usuario {
     private String senha;
     @Enumerated(EnumType.STRING)
     private TipoUsuario tipo;
-    @ManyToMany(fetch = FetchType.EAGER)
+    @ManyToMany
     private List<Livro> favoritos = new ArrayList<>();
     private boolean ativo = true;
+    private int tentativasFalhas = 0;
+    private LocalDateTime tempoBloqueio;
 
     public Usuario(){}
 
@@ -91,6 +94,22 @@ public class Usuario {
 
     public void setAtivo(boolean ativo) {
         this.ativo = ativo;
+    }
+
+    public int getTentativasFalhas() {
+        return tentativasFalhas;
+    }
+
+    public void setTentativasFalhas(int tentativasFalhas) {
+        this.tentativasFalhas = tentativasFalhas;
+    }
+
+    public LocalDateTime getTempoBloqueio() {
+        return tempoBloqueio;
+    }
+
+    public void setTempoBloqueio(LocalDateTime tempoBloqueio) {
+        this.tempoBloqueio = tempoBloqueio;
     }
 
     @Override
