@@ -1,22 +1,22 @@
 package br.com.pfc.biblioteca.service;
 
-import br.com.pfc.biblioteca.dto.LivroDTO;
-import br.com.pfc.biblioteca.dto.LoginRequest;
-import br.com.pfc.biblioteca.dto.UsuarioDTO;
-import br.com.pfc.biblioteca.dto.UsuarioRequest;
+import br.com.pfc.biblioteca.dto.*;
 import br.com.pfc.biblioteca.enums.TipoUsuario;
 import br.com.pfc.biblioteca.infra.exception.ConflitoException;
 import br.com.pfc.biblioteca.infra.exception.CredenciaisInvalidasException;
 import br.com.pfc.biblioteca.infra.exception.RecursoNaoEncontradoException;
 import br.com.pfc.biblioteca.infra.exception.RegraDeNegocioException;
+import br.com.pfc.biblioteca.infra.security.JwtService;
 import br.com.pfc.biblioteca.model.Livro;
 import br.com.pfc.biblioteca.model.Usuario;
 import br.com.pfc.biblioteca.repository.LivroRepository;
 import br.com.pfc.biblioteca.repository.UsuarioRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -27,6 +27,11 @@ public class UsuarioService {
     private UsuarioRepository repository;
     @Autowired
     private LivroRepository livroRepository;
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+    @Autowired
+    private JwtService jwtService;
+
 
     private List<UsuarioDTO> converteDados(List<Usuario> usuario){
         return usuario.stream()
@@ -52,6 +57,7 @@ public class UsuarioService {
         }
 
         Usuario usuario = new Usuario(request);
+        usuario.setSenha(passwordEncoder.encode(request.senha()));
         return repository.save(usuario);
     }
 
@@ -115,10 +121,28 @@ public class UsuarioService {
                 .collect(Collectors.toList());
     }
 
-    public UsuarioDTO login(LoginRequest request){
-        Usuario usuario = repository.findByEmailAndSenhaAndAtivoTrue(request.email(), request.senha())
+    public LoginResponseDTO login(LoginRequest request){
+        Usuario usuario = repository.findByEmailAndAtivoTrue(request.email())
                 .orElseThrow(() -> new CredenciaisInvalidasException("Email ou senha incorretos"));
 
-        return new UsuarioDTO(usuario);
+        if(usuario.getTempoBloqueio() != null && usuario.getTempoBloqueio().isAfter(LocalDateTime.now())){
+            throw new RegraDeNegocioException("Conta bloqueada, tente novamente mais tarde");
+        }
+
+        if(!passwordEncoder.matches(request.senha(), usuario.getSenha())){
+            usuario.setTentativasFalhas(usuario.getTentativasFalhas() + 1);
+            if(usuario.getTentativasFalhas() >= 3){
+                usuario.setTempoBloqueio(LocalDateTime.now().plusMinutes(15));
+            }
+            repository.save(usuario);
+            throw new CredenciaisInvalidasException("Email ou senha incorretos!");
+        }
+
+        usuario.setTentativasFalhas(0);
+        usuario.setTempoBloqueio(null);
+        repository.save(usuario);
+
+        String token = jwtService.gerarToken(usuario);
+        return new LoginResponseDTO(new UsuarioDTO(usuario), token);
     }
 }

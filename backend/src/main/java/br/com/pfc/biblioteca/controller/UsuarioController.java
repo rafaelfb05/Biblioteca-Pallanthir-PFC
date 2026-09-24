@@ -1,11 +1,9 @@
 package br.com.pfc.biblioteca.controller;
 
-import br.com.pfc.biblioteca.dto.LivroDTO;
-import br.com.pfc.biblioteca.dto.LoginRequest;
-import br.com.pfc.biblioteca.dto.UsuarioDTO;
-import br.com.pfc.biblioteca.dto.UsuarioRequest;
+import br.com.pfc.biblioteca.dto.*;
 import br.com.pfc.biblioteca.model.Usuario;
 import br.com.pfc.biblioteca.service.UsuarioService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -20,7 +18,7 @@ public class UsuarioController {
     public UsuarioService service;
 
     @PostMapping("/cadastro")
-    public ResponseEntity<UsuarioDTO> cadastrarUsuario(@RequestBody UsuarioRequest request) {
+    public ResponseEntity<UsuarioDTO> cadastrarUsuario(@RequestBody @Valid UsuarioRequest request) {
         Usuario usuario = service.cadastrarUsuario(request);
         return ResponseEntity.ok(new UsuarioDTO(usuario));
     }
@@ -59,8 +57,7 @@ public class UsuarioController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<UsuarioDTO> login(@RequestBody LoginRequest request){
-        UsuarioDTO usuario = service.login(request);
-        return ResponseEntity.ok(usuario);
+    public ResponseEntity<LoginResponseDTO> login(@RequestBody LoginRequest request){
+        return ResponseEntity.ok(service.login(request));
     }
 }
