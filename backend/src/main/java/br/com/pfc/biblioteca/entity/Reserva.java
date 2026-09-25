@@ -1,4 +1,4 @@
-package br.com.pfc.biblioteca.model;
+package br.com.pfc.biblioteca.entity;
 
 import br.com.pfc.biblioteca.enums.StatusReserva;
 import jakarta.persistence.*;

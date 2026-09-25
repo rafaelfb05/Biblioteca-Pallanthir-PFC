@@ -7,11 +7,11 @@ import br.com.pfc.biblioteca.infra.exception.CredenciaisInvalidasException;
 import br.com.pfc.biblioteca.infra.exception.RecursoNaoEncontradoException;
 import br.com.pfc.biblioteca.infra.exception.RegraDeNegocioException;
 import br.com.pfc.biblioteca.infra.security.JwtService;
-import br.com.pfc.biblioteca.model.Livro;
-import br.com.pfc.biblioteca.model.Usuario;
+import br.com.pfc.biblioteca.entity.Livro;
+import br.com.pfc.biblioteca.entity.Usuario;
 import br.com.pfc.biblioteca.repository.LivroRepository;
 import br.com.pfc.biblioteca.repository.UsuarioRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,16 +23,19 @@ import java.util.stream.Collectors;
 @Service
 public class UsuarioService {
 
-    @Autowired
-    private UsuarioRepository repository;
-    @Autowired
-    private LivroRepository livroRepository;
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-    @Autowired
-    private JwtService jwtService;
-    @Autowired
-    private EmailService emailService;
+    private final UsuarioRepository repository;
+    private final LivroRepository livroRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final JwtService jwtService;
+    private final EmailService emailService;
+
+    public UsuarioService(UsuarioRepository repository, LivroRepository livroRepository, PasswordEncoder passwordEncoder, JwtService jwtService, EmailService emailService) {
+        this.repository = repository;
+        this.livroRepository = livroRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.jwtService = jwtService;
+        this.emailService = emailService;
+    }
 
 
     private List<UsuarioDTO> converteDados(List<Usuario> usuario){
@@ -81,12 +84,20 @@ public class UsuarioService {
         return repository.save(usuario);
     }
 
-    public void deletarUsuario(Long id) {
+    public Usuario excluirUsuario(Long id) {
+        String emailLogado = SecurityContextHolder.getContext().getAuthentication().getName();
+
         Usuario usuario = repository.findById(id)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado"));
+        if(!usuario.getEmail().equals(emailLogado)){
+            throw new RegraDeNegocioException("Você só pode excluir sua própria conta");
+        }
 
+        usuario.setNome("Usuário removido");
+        usuario.setEmail("removido-" + usuario.getId() + "@anonimizado.local");
+        usuario.setSenha(null);
         usuario.setAtivo(false);
-        repository.save(usuario);
+        return repository.save(usuario);
     }
     @Transactional
     public void adicionarFavorito(Long usuarioId, Long livroId){
@@ -123,7 +134,7 @@ public class UsuarioService {
                 .collect(Collectors.toList());
     }
 
-    public LoginResponse login(LoginRequest request){
+    public void login(LoginRequest request){
         Usuario usuario = repository.findByEmailAndAtivoTrue(request.email())
                 .orElseThrow(() -> new CredenciaisInvalidasException("Email ou senha incorretos"));
 
@@ -142,14 +153,36 @@ public class UsuarioService {
 
         usuario.setTentativasFalhas(0);
         usuario.setTempoBloqueio(null);
+        String codigo = gerarCodigo();
+        usuario.setCodigo2FA(codigo);
+        usuario.setExpiracao2FA(LocalDateTime.now().plusMinutes(10));
+        repository.save(usuario);
+
+        emailService.enviarEmail(usuario.getEmail(), "Autenticação de 2 fatores",
+                "Seu código para login é:\n" + codigo +
+                        "\nO código tem o prazo de validade de 10 minutos!");
+    }
+
+    private String gerarCodigo(){
+        return String.valueOf((int) (Math.random() * 900000) + 100000);
+    }
+
+    public LoginResponse confirmar2FA(Confirmar2FARequest request){
+        Usuario usuario = repository.findByEmailAndAtivoTrue(request.email())
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado"));
+
+        if(usuario.getCodigo2FA() == null
+                || !usuario.getCodigo2FA().equals(request.codigo())
+                || usuario.getExpiracao2FA().isBefore(LocalDateTime.now())){
+            throw new RegraDeNegocioException("Código invalido ou expirado!");
+        }
+
+        usuario.setCodigo2FA(null);
+        usuario.setExpiracao2FA(null);
         repository.save(usuario);
 
         String token = jwtService.gerarToken(usuario);
         return new LoginResponse(new UsuarioDTO(usuario), token);
-    }
-
-    private String gerarCodigo(){
-        return String.valueOf((int) (Math.random() * 900000 + 100000));
     }
 
     public void recuperacaoSenha(SolicitarRecuperacaoRequest request){
@@ -159,6 +192,7 @@ public class UsuarioService {
         String codigo = gerarCodigo();
         usuario.setCodigoRecuperacao(codigo);
         usuario.setExpiracaoCodigo(LocalDateTime.now().plusMinutes(15));
+        repository.save(usuario);
         emailService.enviarEmail(usuario.getEmail(),
                 "Recuperação de Conta - Biblioteca Pallanthir",
                 "Recebemos sua solicitação para recuperação de conta, seu código de acesso é: \n" +

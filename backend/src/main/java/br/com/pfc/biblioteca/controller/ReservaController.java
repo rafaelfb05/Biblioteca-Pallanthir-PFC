@@ -2,7 +2,6 @@ package br.com.pfc.biblioteca.controller;
 
 import br.com.pfc.biblioteca.dto.ReservaDTO;
 import br.com.pfc.biblioteca.service.ReservaService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -12,8 +11,11 @@ import java.util.List;
 @RequestMapping("/reservas")
 public class ReservaController {
 
-    @Autowired
-    private ReservaService service;
+    private final ReservaService service;
+
+    public ReservaController(ReservaService service) {
+        this.service = service;
+    }
 
     @PostMapping("/{usuarioId}/{livroId}")
     public ResponseEntity<Void> reservar(@PathVariable Long usuarioId, @PathVariable Long livroId){

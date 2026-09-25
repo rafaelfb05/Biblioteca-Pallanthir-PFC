@@ -1,10 +1,9 @@
 package br.com.pfc.biblioteca.controller;
 
 import br.com.pfc.biblioteca.dto.*;
-import br.com.pfc.biblioteca.model.Usuario;
+import br.com.pfc.biblioteca.entity.Usuario;
 import br.com.pfc.biblioteca.service.UsuarioService;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -14,8 +13,11 @@ import java.util.List;
 @RequestMapping("/usuarios")
 public class UsuarioController {
 
-    @Autowired
-    public UsuarioService service;
+    private final UsuarioService service;
+
+    public UsuarioController(UsuarioService service) {
+        this.service = service;
+    }
 
     @PostMapping("/cadastro")
     public ResponseEntity<UsuarioDTO> cadastrarUsuario(@RequestBody @Valid UsuarioRequest request) {
@@ -36,7 +38,7 @@ public class UsuarioController {
 
     @DeleteMapping("/deletar/{id}")
     public ResponseEntity<Void> deletarUsuario(@PathVariable Long id) {
-        service.deletarUsuario(id);
+        service.excluirUsuario(id);
         return ResponseEntity.noContent().build();
     }
     @PostMapping("/{usuarioId}/favoritar/{livroId}")
@@ -57,8 +59,14 @@ public class UsuarioController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest request){
-        return ResponseEntity.ok(service.login(request));
+    public ResponseEntity<Void> login(@RequestBody LoginRequest request){
+        service.login(request);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/verificar-2fa")
+    public ResponseEntity<LoginResponse> confirmar2FA(@RequestBody Confirmar2FARequest request){
+        return ResponseEntity.ok(service.confirmar2FA(request));
     }
 
     @PostMapping("/recuperar-senha")

@@ -1,7 +1,7 @@
 package br.com.pfc.biblioteca.repository;
 
 import br.com.pfc.biblioteca.enums.StatusReserva;
-import br.com.pfc.biblioteca.model.Reserva;
+import br.com.pfc.biblioteca.entity.Reserva;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;

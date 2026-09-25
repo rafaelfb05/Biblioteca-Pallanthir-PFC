@@ -25,7 +25,7 @@ public class SecurityConfig {
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST, "/usuarios/cadastro", "/usuarios/login",
-                                "/usuarios/recuperar-senha", "/usuarios/redefinir-senha").permitAll()
+                               "/usuarios/verificar-2fa", "/usuarios/recuperar-senha", "/usuarios/redefinir-senha").permitAll()
                         .requestMatchers(HttpMethod.GET, "/livros/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/livro/cadastro").hasRole("FUNCIONARIO")
                         . requestMatchers(HttpMethod.PUT, "/livros/*").hasRole("FUNCIONARIO")
@@ -36,6 +36,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/reservas/*/*").hasRole("ESTUDANTE")
                         .requestMatchers(HttpMethod.PUT, "/reservas/*/cancelar").hasRole("ESTUDANTE")
                         .requestMatchers(HttpMethod.GET, "/reservas/**").authenticated()
+                        .requestMatchers(HttpMethod.DELETE, "/usuarios/deletar/*").authenticated()
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();

@@ -1,7 +1,7 @@
 package br.com.pfc.biblioteca.dto;
 
 import br.com.pfc.biblioteca.enums.StatusReserva;
-import br.com.pfc.biblioteca.model.Reserva;
+import br.com.pfc.biblioteca.entity.Reserva;
 
 import java.time.LocalDateTime;
 
