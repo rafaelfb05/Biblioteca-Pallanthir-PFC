@@ -3,6 +3,7 @@ package br.com.pfc.biblioteca.model;
 import br.com.pfc.biblioteca.dto.DadosLivro;
 import br.com.pfc.biblioteca.enums.Materia;
 import jakarta.persistence.*;
+import org.hibernate.annotations.ColumnDefault;
 
 import java.util.List;
 
@@ -22,6 +23,8 @@ public class Livro {
     private Integer estoque = 1;
     private Double preco = 0.0;
     private double avaliacao;
+    @Column(nullable = false)
+    @ColumnDefault("false")
     private boolean ativo = true;
 
     public Livro(){}
