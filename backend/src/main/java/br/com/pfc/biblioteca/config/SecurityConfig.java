@@ -24,7 +24,8 @@ public class SecurityConfig {
         http.csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.POST, "/usuarios/cadastro", "/usuarios/login").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/usuarios/cadastro", "/usuarios/login",
+                                "/usuarios/recuperar-senha", "/usuarios/redefinir-senha").permitAll()
                         .requestMatchers(HttpMethod.GET, "/livros/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/livro/cadastro").hasRole("FUNCIONARIO")
                         . requestMatchers(HttpMethod.PUT, "/livros/*").hasRole("FUNCIONARIO")

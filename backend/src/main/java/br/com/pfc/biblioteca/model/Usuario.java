@@ -33,6 +33,8 @@ public class Usuario {
     private boolean ativo = true;
     private Integer tentativasFalhas = 0;
     private LocalDateTime tempoBloqueio;
+    private String codigoRecuperacao;
+    private LocalDateTime expiracaoCodigo;
 
     public Usuario(){}
 
@@ -113,6 +115,22 @@ public class Usuario {
 
     public void setTempoBloqueio(LocalDateTime tempoBloqueio) {
         this.tempoBloqueio = tempoBloqueio;
+    }
+
+    public String getCodigoRecuperacao() {
+        return codigoRecuperacao;
+    }
+
+    public void setCodigoRecuperacao(String codigoRecuperacao) {
+        this.codigoRecuperacao = codigoRecuperacao;
+    }
+
+    public LocalDateTime getExpiracaoCodigo() {
+        return expiracaoCodigo;
+    }
+
+    public void setExpiracaoCodigo(LocalDateTime expiracaoCodigo) {
+        this.expiracaoCodigo = expiracaoCodigo;
     }
 
     @Override

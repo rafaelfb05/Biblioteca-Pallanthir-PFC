@@ -31,6 +31,8 @@ public class UsuarioService {
     private PasswordEncoder passwordEncoder;
     @Autowired
     private JwtService jwtService;
+    @Autowired
+    private EmailService emailService;
 
 
     private List<UsuarioDTO> converteDados(List<Usuario> usuario){
@@ -121,7 +123,7 @@ public class UsuarioService {
                 .collect(Collectors.toList());
     }
 
-    public LoginResponseDTO login(LoginRequest request){
+    public LoginResponse login(LoginRequest request){
         Usuario usuario = repository.findByEmailAndAtivoTrue(request.email())
                 .orElseThrow(() -> new CredenciaisInvalidasException("Email ou senha incorretos"));
 
@@ -143,6 +145,39 @@ public class UsuarioService {
         repository.save(usuario);
 
         String token = jwtService.gerarToken(usuario);
-        return new LoginResponseDTO(new UsuarioDTO(usuario), token);
+        return new LoginResponse(new UsuarioDTO(usuario), token);
+    }
+
+    private String gerarCodigo(){
+        return String.valueOf((int) (Math.random() * 900000 + 100000));
+    }
+
+    public void recuperacaoSenha(SolicitarRecuperacaoRequest request){
+        Usuario usuario = repository.findByEmailAndAtivoTrue(request.email())
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado"));
+
+        String codigo = gerarCodigo();
+        usuario.setCodigoRecuperacao(codigo);
+        usuario.setExpiracaoCodigo(LocalDateTime.now().plusMinutes(15));
+        emailService.enviarEmail(usuario.getEmail(),
+                "Recuperação de Conta - Biblioteca Pallanthir",
+                "Recebemos sua solicitação para recuperação de conta, seu código de acesso é: \n" +
+                codigo + "\nO código tem o prazo de válidade de 15 minutos!");
+    }
+
+    public void redefinirSenha(RedefinirSenhaRequest request){
+        Usuario usuario = repository.findByEmailAndAtivoTrue(request.email())
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado"));
+
+        if(usuario.getCodigoRecuperacao() == null
+        || !usuario.getCodigoRecuperacao().equals(request.codigo())
+        || usuario.getExpiracaoCodigo().isBefore(LocalDateTime.now())){
+            throw new RegraDeNegocioException("Código de recuperção invalido ou expirado!");
+        }
+
+        usuario.setSenha(passwordEncoder.encode(request.novaSenha()));
+        usuario.setCodigoRecuperacao(null);
+        usuario.setExpiracaoCodigo(null);
+        repository.save(usuario);
     }
 }

@@ -57,7 +57,19 @@ public class UsuarioController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<LoginResponseDTO> login(@RequestBody LoginRequest request){
+    public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest request){
         return ResponseEntity.ok(service.login(request));
+    }
+
+    @PostMapping("/recuperar-senha")
+    public ResponseEntity<Void> recuperarSenha(@RequestBody SolicitarRecuperacaoRequest request){
+        service.recuperacaoSenha(request);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/redefinir-senha")
+    public ResponseEntity<Void> redefinirSenha(@RequestBody RedefinirSenhaRequest request){
+        service.redefinirSenha(request);
+        return ResponseEntity.ok().build();
     }
 }
