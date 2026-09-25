@@ -5,6 +5,7 @@ import br.com.pfc.biblioteca.enums.TipoUsuario;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import org.hibernate.annotations.ColumnDefault;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -27,8 +28,10 @@ public class Usuario {
     private TipoUsuario tipo;
     @ManyToMany
     private List<Livro> favoritos = new ArrayList<>();
+    @Column(nullable = false)
+    @ColumnDefault("false")
     private boolean ativo = true;
-    private int tentativasFalhas = 0;
+    private Integer tentativasFalhas = 0;
     private LocalDateTime tempoBloqueio;
 
     public Usuario(){}
@@ -96,11 +99,11 @@ public class Usuario {
         this.ativo = ativo;
     }
 
-    public int getTentativasFalhas() {
+    public Integer getTentativasFalhas() {
         return tentativasFalhas;
     }
 
-    public void setTentativasFalhas(int tentativasFalhas) {
+    public void setTentativasFalhas(Integer tentativasFalhas) {
         this.tentativasFalhas = tentativasFalhas;
     }
 
