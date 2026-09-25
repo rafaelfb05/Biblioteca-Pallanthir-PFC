@@ -122,7 +122,7 @@ public class UsuarioService {
                 .collect(Collectors.toList());
     }
 
-    public LoginResponse login(LoginRequest request){
+    public void login(LoginRequest request){
         Usuario usuario = repository.findByEmailAndAtivoTrue(request.email())
                 .orElseThrow(() -> new CredenciaisInvalidasException("Email ou senha incorretos"));
 
@@ -141,14 +141,36 @@ public class UsuarioService {
 
         usuario.setTentativasFalhas(0);
         usuario.setTempoBloqueio(null);
+        String codigo = gerarCodigo();
+        usuario.setCodigo2FA(codigo);
+        usuario.setExpiracao2FA(LocalDateTime.now().plusMinutes(10));
         repository.save(usuario);
 
-        String token = jwtService.gerarToken(usuario);
-        return new LoginResponse(new UsuarioDTO(usuario), token);
+        emailService.enviarEmail(usuario.getEmail(), "Autenticação de 2 fatores",
+                "Seu código para login é:\n" + codigo +
+                        "\nO código tem o prazo de validade de 10 minutos!");
     }
 
     private String gerarCodigo(){
         return String.valueOf((int) (Math.random() * 900000) + 100000);
+    }
+
+    public LoginResponse confirmar2FA(Confirmar2FARequest request){
+        Usuario usuario = repository.findByEmailAndAtivoTrue(request.email())
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado"));
+
+        if(usuario.getCodigo2FA() == null
+                || !usuario.getCodigo2FA().equals(request.codigo())
+                || usuario.getExpiracao2FA().isBefore(LocalDateTime.now())){
+            throw new RegraDeNegocioException("Código invalido ou expirado!");
+        }
+
+        usuario.setCodigo2FA(null);
+        usuario.setExpiracao2FA(null);
+        repository.save(usuario);
+
+        String token = jwtService.gerarToken(usuario);
+        return new LoginResponse(new UsuarioDTO(usuario), token);
     }
 
     public void recuperacaoSenha(SolicitarRecuperacaoRequest request){

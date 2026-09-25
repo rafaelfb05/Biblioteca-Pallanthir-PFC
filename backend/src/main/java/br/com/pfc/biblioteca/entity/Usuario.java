@@ -35,6 +35,8 @@ public class Usuario {
     private LocalDateTime tempoBloqueio;
     private String codigoRecuperacao;
     private LocalDateTime expiracaoCodigo;
+    private String codigo2FA;
+    private LocalDateTime expiracao2FA;
 
     public Usuario(){}
 
@@ -131,6 +133,22 @@ public class Usuario {
 
     public void setExpiracaoCodigo(LocalDateTime expiracaoCodigo) {
         this.expiracaoCodigo = expiracaoCodigo;
+    }
+
+    public String getCodigo2FA() {
+        return codigo2FA;
+    }
+
+    public void setCodigo2FA(String codigo2FA) {
+        this.codigo2FA = codigo2FA;
+    }
+
+    public LocalDateTime getExpiracao2FA() {
+        return expiracao2FA;
+    }
+
+    public void setExpiracao2FA(LocalDateTime expiracao2FA) {
+        this.expiracao2FA = expiracao2FA;
     }
 
     @Override

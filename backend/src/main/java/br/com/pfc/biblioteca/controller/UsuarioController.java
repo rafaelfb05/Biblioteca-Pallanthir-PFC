@@ -59,8 +59,14 @@ public class UsuarioController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest request){
-        return ResponseEntity.ok(service.login(request));
+    public ResponseEntity<Void> login(@RequestBody LoginRequest request){
+        service.login(request);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/verificar-2fa")
+    public ResponseEntity<LoginResponse> confirmar2FA(@RequestBody Confirmar2FARequest request){
+        return ResponseEntity.ok(service.confirmar2FA(request));
     }
 
     @PostMapping("/recuperar-senha")
