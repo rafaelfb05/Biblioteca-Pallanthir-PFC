@@ -1,7 +1,7 @@
 package br.com.pfc.biblioteca.dto;
 
 import br.com.pfc.biblioteca.enums.Materia;
-import br.com.pfc.biblioteca.entity.Livro;
+import br.com.pfc.biblioteca.entity.jpa.Livro;
 
 import java.util.List;
 

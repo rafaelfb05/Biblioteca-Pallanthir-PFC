@@ -7,8 +7,8 @@ import br.com.pfc.biblioteca.infra.exception.CredenciaisInvalidasException;
 import br.com.pfc.biblioteca.infra.exception.RecursoNaoEncontradoException;
 import br.com.pfc.biblioteca.infra.exception.RegraDeNegocioException;
 import br.com.pfc.biblioteca.infra.security.JwtService;
-import br.com.pfc.biblioteca.entity.Livro;
-import br.com.pfc.biblioteca.entity.Usuario;
+import br.com.pfc.biblioteca.entity.jpa.Livro;
+import br.com.pfc.biblioteca.entity.jpa.Usuario;
 import br.com.pfc.biblioteca.repository.LivroRepository;
 import br.com.pfc.biblioteca.repository.UsuarioRepository;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -28,13 +28,15 @@ public class UsuarioService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final EmailService emailService;
+    private final LogAuditoriaService logService;
 
-    public UsuarioService(UsuarioRepository repository, LivroRepository livroRepository, PasswordEncoder passwordEncoder, JwtService jwtService, EmailService emailService) {
+    public UsuarioService(UsuarioRepository repository, LivroRepository livroRepository, PasswordEncoder passwordEncoder, JwtService jwtService, EmailService emailService, LogAuditoriaService logService) {
         this.repository = repository;
         this.livroRepository = livroRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.emailService = emailService;
+        this.logService = logService;
     }
 
 
@@ -136,9 +138,13 @@ public class UsuarioService {
 
     public void login(LoginRequest request){
         Usuario usuario = repository.findByEmailAndAtivoTrue(request.email())
-                .orElseThrow(() -> new CredenciaisInvalidasException("Email ou senha incorretos"));
+                .orElseThrow(() -> {
+                    logService.registrarLog(null, request.email(), "FALHA_LOGIN", "Email não encontrado");
+                    return new CredenciaisInvalidasException("Email ou senha incorretos");
+                });
 
         if(usuario.getTempoBloqueio() != null && usuario.getTempoBloqueio().isAfter(LocalDateTime.now())){
+            logService.registrarLog(usuario.getId(), usuario.getEmail(), "LOGIN_BLOQUEADO", "Bloqueio contra força bruta ativado");
             throw new RegraDeNegocioException("Conta bloqueada, tente novamente mais tarde");
         }
 
@@ -148,6 +154,7 @@ public class UsuarioService {
                 usuario.setTempoBloqueio(LocalDateTime.now().plusMinutes(15));
             }
             repository.save(usuario);
+            logService.registrarLog(usuario.getId(), usuario.getEmail(), "FALHA_LOGIN", "Senha incorreta");
             throw new CredenciaisInvalidasException("Email ou senha incorretos!");
         }
 
@@ -161,6 +168,8 @@ public class UsuarioService {
         emailService.enviarEmail(usuario.getEmail(), "Autenticação de 2 fatores",
                 "Seu código para login é:\n" + codigo +
                         "\nO código tem o prazo de validade de 10 minutos!");
+
+        logService.registrarLog(usuario.getId(), usuario.getEmail(), "SUCESSO_LOGIN", "Código 2FA enviado");
     }
 
     private String gerarCodigo(){

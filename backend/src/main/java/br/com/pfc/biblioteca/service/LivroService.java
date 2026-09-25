@@ -8,7 +8,7 @@ import br.com.pfc.biblioteca.enums.Materia;
 import br.com.pfc.biblioteca.enums.StatusReserva;
 import br.com.pfc.biblioteca.infra.exception.ConflitoException;
 import br.com.pfc.biblioteca.infra.exception.RecursoNaoEncontradoException;
-import br.com.pfc.biblioteca.entity.Livro;
+import br.com.pfc.biblioteca.entity.jpa.Livro;
 import br.com.pfc.biblioteca.repository.LivroRepository;
 import br.com.pfc.biblioteca.repository.ReservaRepository;
 import br.com.pfc.biblioteca.repository.UsuarioRepository;

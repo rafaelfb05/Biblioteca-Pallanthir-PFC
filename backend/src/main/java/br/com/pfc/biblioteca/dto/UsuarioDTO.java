@@ -1,7 +1,7 @@
 package br.com.pfc.biblioteca.dto;
 
 import br.com.pfc.biblioteca.enums.TipoUsuario;
-import br.com.pfc.biblioteca.entity.Usuario;
+import br.com.pfc.biblioteca.entity.jpa.Usuario;
 
 public record UsuarioDTO(Long id,
                          String nome,
