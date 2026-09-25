@@ -5,7 +5,7 @@ import br.com.pfc.biblioteca.dto.CadastroLivroRequest;
 import br.com.pfc.biblioteca.dto.LivroDTO;
 import br.com.pfc.biblioteca.dto.MateriaDTO;
 import br.com.pfc.biblioteca.enums.Materia;
-import br.com.pfc.biblioteca.model.Livro;
+import br.com.pfc.biblioteca.entity.Livro;
 import br.com.pfc.biblioteca.service.LivroService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

@@ -1,6 +1,6 @@
 package br.com.pfc.biblioteca.infra.security;
 
-import br.com.pfc.biblioteca.model.Usuario;
+import br.com.pfc.biblioteca.entity.Usuario;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.stereotype.Service;

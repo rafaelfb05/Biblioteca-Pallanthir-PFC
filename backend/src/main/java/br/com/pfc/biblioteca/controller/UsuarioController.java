@@ -1,7 +1,7 @@
 package br.com.pfc.biblioteca.controller;
 
 import br.com.pfc.biblioteca.dto.*;
-import br.com.pfc.biblioteca.model.Usuario;
+import br.com.pfc.biblioteca.entity.Usuario;
 import br.com.pfc.biblioteca.service.UsuarioService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;

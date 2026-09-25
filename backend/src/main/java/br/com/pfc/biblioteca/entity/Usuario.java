@@ -1,4 +1,4 @@
-package br.com.pfc.biblioteca.model;
+package br.com.pfc.biblioteca.entity;
 
 import br.com.pfc.biblioteca.dto.UsuarioRequest;
 import br.com.pfc.biblioteca.enums.TipoUsuario;
