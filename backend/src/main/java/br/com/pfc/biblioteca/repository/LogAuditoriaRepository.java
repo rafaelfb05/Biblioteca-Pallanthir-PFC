@@ -5,7 +5,7 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 
 import java.util.List;
 
-public interface LogAuditoriaRepository extends MongoRepository {
+public interface LogAuditoriaRepository extends MongoRepository <LogAuditoria, String> {
 
     List<LogAuditoria> findAllByOrderByDataHoraDesc();
 
