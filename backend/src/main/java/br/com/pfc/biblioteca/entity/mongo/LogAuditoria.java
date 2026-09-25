@@ -1,11 +1,11 @@
 package br.com.pfc.biblioteca.entity.mongo;
 
-import jakarta.persistence.Id;
+import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
 
-@Document(collation = "logs_auditoria")
+@Document(collection = "logs_auditoria")
 public class LogAuditoria {
     @Id
     private String id;
@@ -17,11 +17,11 @@ public class LogAuditoria {
 
     public LogAuditoria(){}
 
-    public LogAuditoria(Long usuarioId, String usuarioEmail, String descricao, String acao) {
+    public LogAuditoria(Long usuarioId, String usuarioEmail, String acao, String descricao) {
         this.usuarioId = usuarioId;
         this.usuarioEmail = usuarioEmail;
-        this.descricao = descricao;
         this.acao = acao;
+        this.descricao = descricao;
         this.dataHora = LocalDateTime.now();
     }
 

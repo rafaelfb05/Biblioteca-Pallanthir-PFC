@@ -25,11 +25,13 @@ public class ReservaService {
     private final ReservaRepository repository;
     private final LivroRepository livroRepository;
     private final UsuarioRepository usuarioRepository;
+    private final LogAuditoriaService logService;
 
-    public ReservaService(ReservaRepository repository, LivroRepository livroRepository, UsuarioRepository usuarioRepository) {
+    public ReservaService(ReservaRepository repository, LivroRepository livroRepository, UsuarioRepository usuarioRepository, LogAuditoriaService logService) {
         this.repository = repository;
         this.livroRepository = livroRepository;
         this.usuarioRepository = usuarioRepository;
+        this.logService = logService;
     }
 
     @Transactional
@@ -41,13 +43,15 @@ public class ReservaService {
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Livro não encontrado"));
 
         if(livro.getEstoque() == null || livro.getEstoque() <= 0){
+            logService.registrarLog(usuario.getId(), usuario.getEmail(), "FALHA_RESERVA", "Livro " + livro.getId() + " esgotado");
             throw new ConflitoException("Livro esgotado no momento!");
         }
         livro.setEstoque(livro.getEstoque() -1);
         livroRepository.save(livro);
 
-        Reserva reserva = new Reserva(usuario, livro);
-        return repository.save(reserva);
+        Reserva reserva = repository.save(new Reserva(usuario, livro));
+        logService.registrarLog(usuario.getId(), usuario.getEmail(), "RESERVA_LIVRO", "Reserva " + reserva.getId() + " do livro " + livro.getId() + " criada");
+        return reserva;
     }
 
     @Transactional
@@ -58,6 +62,7 @@ public class ReservaService {
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Reserva não encontrada!"));
 
         if(!reserva.getUsuario().getEmail().equals(emailLogado)){
+            logService.registrarLogUsuarioLogado("ACESSO_NEGADO", "Tentativa de cancelar a reserva " + reservaId + " de outro usuário");
             throw new RegraDeNegocioException("Reserva não encontrada");
         }
 
@@ -69,6 +74,7 @@ public class ReservaService {
 
         reserva.setStatus(StatusReserva.CANCELADO);
         repository.save(reserva);
+        logService.registrarLog(reserva.getUsuario().getId(), emailLogado, "CANCELAMENTO_RESERVA", "Reserva " + reservaId + " cancelada");
     }
 
     @Transactional
@@ -82,6 +88,7 @@ public class ReservaService {
 
         reserva.setStatus(StatusReserva.DEVOLVIDO);
         repository.save(reserva);
+        logService.registrarLogUsuarioLogado("DEVOLUCAO_LIVRO", "Reserva " + reservaId + " do usuário " + reserva.getUsuario().getId() + " devolvida");
     }
 
     public List<ReservaDTO> listarReservasPorUsuario(Long usuarioId) {
@@ -95,6 +102,7 @@ public class ReservaService {
                     .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado"));
 
             if(!usuarioLogado.getId().equals(usuarioId)){
+                logService.registrarLog(usuarioLogado.getId(), usuarioLogado.getEmail(), "ACESSO_NEGADO", "Tentativa de listar as reservas do usuário " + usuarioId);
                 throw new RegraDeNegocioException("Você só pode ver suas próprias reservas");
             }
         }

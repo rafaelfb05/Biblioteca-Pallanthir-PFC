@@ -24,11 +24,13 @@ public class SecurityConfig {
         http.csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(HttpMethod.GET, "/", "/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                        .requestMatchers("/error").permitAll()
                         .requestMatchers(HttpMethod.POST, "/usuarios/cadastro", "/usuarios/login",
                                "/usuarios/verificar-2fa", "/usuarios/recuperar-senha", "/usuarios/redefinir-senha").permitAll()
                         .requestMatchers(HttpMethod.GET, "/livros/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/logs/**").hasRole("FUNCIONARIO")
-                        .requestMatchers(HttpMethod.POST, "/livro/cadastro").hasRole("FUNCIONARIO")
+                        .requestMatchers(HttpMethod.POST, "/livros/cadastro").hasRole("FUNCIONARIO")
                         . requestMatchers(HttpMethod.PUT, "/livros/*").hasRole("FUNCIONARIO")
                         .requestMatchers(HttpMethod.DELETE, "/livros/*").hasRole("FUNCIONARIO")
                         .requestMatchers(HttpMethod.PUT, "/reservas/*/devolver").hasRole("FUNCIONARIO")

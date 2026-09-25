@@ -26,15 +26,17 @@ public class LivroService {
     private final LivroRepository repository;
     private final ReservaRepository reservaRepository;
     private final UsuarioRepository usuarioRepository;
+    private final LogAuditoriaService logService;
     private ConsumoApi consumo = new ConsumoApi();
     private ConverteDados conversor = new ConverteDados();
     private final String ENDERECO = "https://www.googleapis.com/books/v1/volumes?q=";
     private final String API_KEY = System.getenv("BOOK_API");
 
-    public LivroService(LivroRepository repository, ReservaRepository reservaRepository, UsuarioRepository usuarioRepository) {
+    public LivroService(LivroRepository repository, ReservaRepository reservaRepository, UsuarioRepository usuarioRepository, LogAuditoriaService logService) {
         this.repository = repository;
         this.reservaRepository = reservaRepository;
         this.usuarioRepository = usuarioRepository;
+        this.logService = logService;
     }
 
 
@@ -43,6 +45,7 @@ public class LivroService {
         DadosLivro.DadosBusca dadosBusca = conversor.obterDados(json, DadosLivro.DadosBusca.class);
 
         if (dadosBusca.items() == null || dadosBusca.items().isEmpty()) {
+            logService.registrarLogUsuarioLogado("FALHA_CADASTRO_LIVRO", "Livro \"" + titulo + "\" não encontrado na API do Google Books");
             throw new RecursoNaoEncontradoException("Livro não encontrado na API do Google Books");
         }
         DadosLivro dados = dadosBusca.items().get(0).volumeInfo();
@@ -50,7 +53,9 @@ public class LivroService {
         livro.setMateria(materia);
         livro.setPreco(preco);
         livro.setEstoque(estoque);
-        return repository.save(livro);
+        Livro salvo = repository.save(livro);
+        logService.registrarLogUsuarioLogado("CADASTRO_LIVRO", "Livro " + salvo.getId() + " (" + salvo.getTitulo() + ") cadastrado");
+        return salvo;
     }
 
     public List<LivroDTO> obterTodosOsLivros() {
@@ -94,7 +99,9 @@ public class LivroService {
         if (request.estoque() != null) {
             livro.setEstoque(request.estoque());
         }
-        return repository.save(livro);
+        Livro salvo = repository.save(livro);
+        logService.registrarLogUsuarioLogado("ATUALIZACAO_LIVRO", "Livro " + salvo.getId() + " (" + salvo.getTitulo() + ") atualizado");
+        return salvo;
     }
 
     @Transactional
@@ -113,6 +120,7 @@ public class LivroService {
 
         livro.setAtivo(false);
         repository.save(livro);
+        logService.registrarLogUsuarioLogado("EXCLUSAO_LIVRO", "Livro " + livro.getId() + " (" + livro.getTitulo() + ") excluído");
     }
 
     public List<MateriaDTO> listarMaterias() {

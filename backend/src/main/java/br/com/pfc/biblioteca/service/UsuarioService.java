@@ -52,6 +52,7 @@ public class UsuarioService {
 
         boolean emailExiste = repository.findByEmailAndAtivoTrue(request.email()).isPresent();
         if(emailExiste){
+            logService.registrarLog(null, request.email(), "FALHA_CADASTRO", "Email já cadastrado");
             throw new ConflitoException("Já existe um usuário ativo com esse email");
         }
 
@@ -59,13 +60,16 @@ public class UsuarioService {
             String codigoCorreto = System.getenv("CODIGO_FUNCIONARIO");
 
             if(request.codigoAcesso() == null || !request.codigoAcesso().equals(codigoCorreto)){
+                logService.registrarLog(null, request.email(), "FALHA_CADASTRO", "Código de funcionário inválido");
                 throw new RegraDeNegocioException("Código inválido para cadastro de funcionário");
             }
         }
 
         Usuario usuario = new Usuario(request);
         usuario.setSenha(passwordEncoder.encode(request.senha()));
-        return repository.save(usuario);
+        Usuario salvo = repository.save(usuario);
+        logService.registrarLog(salvo.getId(), salvo.getEmail(), "CADASTRO_USUARIO", "Usuário cadastrado como " + salvo.getTipo());
+        return salvo;
     }
 
     public List<UsuarioDTO> obterUsuarios() {
@@ -79,11 +83,11 @@ public class UsuarioService {
         }
         if(request.email() != null){
             usuario.setEmail(request.email());
+
         }
-        if(request.senha() != null){
-            usuario.setSenha(request.senha());
-        }
-        return repository.save(usuario);
+        Usuario salvo = repository.save(usuario);
+        logService.registrarLog(salvo.getId(), salvo.getEmail(), "ATUALIZACAO_USUARIO", "Dados do usuário atualizados");
+        return salvo;
     }
 
     public Usuario excluirUsuario(Long id) {
@@ -92,6 +96,7 @@ public class UsuarioService {
         Usuario usuario = repository.findById(id)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado"));
         if(!usuario.getEmail().equals(emailLogado)){
+            logService.registrarLogUsuarioLogado("ACESSO_NEGADO", "Tentativa de excluir a conta do usuário " + id);
             throw new RegraDeNegocioException("Você só pode excluir sua própria conta");
         }
 
@@ -99,7 +104,9 @@ public class UsuarioService {
         usuario.setEmail("removido-" + usuario.getId() + "@anonimizado.local");
         usuario.setSenha(null);
         usuario.setAtivo(false);
-        return repository.save(usuario);
+        Usuario salvo = repository.save(usuario);
+        logService.registrarLog(salvo.getId(), salvo.getEmail(), "EXCLUSAO_USUARIO", "Conta excluída e dados anonimizados");
+        return salvo;
     }
     @Transactional
     public void adicionarFavorito(Long usuarioId, Long livroId){
@@ -115,6 +122,7 @@ public class UsuarioService {
         if (!jaFavoritado) {
             usuario.getFavoritos().add(livro);
             repository.save(usuario);
+            logService.registrarLog(usuario.getId(), usuario.getEmail(), "FAVORITAR_LIVRO", "Livro " + livro.getId() + " adicionado aos favoritos");
         }
     }
 
@@ -124,6 +132,7 @@ public class UsuarioService {
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado"));
         usuario.getFavoritos().removeIf(l -> l.getId().equals(livroId));
         repository.save(usuario);
+        logService.registrarLog(usuario.getId(), usuario.getEmail(), "DESFAVORITAR_LIVRO", "Livro " + livroId + " removido dos favoritos");
 
     }
 
@@ -178,11 +187,15 @@ public class UsuarioService {
 
     public LoginResponse confirmar2FA(Confirmar2FARequest request){
         Usuario usuario = repository.findByEmailAndAtivoTrue(request.email())
-                .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado"));
+                .orElseThrow(() -> {
+                    logService.registrarLog(null, request.email(), "FALHA_2FA", "Email não encontrado");
+                    return new RecursoNaoEncontradoException("Usuário não encontrado");
+                });
 
         if(usuario.getCodigo2FA() == null
                 || !usuario.getCodigo2FA().equals(request.codigo())
                 || usuario.getExpiracao2FA().isBefore(LocalDateTime.now())){
+            logService.registrarLog(usuario.getId(), usuario.getEmail(), "FALHA_2FA", "Código 2FA inválido ou expirado");
             throw new RegraDeNegocioException("Código invalido ou expirado!");
         }
 
@@ -191,12 +204,16 @@ public class UsuarioService {
         repository.save(usuario);
 
         String token = jwtService.gerarToken(usuario);
+        logService.registrarLog(usuario.getId(), usuario.getEmail(), "SUCESSO_2FA", "Login concluído, token gerado");
         return new LoginResponse(new UsuarioDTO(usuario), token);
     }
 
     public void recuperacaoSenha(SolicitarRecuperacaoRequest request){
         Usuario usuario = repository.findByEmailAndAtivoTrue(request.email())
-                .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado"));
+                .orElseThrow(() -> {
+                    logService.registrarLog(null, request.email(), "FALHA_RECUPERACAO_SENHA", "Email não encontrado");
+                    return new RecursoNaoEncontradoException("Usuário não encontrado");
+                });
 
         String codigo = gerarCodigo();
         usuario.setCodigoRecuperacao(codigo);
@@ -206,15 +223,20 @@ public class UsuarioService {
                 "Recuperação de Conta - Biblioteca Pallanthir",
                 "Recebemos sua solicitação para recuperação de conta, seu código de acesso é: \n" +
                 codigo + "\nO código tem o prazo de válidade de 15 minutos!");
+        logService.registrarLog(usuario.getId(), usuario.getEmail(), "SOLICITACAO_RECUPERACAO_SENHA", "Código de recuperação enviado");
     }
 
     public void redefinirSenha(RedefinirSenhaRequest request){
         Usuario usuario = repository.findByEmailAndAtivoTrue(request.email())
-                .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado"));
+                .orElseThrow(() -> {
+                    logService.registrarLog(null, request.email(), "FALHA_REDEFINICAO_SENHA", "Email não encontrado");
+                    return new RecursoNaoEncontradoException("Usuário não encontrado");
+                });
 
         if(usuario.getCodigoRecuperacao() == null
         || !usuario.getCodigoRecuperacao().equals(request.codigo())
         || usuario.getExpiracaoCodigo().isBefore(LocalDateTime.now())){
+            logService.registrarLog(usuario.getId(), usuario.getEmail(), "FALHA_REDEFINICAO_SENHA", "Código de recuperação inválido ou expirado");
             throw new RegraDeNegocioException("Código de recuperção invalido ou expirado!");
         }
 
@@ -222,5 +244,6 @@ public class UsuarioService {
         usuario.setCodigoRecuperacao(null);
         usuario.setExpiracaoCodigo(null);
         repository.save(usuario);
+        logService.registrarLog(usuario.getId(), usuario.getEmail(), "REDEFINICAO_SENHA", "Senha redefinida com sucesso");
     }
 }
