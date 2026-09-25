@@ -11,6 +11,7 @@ import br.com.pfc.biblioteca.entity.Livro;
 import br.com.pfc.biblioteca.entity.Usuario;
 import br.com.pfc.biblioteca.repository.LivroRepository;
 import br.com.pfc.biblioteca.repository.UsuarioRepository;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -77,15 +78,26 @@ public class UsuarioService {
         if(request.email() != null){
             usuario.setEmail(request.email());
         }
+        if(request.senha() != null){
+            usuario.setSenha(request.senha());
+        }
         return repository.save(usuario);
     }
 
-    public void deletarUsuario(Long id) {
+    public Usuario excluirUsuario(Long id) {
+        String emailLogado = SecurityContextHolder.getContext().getAuthentication().getName();
+
         Usuario usuario = repository.findById(id)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado"));
+        if(!usuario.getEmail().equals(emailLogado)){
+            throw new RegraDeNegocioException("Você só pode excluir sua própria conta");
+        }
 
+        usuario.setNome("Usuário removido");
+        usuario.setEmail("removido-" + usuario.getId() + "@anonimizado.local");
+        usuario.setSenha(null);
         usuario.setAtivo(false);
-        repository.save(usuario);
+        return repository.save(usuario);
     }
     @Transactional
     public void adicionarFavorito(Long usuarioId, Long livroId){

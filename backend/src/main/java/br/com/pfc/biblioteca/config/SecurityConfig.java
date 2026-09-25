@@ -36,6 +36,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/reservas/*/*").hasRole("ESTUDANTE")
                         .requestMatchers(HttpMethod.PUT, "/reservas/*/cancelar").hasRole("ESTUDANTE")
                         .requestMatchers(HttpMethod.GET, "/reservas/**").authenticated()
+                        .requestMatchers(HttpMethod.DELETE, "/usuarios/deletar/*").authenticated()
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();

@@ -38,7 +38,7 @@ public class UsuarioController {
 
     @DeleteMapping("/deletar/{id}")
     public ResponseEntity<Void> deletarUsuario(@PathVariable Long id) {
-        service.deletarUsuario(id);
+        service.excluirUsuario(id);
         return ResponseEntity.noContent().build();
     }
     @PostMapping("/{usuarioId}/favoritar/{livroId}")
