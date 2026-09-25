@@ -12,7 +12,6 @@ import br.com.pfc.biblioteca.model.Livro;
 import br.com.pfc.biblioteca.repository.LivroRepository;
 import br.com.pfc.biblioteca.repository.ReservaRepository;
 import br.com.pfc.biblioteca.repository.UsuarioRepository;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,16 +23,19 @@ import java.util.stream.Collectors;
 @Service
 public class LivroService {
 
-    @Autowired
-    private LivroRepository repository;
-    @Autowired
-    private ReservaRepository reservaRepository;
-    @Autowired
-    private UsuarioRepository usuarioRepository;
+    private final LivroRepository repository;
+    private final ReservaRepository reservaRepository;
+    private final UsuarioRepository usuarioRepository;
     private ConsumoApi consumo = new ConsumoApi();
     private ConverteDados conversor = new ConverteDados();
     private final String ENDERECO = "https://www.googleapis.com/books/v1/volumes?q=";
     private final String API_KEY = System.getenv("BOOK_API");
+
+    public LivroService(LivroRepository repository, ReservaRepository reservaRepository, UsuarioRepository usuarioRepository) {
+        this.repository = repository;
+        this.reservaRepository = reservaRepository;
+        this.usuarioRepository = usuarioRepository;
+    }
 
 
     public Livro salvarLivro(String titulo, Materia materia, Double preco, Integer estoque) {

@@ -7,7 +7,6 @@ import br.com.pfc.biblioteca.dto.MateriaDTO;
 import br.com.pfc.biblioteca.enums.Materia;
 import br.com.pfc.biblioteca.model.Livro;
 import br.com.pfc.biblioteca.service.LivroService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,8 +16,11 @@ import java.util.List;
 @RequestMapping("/livros")
 public class LivroController {
 
-    @Autowired
-    public LivroService service;
+    private final LivroService service;
+
+    public LivroController(LivroService service) {
+        this.service = service;
+    }
 
     @PostMapping("/cadastro")
     public ResponseEntity<LivroDTO> salvarLivro(@RequestBody CadastroLivroRequest request) {

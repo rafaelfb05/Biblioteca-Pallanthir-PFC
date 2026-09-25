@@ -4,7 +4,6 @@ import br.com.pfc.biblioteca.dto.*;
 import br.com.pfc.biblioteca.model.Usuario;
 import br.com.pfc.biblioteca.service.UsuarioService;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -14,8 +13,11 @@ import java.util.List;
 @RequestMapping("/usuarios")
 public class UsuarioController {
 
-    @Autowired
-    public UsuarioService service;
+    private final UsuarioService service;
+
+    public UsuarioController(UsuarioService service) {
+        this.service = service;
+    }
 
     @PostMapping("/cadastro")
     public ResponseEntity<UsuarioDTO> cadastrarUsuario(@RequestBody @Valid UsuarioRequest request) {

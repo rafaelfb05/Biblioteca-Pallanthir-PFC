@@ -12,7 +12,6 @@ import br.com.pfc.biblioteca.repository.LivroRepository;
 import br.com.pfc.biblioteca.repository.ReservaRepository;
 import br.com.pfc.biblioteca.repository.UsuarioRepository;
 import jakarta.transaction.Transactional;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -23,12 +22,15 @@ import java.util.stream.Collectors;
 @Service
 public class ReservaService {
 
-    @Autowired
-    private ReservaRepository repository;
-    @Autowired
-    private LivroRepository livroRepository;
-    @Autowired
-    private UsuarioRepository usuarioRepository;
+    private final ReservaRepository repository;
+    private final LivroRepository livroRepository;
+    private final UsuarioRepository usuarioRepository;
+
+    public ReservaService(ReservaRepository repository, LivroRepository livroRepository, UsuarioRepository usuarioRepository) {
+        this.repository = repository;
+        this.livroRepository = livroRepository;
+        this.usuarioRepository = usuarioRepository;
+    }
 
     @Transactional
     public Reserva reservarLivro(Long usuarioId, Long livroId){

@@ -11,7 +11,6 @@ import br.com.pfc.biblioteca.model.Livro;
 import br.com.pfc.biblioteca.model.Usuario;
 import br.com.pfc.biblioteca.repository.LivroRepository;
 import br.com.pfc.biblioteca.repository.UsuarioRepository;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,16 +22,19 @@ import java.util.stream.Collectors;
 @Service
 public class UsuarioService {
 
-    @Autowired
-    private UsuarioRepository repository;
-    @Autowired
-    private LivroRepository livroRepository;
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-    @Autowired
-    private JwtService jwtService;
-    @Autowired
-    private EmailService emailService;
+    private final UsuarioRepository repository;
+    private final LivroRepository livroRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final JwtService jwtService;
+    private final EmailService emailService;
+
+    public UsuarioService(UsuarioRepository repository, LivroRepository livroRepository, PasswordEncoder passwordEncoder, JwtService jwtService, EmailService emailService) {
+        this.repository = repository;
+        this.livroRepository = livroRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.jwtService = jwtService;
+        this.emailService = emailService;
+    }
 
 
     private List<UsuarioDTO> converteDados(List<Usuario> usuario){
@@ -74,9 +76,6 @@ public class UsuarioService {
         }
         if(request.email() != null){
             usuario.setEmail(request.email());
-        }
-        if(request.senha() != null){
-            usuario.setSenha(request.senha());
         }
         return repository.save(usuario);
     }
@@ -149,7 +148,7 @@ public class UsuarioService {
     }
 
     private String gerarCodigo(){
-        return String.valueOf((int) (Math.random() * 900000 + 100000));
+        return String.valueOf((int) (Math.random() * 900000) + 100000);
     }
 
     public void recuperacaoSenha(SolicitarRecuperacaoRequest request){
@@ -159,6 +158,7 @@ public class UsuarioService {
         String codigo = gerarCodigo();
         usuario.setCodigoRecuperacao(codigo);
         usuario.setExpiracaoCodigo(LocalDateTime.now().plusMinutes(15));
+        repository.save(usuario);
         emailService.enviarEmail(usuario.getEmail(),
                 "Recuperação de Conta - Biblioteca Pallanthir",
                 "Recebemos sua solicitação para recuperação de conta, seu código de acesso é: \n" +
