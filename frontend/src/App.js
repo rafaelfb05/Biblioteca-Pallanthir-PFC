@@ -28,6 +28,7 @@ const FORM_USUARIO_VAZIO = {
   nome: "",
   email: "",
   senha: "",
+  confirmarSenha: "",
   tipo: "ESTUDANTE",
   codigoAcesso: "",
 };
@@ -135,6 +136,34 @@ const limitarEscala = (valor) =>
     ESCALA_MAXIMA,
     Math.max(ESCALA_MINIMA, Math.round(valor * 100) / 100)
   );
+
+function CampoSenha({ rotulo, valor, aoMudar, autoComplete }) {
+  const [visivel, setVisivel] = useState(false);
+
+  return (
+    <label>
+      {rotulo}
+      <div className="campo-senha">
+        <input
+          type={visivel ? "text" : "password"}
+          required
+          autoComplete={autoComplete}
+          value={valor}
+          onChange={(e) => aoMudar(e.target.value)}
+        />
+        <button
+          type="button"
+          className="mostrar-senha"
+          onClick={() => setVisivel((atual) => !atual)}
+          aria-label={visivel ? "Ocultar senha" : "Mostrar senha"}
+          title={visivel ? "Ocultar senha" : "Mostrar senha"}
+        >
+          {visivel ? "Ocultar" : "Mostrar"}
+        </button>
+      </div>
+    </label>
+  );
+}
 
 function VisualizadorDeCapa({ capaUrl, titulo, aoFechar }) {
   const [escala, setEscala] = useState(1);
@@ -1072,6 +1101,10 @@ function App() {
       setErro(DICA_SENHA);
       return;
     }
+    if (formUsuario.senha !== formUsuario.confirmarSenha) {
+      setErro("As senhas não conferem.");
+      return;
+    }
     if (formUsuario.tipo === "FUNCIONARIO" && !formUsuario.codigoAcesso.trim()) {
       setErro("Informe o código de acesso de funcionário.");
       return;
@@ -1462,8 +1495,8 @@ function App() {
   }[modoAutenticacao];
 
   const modalAutenticacao = mostrarAutenticacao && (
-    <div className="modal" onClick={fecharAutenticacao}>
-      <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+    <div className="modal">
+      <div className="modal-box">
         <div className="modal-header">
           <h3>{TITULOS_AUTENTICACAO[modoAutenticacao]}</h3>
           <button type="button" onClick={fecharAutenticacao}>
@@ -1515,17 +1548,12 @@ function App() {
                 }
               />
             </label>
-            <label>
-              Senha
-              <input
-                type="password"
-                required
-                value={formLogin.senha}
-                onChange={(e) =>
-                  setFormLogin({ ...formLogin, senha: e.target.value })
-                }
-              />
-            </label>
+            <CampoSenha
+              rotulo="Senha"
+              autoComplete="current-password"
+              valor={formLogin.senha}
+              aoMudar={(senha) => setFormLogin({ ...formLogin, senha })}
+            />
 
             {erro && <p className="erro">{erro}</p>}
 
@@ -1656,35 +1684,23 @@ function App() {
                 }
               />
             </label>
-            <label>
-              Nova senha
-              <input
-                type="password"
-                required
-                value={formRecuperacao.novaSenha}
-                onChange={(e) =>
-                  setFormRecuperacao({
-                    ...formRecuperacao,
-                    novaSenha: e.target.value,
-                  })
-                }
-              />
-            </label>
+            <CampoSenha
+              rotulo="Nova senha"
+              autoComplete="new-password"
+              valor={formRecuperacao.novaSenha}
+              aoMudar={(novaSenha) =>
+                setFormRecuperacao({ ...formRecuperacao, novaSenha })
+              }
+            />
             <small className="dica-senha">{DICA_SENHA}</small>
-            <label>
-              Confirmar nova senha
-              <input
-                type="password"
-                required
-                value={formRecuperacao.confirmarSenha}
-                onChange={(e) =>
-                  setFormRecuperacao({
-                    ...formRecuperacao,
-                    confirmarSenha: e.target.value,
-                  })
-                }
-              />
-            </label>
+            <CampoSenha
+              rotulo="Confirmar nova senha"
+              autoComplete="new-password"
+              valor={formRecuperacao.confirmarSenha}
+              aoMudar={(confirmarSenha) =>
+                setFormRecuperacao({ ...formRecuperacao, confirmarSenha })
+              }
+            />
 
             {erro && <p className="erro">{erro}</p>}
 
@@ -1730,18 +1746,21 @@ function App() {
                 }
               />
             </label>
-            <label>
-              Senha
-              <input
-                type="password"
-                required
-                value={formUsuario.senha}
-                onChange={(e) =>
-                  setFormUsuario({ ...formUsuario, senha: e.target.value })
-                }
-              />
-            </label>
+            <CampoSenha
+              rotulo="Senha"
+              autoComplete="new-password"
+              valor={formUsuario.senha}
+              aoMudar={(senha) => setFormUsuario({ ...formUsuario, senha })}
+            />
             <small className="dica-senha">{DICA_SENHA}</small>
+            <CampoSenha
+              rotulo="Confirmar senha"
+              autoComplete="new-password"
+              valor={formUsuario.confirmarSenha}
+              aoMudar={(confirmarSenha) =>
+                setFormUsuario({ ...formUsuario, confirmarSenha })
+              }
+            />
             <label>
               Tipo de conta
               <select
@@ -1759,20 +1778,14 @@ function App() {
               </select>
             </label>
             {formUsuario.tipo === "FUNCIONARIO" && (
-              <label>
-                Código de acesso de funcionário
-                <input
-                  type="password"
-                  required
-                  value={formUsuario.codigoAcesso}
-                  onChange={(e) =>
-                    setFormUsuario({
-                      ...formUsuario,
-                      codigoAcesso: e.target.value,
-                    })
-                  }
-                />
-              </label>
+              <CampoSenha
+                rotulo="Código de acesso de funcionário"
+                autoComplete="off"
+                valor={formUsuario.codigoAcesso}
+                aoMudar={(codigoAcesso) =>
+                  setFormUsuario({ ...formUsuario, codigoAcesso })
+                }
+              />
             )}
 
             {erro && <p className="erro">{erro}</p>}
@@ -2689,7 +2702,9 @@ function App() {
 
         <div className="books">
           {carregando && <p>Carregando livros...</p>}
-          {!carregando && erro && <p className="erro">{erro}</p>}
+          {!carregando && erro && !mostrarAutenticacao && (
+            <p className="erro">{erro}</p>
+          )}
           {!carregando && !erro && livrosExibidos.length === 0 && (
             <p>{mensagemListaVazia}</p>
           )}

@@ -1180,3 +1180,36 @@
     width: 100%;
   }
 }
+
+.campo-senha {
+  position: relative;
+  display: flex;
+}
+
+.campo-senha input {
+  flex: 1;
+  padding-right: 80px;
+}
+
+.campo-senha .mostrar-senha {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+  padding: 5px 10px;
+  background: transparent;
+  border: 1px solid #35353b;
+  border-radius: 5px;
+  color: #96969d;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.campo-senha .mostrar-senha:hover {
+  border-color: #e51d2a;
+  color: #ffffff;
+}
