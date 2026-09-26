@@ -29,7 +29,7 @@ public class Usuario {
     @ManyToMany
     private List<Livro> favoritos = new ArrayList<>();
     @Column(nullable = false)
-    @ColumnDefault("false")
+    @ColumnDefault("true")
     private boolean ativo = true;
     private Integer tentativasFalhas = 0;
     private LocalDateTime tempoBloqueio;

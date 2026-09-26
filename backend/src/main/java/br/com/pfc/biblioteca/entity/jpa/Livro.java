@@ -24,7 +24,7 @@ public class Livro {
     private Double preco = 0.0;
     private double avaliacao;
     @Column(nullable = false)
-    @ColumnDefault("false")
+    @ColumnDefault("true")
     private boolean ativo = true;
 
     public Livro(){}
