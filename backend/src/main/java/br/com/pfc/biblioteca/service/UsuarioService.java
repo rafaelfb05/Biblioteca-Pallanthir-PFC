@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -108,6 +109,7 @@ public class UsuarioService {
         return salvo;
     }
 
+    @Transactional
     public Usuario excluirUsuario(Long id) {
         String emailLogado = SecurityContextHolder.getContext().getAuthentication().getName();
 
@@ -120,7 +122,12 @@ public class UsuarioService {
 
         usuario.setNome("Usuário removido");
         usuario.setEmail("removido-" + usuario.getId() + "@anonimizado.local");
-        usuario.setSenha(null);
+        usuario.setSenha(passwordEncoder.encode(UUID.randomUUID().toString()));
+        usuario.setCodigo2FA(null);
+        usuario.setExpiracao2FA(null);
+        usuario.setCodigoRecuperacao(null);
+        usuario.setExpiracaoCodigo(null);
+        usuario.getFavoritos().clear();
         usuario.setAtivo(false);
         Usuario salvo = repository.save(usuario);
         logService.registrarLog(salvo.getId(), salvo.getEmail(), "EXCLUSAO_USUARIO", "Conta excluída e dados anonimizados");
