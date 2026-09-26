@@ -251,15 +251,9 @@ a {
   font-size: 12px;
 }
 
-.main-content {
-  display: grid;
-  grid-template-columns: 1fr 330px;
-  gap: 25px;
-}
-
 .books {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 20px;
 }
 
@@ -361,78 +355,6 @@ a {
   color: #e56a6a;
 }
 
-.bestsellers {
-  align-self: start;
-  padding: 25px;
-  background: #121216;
-  border: 1px solid #29292e;
-  border-radius: 10px;
-}
-
-.best-title {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.best-title span {
-  color: #e51d2a;
-  font-size: 22px;
-}
-
-.best-title h3 {
-  font-size: 18px;
-}
-
-.best-subtitle {
-  margin-top: 7px;
-  color: #6f6f77;
-  font-size: 12px;
-}
-
-.ranking {
-  margin-top: 25px;
-}
-
-.rank {
-  display: flex;
-  gap: 15px;
-  padding: 17px 0;
-  border-bottom: 1px solid #27272c;
-}
-
-.number {
-  color: #e51d2a;
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.rank div {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.rank strong {
-  font-size: 13px;
-}
-
-.rank small {
-  color: #77777f;
-  font-size: 11px;
-}
-
-.ranking-button {
-  width: 100%;
-  margin-top: 20px;
-  padding: 11px;
-  background: transparent;
-  border: 1px solid #39393f;
-  border-radius: 6px;
-  color: #e51d2a;
-  font-size: 12px;
-}
-
 @media (max-width: 1000px) {
   .nav {
     display: none;
@@ -440,10 +362,6 @@ a {
 
   .categories {
     grid-template-columns: repeat(3, 1fr);
-  }
-
-  .main-content {
-    grid-template-columns: 1fr;
   }
 
   .books {

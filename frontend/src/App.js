@@ -459,6 +459,14 @@ function App() {
     window.scrollTo({ top: 0 });
   };
 
+  const irParaRanking = () => {
+    setPagina("ranking");
+    setLivroAbertoId(null);
+    setFormEdicao(null);
+    setErro(null);
+    window.scrollTo({ top: 0 });
+  };
+
   const irParaMaterias = () => {
     setPagina("materias");
     setLivroAbertoId(null);
@@ -757,11 +765,9 @@ function App() {
   const rotuloDaLista =
     filtro.tipo === "todos" ? "RECOMENDADOS" : "RESULTADO DA BUSCA";
 
-  const maisAvaliados = useMemo(
+  const rankingDeLivros = useMemo(
     () =>
-      [...livros]
-        .sort((a, b) => (b.avalliacao || 0) - (a.avalliacao || 0))
-        .slice(0, 3),
+      [...livros].sort((a, b) => (b.avalliacao || 0) - (a.avalliacao || 0)),
     [livros]
   );
 
@@ -896,6 +902,13 @@ function App() {
           onClick={irParaMaterias}
         >
           Matérias
+        </button>
+        <button
+          type="button"
+          className={"nav-link" + (pagina === "ranking" ? " active" : "")}
+          onClick={irParaRanking}
+        >
+          Ranking ♛
         </button>
         <button
           type="button"
@@ -1196,6 +1209,75 @@ function App() {
               </button>
             ))}
           </div>
+        </section>
+
+        {modalCadastroLivro}
+        {modalAutenticacao}
+      </div>
+    );
+  }
+
+  if (pagina === "ranking") {
+    return (
+      <div className="app">
+        {cabecalho}
+
+        <section className="section pagina-ranking">
+          <div className="section-header">
+            <div>
+              <span className="section-label">RANKING</span>
+              <h2>Mais bem avaliados</h2>
+            </div>
+            <button type="button" className="link-button" onClick={irParaInicio}>
+              Voltar ao acervo →
+            </button>
+          </div>
+
+          <p className="materias-sub">
+            Os livros do acervo ordenados pela nota de avaliação.
+          </p>
+
+          {carregando && <p>Carregando livros...</p>}
+          {!carregando && erro && <p className="erro">{erro}</p>}
+          {!carregando && !erro && rankingDeLivros.length === 0 && (
+            <p>Nenhum livro no acervo ainda.</p>
+          )}
+
+          <ol className="ranking-lista">
+            {rankingDeLivros.map((livro, indice) => (
+              <li key={livro.id}>
+                <button
+                  type="button"
+                  className={"ranking-item" + (indice < 3 ? " podio" : "")}
+                  onClick={() => abrirLivro(livro)}
+                >
+                  <span className="ranking-posicao">
+                    {String(indice + 1).padStart(2, "0")}
+                  </span>
+                  <div className="ranking-capa">
+                    {livro.capaUrl ? (
+                      <img
+                        src={capaNaResolucao(livro.capaUrl, ZOOM_CAPA_CARTAO)}
+                        alt={"Capa de " + livro.titulo}
+                        loading="lazy"
+                      />
+                    ) : (
+                      <span>📘</span>
+                    )}
+                  </div>
+                  <div className="ranking-info">
+                    <span className="book-category">{livro.materia}</span>
+                    <strong>{livro.titulo}</strong>
+                    <small>{(livro.autores || []).join(", ")}</small>
+                  </div>
+                  <div className="ranking-nota">
+                    <span>★</span>
+                    {Number(livro.avalliacao || 0).toFixed(1)}
+                  </div>
+                </button>
+              </li>
+            ))}
+          </ol>
         </section>
 
         {modalCadastroLivro}
@@ -1636,64 +1718,14 @@ function App() {
           </p>
         )}
 
-        <div className="main-content">
-          <div className="books">
-            {carregando && <p>Carregando livros...</p>}
-            {!carregando && erro && <p className="erro">{erro}</p>}
-            {!carregando && !erro && livrosExibidos.length === 0 && (
-              <p>{mensagemListaVazia}</p>
-            )}
+        <div className="books">
+          {carregando && <p>Carregando livros...</p>}
+          {!carregando && erro && <p className="erro">{erro}</p>}
+          {!carregando && !erro && livrosExibidos.length === 0 && (
+            <p>{mensagemListaVazia}</p>
+          )}
 
-            {!carregando && livrosExibidos.map(cartaoLivro)}
-          </div>
-
-          <aside className="bestsellers">
-            <div className="best-title">
-              <span>♛</span>
-              <h3>Mais bem avaliados</h3>
-            </div>
-            <p className="best-subtitle">Os favoritos deste mês</p>
-
-            <div className="ranking">
-              {maisAvaliados.length === 0 && (
-                <p className="best-subtitle">Nenhum livro no acervo ainda.</p>
-              )}
-              {maisAvaliados.map((livro, indice) => (
-                <button
-                  type="button"
-                  className="rank"
-                  key={livro.id}
-                  onClick={() => abrirLivro(livro)}
-                >
-                  <span className="number">
-                    {String(indice + 1).padStart(2, "0")}
-                  </span>
-                  <div>
-                    <strong>{livro.titulo}</strong>
-                    <small>
-                      nota {Number(livro.avalliacao || 0).toFixed(1)}
-                    </small>
-                  </div>
-                </button>
-              ))}
-            </div>
-
-            <button
-              type="button"
-              className="ranking-button"
-              onClick={() => {
-                setBusca("");
-                setResultado(
-                  [...livros].sort(
-                    (a, b) => (b.avalliacao || 0) - (a.avalliacao || 0)
-                  )
-                );
-                setFiltro({ tipo: "busca", termo: "ranking completo" });
-              }}
-            >
-              Ver ranking completo →
-            </button>
-          </aside>
+          {!carregando && livrosExibidos.map(cartaoLivro)}
         </div>
       </section>
 
