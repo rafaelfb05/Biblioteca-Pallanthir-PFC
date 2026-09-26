@@ -148,6 +148,8 @@ export const reservasApi = {
     request(`/reservas/${usuarioId}/${livroId}`, { method: "POST" }),
   cancelar: (reservaId) =>
     request(`/reservas/${reservaId}/cancelar`, { method: "PUT" }),
+  entregar: (reservaId) =>
+    request(`/reservas/${reservaId}/entregar`, { method: "PUT" }),
   devolver: (reservaId) =>
     request(`/reservas/${reservaId}/devolver`, { method: "PUT" }),
 };

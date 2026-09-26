@@ -1,6 +1,7 @@
 package br.com.pfc.biblioteca.service;
 
 import br.com.pfc.biblioteca.dto.*;
+import br.com.pfc.biblioteca.enums.StatusReserva;
 import br.com.pfc.biblioteca.enums.TipoUsuario;
 import br.com.pfc.biblioteca.infra.exception.ConflitoException;
 import br.com.pfc.biblioteca.infra.exception.CredenciaisInvalidasException;
@@ -10,6 +11,7 @@ import br.com.pfc.biblioteca.infra.security.JwtService;
 import br.com.pfc.biblioteca.entity.jpa.Livro;
 import br.com.pfc.biblioteca.entity.jpa.Usuario;
 import br.com.pfc.biblioteca.repository.LivroRepository;
+import br.com.pfc.biblioteca.repository.ReservaRepository;
 import br.com.pfc.biblioteca.repository.UsuarioRepository;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -26,14 +28,16 @@ public class UsuarioService {
 
     private final UsuarioRepository repository;
     private final LivroRepository livroRepository;
+    private final ReservaRepository reservaRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final EmailService emailService;
     private final LogAuditoriaService logService;
 
-    public UsuarioService(UsuarioRepository repository, LivroRepository livroRepository, PasswordEncoder passwordEncoder, JwtService jwtService, EmailService emailService, LogAuditoriaService logService) {
+    public UsuarioService(UsuarioRepository repository, LivroRepository livroRepository, ReservaRepository reservaRepository, PasswordEncoder passwordEncoder, JwtService jwtService, EmailService emailService, LogAuditoriaService logService) {
         this.repository = repository;
         this.livroRepository = livroRepository;
+        this.reservaRepository = reservaRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.emailService = emailService;
@@ -57,6 +61,11 @@ public class UsuarioService {
             throw new ConflitoException("Já existe um usuário ativo com esse email");
         }
 
+        if(!Boolean.TRUE.equals(request.aceitouTermos())){
+            logService.registrarLog(null, request.email(), "FALHA_CADASTRO", "Termos de Uso e Política de Privacidade não aceitos");
+            throw new RegraDeNegocioException("É necessário aceitar os Termos de Uso e a Política de Privacidade");
+        }
+
         if(request.tipo() == TipoUsuario.FUNCIONARIO){
             String codigoCorreto = System.getenv("CODIGO_FUNCIONARIO");
 
@@ -68,6 +77,7 @@ public class UsuarioService {
 
         Usuario usuario = new Usuario(request);
         usuario.setSenha(passwordEncoder.encode(request.senha()));
+        usuario.setDataAceiteTermos(LocalDateTime.now());
         Usuario salvo = repository.save(usuario);
         logService.registrarLog(salvo.getId(), salvo.getEmail(), "CADASTRO_USUARIO", "Usuário cadastrado como " + salvo.getTipo());
         return salvo;
@@ -118,6 +128,11 @@ public class UsuarioService {
         if(!usuario.getEmail().equals(emailLogado)){
             logService.registrarLogUsuarioLogado("ACESSO_NEGADO", "Tentativa de excluir a conta do usuário " + id);
             throw new RegraDeNegocioException("Você só pode excluir sua própria conta");
+        }
+
+        if(reservaRepository.existsByUsuarioIdAndStatusIn(id, List.of(StatusReserva.RESERVADO, StatusReserva.ENTREGUE))){
+            logService.registrarLog(usuario.getId(), usuario.getEmail(), "FALHA_EXCLUSAO_USUARIO", "Conta possui reservas em aberto ou livros não devolvidos");
+            throw new ConflitoException("Não é possível excluir a conta enquanto houver livros reservados ou não devolvidos. Cancele as reservas ou devolva os livros na biblioteca.");
         }
 
         usuario.setNome("Usuário removido");
@@ -202,9 +217,10 @@ public class UsuarioService {
         usuario.setExpiracao2FA(LocalDateTime.now().plusMinutes(10));
         repository.save(usuario);
 
-        emailService.enviarEmail(usuario.getEmail(), "Autenticação de 2 fatores",
-                "Seu código para login é:\n" + codigo +
-                        "\nO código tem o prazo de validade de 10 minutos!");
+        emailService.enviarCodigo(usuario.getEmail(), "Código de login - Biblioteca Pallanthir",
+                "Confirme seu login",
+                "Use o código abaixo para concluir a entrada na sua conta.",
+                codigo, 10);
 
         logService.registrarLog(usuario.getId(), usuario.getEmail(), "SUCESSO_LOGIN", "Código 2FA enviado");
     }
@@ -252,10 +268,10 @@ public class UsuarioService {
         usuario.setCodigoRecuperacao(codigo);
         usuario.setExpiracaoCodigo(LocalDateTime.now().plusMinutes(15));
         repository.save(usuario);
-        emailService.enviarEmail(usuario.getEmail(),
-                "Recuperação de Conta - Biblioteca Pallanthir",
-                "Recebemos sua solicitação para recuperação de conta, seu código de acesso é: \n" +
-                codigo + "\nO código tem o prazo de válidade de 15 minutos!");
+        emailService.enviarCodigo(usuario.getEmail(), "Recuperação de Conta - Biblioteca Pallanthir",
+                "Recuperação de conta",
+                "Recebemos uma solicitação para redefinir a senha da sua conta. Use o código abaixo para continuar.",
+                codigo, 15);
         logService.registrarLog(usuario.getId(), usuario.getEmail(), "SOLICITACAO_RECUPERACAO_SENHA", "Código de recuperação enviado");
     }
 

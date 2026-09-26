@@ -16,5 +16,6 @@ public record UsuarioRequest(
         message = "A senha deve ter no mínimo 8 caracteres, incluindo letra maiúscula, minúscula, número e caractere especial")
         String senha,
         TipoUsuario tipo,
-        String codigoAcesso) {
+        String codigoAcesso,
+        Boolean aceitouTermos) {
 }

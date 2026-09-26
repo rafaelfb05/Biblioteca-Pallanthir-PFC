@@ -37,6 +37,7 @@ public class Usuario {
     private LocalDateTime expiracaoCodigo;
     private String codigo2FA;
     private LocalDateTime expiracao2FA;
+    private LocalDateTime dataAceiteTermos;
 
     public Usuario(){}
 
@@ -45,6 +46,14 @@ public class Usuario {
         this.email=request.email();
         this.senha=request.senha();
         this.tipo=request.tipo();
+    }
+
+    public LocalDateTime getDataAceiteTermos() {
+        return dataAceiteTermos;
+    }
+
+    public void setDataAceiteTermos(LocalDateTime dataAceiteTermos) {
+        this.dataAceiteTermos = dataAceiteTermos;
     }
 
     public Long getId() {

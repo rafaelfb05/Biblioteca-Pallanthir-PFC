@@ -72,11 +72,13 @@ public class ReservaService {
             throw new RegraDeNegocioException("Reserva não encontrada");
         }
 
-        if(reserva.getStatus() == StatusReserva.RESERVADO){
-            Livro livro = reserva.getLivro();
-            livro.setEstoque(livro.getEstoque() + 1);
-            livroRepository.save(livro);
+        if(reserva.getStatus() != StatusReserva.RESERVADO){
+            throw new RegraDeNegocioException("Só é possível cancelar reservas que ainda não foram entregues");
         }
+
+        Livro livro = reserva.getLivro();
+        livro.setEstoque(livro.getEstoque() + 1);
+        livroRepository.save(livro);
 
         reserva.setStatus(StatusReserva.CANCELADO);
         repository.save(reserva);
@@ -84,12 +86,26 @@ public class ReservaService {
     }
 
     @Transactional
-    public void devolverLivro(Long reservaId){
+    public void entregarLivro(Long reservaId){
         Reserva reserva = repository.findById(reservaId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Reserva não encontrada!"));
 
         if(reserva.getStatus() != StatusReserva.RESERVADO){
-            throw new RegraDeNegocioException("Só é possível devolver reservas em aberto");
+            throw new RegraDeNegocioException("Só é possível entregar livros de reservas em aberto");
+        }
+
+        reserva.setStatus(StatusReserva.ENTREGUE);
+        repository.save(reserva);
+        logService.registrarLogUsuarioLogado("ENTREGA_LIVRO", "Reserva " + reservaId + " do usuário " + reserva.getUsuario().getId() + " entregue");
+    }
+
+    @Transactional
+    public void devolverLivro(Long reservaId){
+        Reserva reserva = repository.findById(reservaId)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Reserva não encontrada!"));
+
+        if(reserva.getStatus() != StatusReserva.ENTREGUE){
+            throw new RegraDeNegocioException("Só é possível devolver livros que já foram entregues");
         }
 
         Livro livro = reserva.getLivro();

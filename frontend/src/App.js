@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
+import ModalDocumento from "./Componentes/ModalDocumento";
 import {
   definirAoExpirarSessao,
   definirToken,
@@ -31,6 +32,7 @@ const FORM_USUARIO_VAZIO = {
   confirmarSenha: "",
   tipo: "ESTUDANTE",
   codigoAcesso: "",
+  aceitouTermos: false,
 };
 const FORM_LOGIN_VAZIO = { email: "", senha: "" };
 const FORM_RECUPERACAO_VAZIO = {
@@ -124,6 +126,7 @@ const formatarEstoque = (quantidade) => {
 
 const ROTULO_STATUS_RESERVA = {
   RESERVADO: "Reservado",
+  ENTREGUE: "Entregue",
   DEVOLVIDO: "Devolvido",
   CANCELADO: "Cancelado",
 };
@@ -404,6 +407,7 @@ function App() {
   const [codigo2FA, setCodigo2FA] = useState("");
   const [avisoAutenticacao, setAvisoAutenticacao] = useState(null);
   const [salvando, setSalvando] = useState(false);
+  const [documentoAberto, setDocumentoAberto] = useState(null);
 
   const [formConta, setFormConta] = useState(FORM_CONTA_VAZIO);
   const [usuariosGestao, setUsuariosGestao] = useState([]);
@@ -926,6 +930,13 @@ function App() {
   };
 
   const excluirConta = async () => {
+    if (reservasAtivas.length > 0) {
+      setErro(
+        "Não é possível excluir a conta enquanto houver livros reservados ou não devolvidos."
+      );
+      return;
+    }
+
     if (
       !window.confirm(
         "Excluir sua conta? Seus dados pessoais serão anonimizados e esta ação não pode ser desfeita."
@@ -995,7 +1006,8 @@ function App() {
     (livro) =>
       reservas.find(
         (reserva) =>
-          reserva.status === "RESERVADO" && reserva.livroId === livro.id
+          ["RESERVADO", "ENTREGUE"].includes(reserva.status) &&
+          reserva.livroId === livro.id
       ) || null,
     [reservas]
   );
@@ -1042,24 +1054,40 @@ function App() {
     }
   };
 
-  const devolverLivro = async (reserva) => {
+  const atualizarReservaNaGestao = async (reserva, acao, sucesso, falha) => {
     try {
       setReservaEmEdicao(reserva.id);
       setErro(null);
-      await reservasApi.devolver(reserva.id);
-      setAviso("\"" + reserva.tituloLivro + "\" foi devolvido.");
+      await acao(reserva.id);
+      setAviso("\"" + reserva.tituloLivro + "\" " + sucesso);
       const [, atualizadas] = await Promise.all([
         carregarLivros(),
         reservasApi.listarPorUsuario(usuarioGestao.id),
       ]);
       setReservasGestao(atualizadas);
     } catch (e) {
-      setErro(mensagemDeErro(e, "Não foi possível registrar a devolução."));
+      setErro(mensagemDeErro(e, falha));
       console.error(e);
     } finally {
       setReservaEmEdicao(null);
     }
   };
+
+  const entregarLivro = (reserva) =>
+    atualizarReservaNaGestao(
+      reserva,
+      reservasApi.entregar,
+      "foi entregue.",
+      "Não foi possível registrar a entrega."
+    );
+
+  const devolverLivro = (reserva) =>
+    atualizarReservaNaGestao(
+      reserva,
+      reservasApi.devolver,
+      "foi devolvido.",
+      "Não foi possível registrar a devolução."
+    );
 
   const pesquisar = async (evento) => {
     evento.preventDefault();
@@ -1224,6 +1252,12 @@ function App() {
       setErro("Informe o código de acesso de funcionário.");
       return;
     }
+    if (!formUsuario.aceitouTermos) {
+      setErro(
+        "Para criar a conta, aceite os Termos de Uso e a Política de Privacidade."
+      );
+      return;
+    }
 
     try {
       setSalvando(true);
@@ -1237,6 +1271,7 @@ function App() {
           formUsuario.tipo === "FUNCIONARIO"
             ? formUsuario.codigoAcesso.trim()
             : null,
+        aceitouTermos: formUsuario.aceitouTermos,
       });
       setFormUsuario(FORM_USUARIO_VAZIO);
       setFormLogin({ email, senha: "" });
@@ -1293,7 +1328,10 @@ function App() {
   }, [logs, filtroLogs.texto]);
 
   const reservasAtivas = useMemo(
-    () => reservas.filter((reserva) => reserva.status === "RESERVADO"),
+    () =>
+      reservas.filter((reserva) =>
+        ["RESERVADO", "ENTREGUE"].includes(reserva.status)
+      ),
     [reservas]
   );
 
@@ -1609,6 +1647,14 @@ function App() {
       " e escolha uma nova senha. O código vale por 15 minutos.",
   }[modoAutenticacao];
 
+  const modalDocumento = documentoAberto && (
+    <ModalDocumento
+      documento={documentoAberto}
+      aoFechar={() => setDocumentoAberto(null)}
+      aoTrocar={setDocumentoAberto}
+    />
+  );
+
   const modalAutenticacao = mostrarAutenticacao && (
     <div className="modal">
       <div className="modal-box">
@@ -1903,16 +1949,54 @@ function App() {
               />
             )}
 
+            <div className="aceite-termos">
+              <div className="aceite-documentos">
+                <button
+                  type="button"
+                  className="favoritar-button"
+                  onClick={() => setDocumentoAberto("termos")}
+                >
+                  Ler Termos de Uso
+                </button>
+                <button
+                  type="button"
+                  className="favoritar-button"
+                  onClick={() => setDocumentoAberto("privacidade")}
+                >
+                  Ler Política de Privacidade
+                </button>
+              </div>
+              <label className="aceite-checkbox">
+                <input
+                  type="checkbox"
+                  checked={formUsuario.aceitouTermos}
+                  onChange={(e) =>
+                    setFormUsuario({
+                      ...formUsuario,
+                      aceitouTermos: e.target.checked,
+                    })
+                  }
+                />
+                <span>
+                  Li e aceito os Termos de Uso e a Política de Privacidade.
+                </span>
+              </label>
+            </div>
+
             {erro && <p className="erro">{erro}</p>}
 
             <div className="modal-actions">
-              <button type="submit" disabled={salvando}>
+              <button
+                type="submit"
+                disabled={salvando || !formUsuario.aceitouTermos}
+              >
                 {salvando ? "Salvando..." : "Cadastrar"}
               </button>
             </div>
           </form>
         )}
       </div>
+      {modalDocumento}
     </div>
   );
 
@@ -2006,17 +2090,48 @@ function App() {
                   </button>
                 </div>
 
+                <div className="conta-card">
+                  <small>Documentos</small>
+                  <p>
+                    Consulte quando quiser os termos e a política que você
+                    aceitou ao criar a conta.
+                  </p>
+                  <div className="aceite-documentos">
+                    <button
+                      type="button"
+                      className="favoritar-button"
+                      onClick={() => setDocumentoAberto("termos")}
+                    >
+                      Termos de Uso
+                    </button>
+                    <button
+                      type="button"
+                      className="favoritar-button"
+                      onClick={() => setDocumentoAberto("privacidade")}
+                    >
+                      Política de Privacidade
+                    </button>
+                  </div>
+                </div>
+
                 <div className="conta-card perigo-card">
                   <small>Excluir conta</small>
                   <p>
                     Seus dados pessoais serão anonimizados e você perderá o
                     acesso aos seus favoritos e reservas.
                   </p>
+                  {reservasAtivas.length > 0 && (
+                    <p className="erro">
+                      Você possui livros reservados ou não devolvidos. Cancele
+                      as reservas ou devolva os livros na biblioteca antes de
+                      excluir a conta.
+                    </p>
+                  )}
                   <button
                     type="button"
                     className="perigo"
                     onClick={excluirConta}
-                    disabled={salvando}
+                    disabled={salvando || reservasAtivas.length > 0}
                   >
                     Excluir minha conta
                   </button>
@@ -2028,6 +2143,7 @@ function App() {
 
         {modalCadastroLivro}
         {modalAutenticacao}
+        {!mostrarAutenticacao && modalDocumento}
       </div>
     );
   }
@@ -2050,7 +2166,7 @@ function App() {
 
           <p className="materias-sub">
             Selecione um estudante para ver as reservas dele e registrar as
-            devoluções.
+            entregas e devoluções.
           </p>
 
           {avisoDaPagina}
@@ -2125,6 +2241,18 @@ function App() {
                         </div>
 
                         {reserva.status === "RESERVADO" && (
+                          <div className="reserva-acoes">
+                            <button
+                              type="button"
+                              className="reservar-button"
+                              onClick={() => entregarLivro(reserva)}
+                              disabled={reservaEmEdicao === reserva.id}
+                            >
+                              Registrar entrega
+                            </button>
+                          </div>
+                        )}
+                        {reserva.status === "ENTREGUE" && (
                           <div className="reserva-acoes">
                             <button
                               type="button"
@@ -2403,8 +2531,9 @@ function App() {
           {!usuario && <p>Entre na sua conta para ver suas reservas.</p>}
           {usuario && reservas.length > 0 && (
             <p className="materias-sub">
-              Para devolver um livro, leve-o até a biblioteca. Um funcionário
-              registrará a devolução.
+              Retire o livro reservado na biblioteca. Depois da entrega, a
+              reserva não pode mais ser cancelada. Para devolver, leve-o até a
+              biblioteca e um funcionário registrará a devolução.
             </p>
           )}
           {usuario && reservas.length === 0 && (
@@ -2585,7 +2714,12 @@ function App() {
                     {favoritado ? "♥ Remover dos favoritos" : "♡ Favoritar"}
                   </button>
                 )}
-                {ehFuncionario ? null : reservaAberta ? (
+                {ehFuncionario ? null : reservaAberta &&
+                  reservaAberta.status === "ENTREGUE" ? (
+                  <button type="button" className="reservar-button" disabled>
+                    Livro entregue
+                  </button>
+                ) : reservaAberta ? (
                   <button
                     type="button"
                     className="reservar-button cancelar"

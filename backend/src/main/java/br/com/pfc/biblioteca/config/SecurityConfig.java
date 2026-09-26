@@ -37,6 +37,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/livros/atualizar/*").hasRole("FUNCIONARIO")
                         .requestMatchers(HttpMethod.DELETE, "/livros/deletar/*").hasRole("FUNCIONARIO")
                         .requestMatchers(HttpMethod.PUT, "/reservas/*/devolver").hasRole("FUNCIONARIO")
+                        .requestMatchers(HttpMethod.PUT, "/reservas/*/entregar").hasRole("FUNCIONARIO")
                         .requestMatchers(HttpMethod.GET, "/usuarios").hasRole("FUNCIONARIO")
                         .requestMatchers(HttpMethod.POST, "/usuarios/*/favoritar/*").hasRole("ESTUDANTE")
                         .requestMatchers(HttpMethod.DELETE, "/usuarios/*/favoritar/*").hasRole("ESTUDANTE")

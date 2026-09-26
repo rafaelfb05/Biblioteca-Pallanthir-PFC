@@ -725,6 +725,11 @@
   color: #e51d2a;
 }
 
+.reserva-status.entregue {
+  background: rgba(240, 170, 40, 0.15);
+  color: #f0aa28;
+}
+
 .reserva-status.devolvido {
   background: rgba(45, 190, 120, 0.15);
   color: #2dbe78;
@@ -1212,4 +1217,188 @@
 .campo-senha .mostrar-senha:hover {
   border-color: #e51d2a;
   color: #ffffff;
+}
+
+.aceite-termos {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 15px;
+  background: #09090b;
+  border: 1px solid #27272c;
+  border-radius: 8px;
+}
+
+.aceite-documentos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.aceite-documentos .favoritar-button {
+  padding: 9px 14px;
+  font-size: 12px;
+}
+
+.modal-form .aceite-checkbox {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 10px;
+  color: #cfcfd6;
+  font-size: 13px;
+  line-height: 1.4;
+  letter-spacing: 0;
+  text-transform: none;
+  cursor: pointer;
+}
+
+.modal-form .aceite-checkbox input {
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  padding: 0;
+  flex-shrink: 0;
+  accent-color: #e51d2a;
+  cursor: pointer;
+}
+
+.modal-documento {
+  z-index: 60;
+}
+
+.modal-documento .modal-box {
+  max-width: 760px;
+}
+
+.documento-conteudo {
+  margin-top: 20px;
+  color: #cfcfd6;
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.documento-conteudo h1 {
+  margin-bottom: 12px;
+  color: #ffffff;
+  font-size: 22px;
+}
+
+.documento-conteudo h2 {
+  margin: 26px 0 10px;
+  color: #ffffff;
+  font-size: 17px;
+}
+
+.documento-conteudo h3 {
+  margin: 18px 0 8px;
+  color: #ffffff;
+  font-size: 15px;
+}
+
+.documento-conteudo p,
+.documento-conteudo ul,
+.documento-conteudo ol {
+  margin-bottom: 12px;
+}
+
+.documento-conteudo ul,
+.documento-conteudo ol {
+  padding-left: 22px;
+}
+
+.documento-conteudo li {
+  margin-bottom: 4px;
+}
+
+.documento-conteudo strong {
+  color: #ffffff;
+}
+
+.documento-conteudo a,
+.documento-conteudo .link-button {
+  color: #e51d2a;
+  font-size: inherit;
+}
+
+.documento-conteudo code {
+  padding: 1px 5px;
+  background: #1c1c22;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.documento-conteudo hr {
+  margin: 22px 0;
+  border: none;
+  border-top: 1px solid #27272c;
+}
+
+.documento-conteudo table {
+  width: 100%;
+  margin-bottom: 14px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.documento-conteudo th,
+.documento-conteudo td {
+  padding: 8px 10px;
+  border: 1px solid #27272c;
+  text-align: left;
+  vertical-align: top;
+}
+
+.documento-conteudo th {
+  background: #1c1c22;
+  color: #ffffff;
+}
+
+.pagina-copiar-codigo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.copiar-codigo-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  max-width: 420px;
+  padding: 35px 28px;
+  background: #121216;
+  border: 1px solid #2f2f36;
+  border-radius: 12px;
+  text-align: center;
+}
+
+.copiar-codigo-card small {
+  color: #77777f;
+  font-size: 11px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.copiar-codigo-valor {
+  padding: 14px 24px;
+  background: #09090b;
+  border: 1px dashed #e51d2a;
+  border-radius: 10px;
+  font-family: "Courier New", monospace;
+  font-size: 34px;
+  letter-spacing: 8px;
+  user-select: all;
+}
+
+.copiar-codigo-card .reservar-button {
+  padding: 12px 0;
+  font-size: 14px;
+}
+
+.copiar-codigo-card p {
+  color: #96969d;
+  font-size: 13px;
+  line-height: 1.5;
 }

@@ -109,7 +109,7 @@ public class LivroService {
         Livro livro = repository.findById(id)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Livro não encontrado"));
 
-        if (!confirmado && reservaRepository.existsByLivroIdAndStatus(id, StatusReserva.RESERVADO)) {
+        if (!confirmado && reservaRepository.existsByLivroIdAndStatusIn(id, List.of(StatusReserva.RESERVADO, StatusReserva.ENTREGUE))) {
             throw new ConflitoException("Este livro possui reservas em aberto.");
         }
 
