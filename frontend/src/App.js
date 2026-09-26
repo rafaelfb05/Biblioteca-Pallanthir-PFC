@@ -1,6 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
-import { livrosApi, reservasApi, usuariosApi } from "./services/api";
+import {
+  definirAoExpirarSessao,
+  definirToken,
+  lerDadosDoToken,
+  livrosApi,
+  logsApi,
+  reservasApi,
+  tokenExpirado,
+  usuariosApi,
+} from "./services/api";
 
 const ICONES_MATERIA = {
   TI: "💻",
@@ -15,9 +24,56 @@ const ICONES_MATERIA = {
 };
 
 const FORM_LIVRO_VAZIO = { titulo: "", materia: "", preco: "", estoque: "1" };
-const FORM_USUARIO_VAZIO = { nome: "", email: "", senha: "" };
+const FORM_USUARIO_VAZIO = {
+  nome: "",
+  email: "",
+  senha: "",
+  tipo: "ESTUDANTE",
+  codigoAcesso: "",
+};
 const FORM_LOGIN_VAZIO = { email: "", senha: "" };
+const FORM_RECUPERACAO_VAZIO = {
+  email: "",
+  codigo: "",
+  novaSenha: "",
+  confirmarSenha: "",
+};
+const FORM_CONTA_VAZIO = { nome: "", email: "" };
+const FILTRO_LOGS_VAZIO = { usuarioId: "", texto: "" };
 const CHAVE_SESSAO = "pallanthir:usuario";
+
+const REGRA_SENHA = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@#$%^&+=!]).{8,}$/;
+const DICA_SENHA =
+  "Mínimo de 8 caracteres, com letra maiúscula, minúscula, número e um destes símbolos: @ # $ % ^ & + = !";
+
+const ROTULO_TIPO_USUARIO = {
+  ESTUDANTE: "Estudante",
+  FUNCIONARIO: "Funcionário",
+};
+
+const TITULOS_AUTENTICACAO = {
+  login: "Entrar",
+  cadastro: "Criar conta",
+  "2fa": "Verificação em duas etapas",
+  recuperar: "Recuperar senha",
+  redefinir: "Redefinir senha",
+};
+
+const PAGINAS_PRIVADAS = ["favoritos", "reservas", "conta", "gestao", "logs"];
+
+const mensagemDeErro = (erro, padrao) =>
+  erro && erro.status && erro.message ? erro.message : padrao;
+
+const classeDaAcao = (acao) => {
+  const texto = String(acao || "");
+  if (/FALHA|NEGADO|BLOQUEADO/.test(texto)) {
+    return "log-acao falha";
+  }
+  if (/EXCLUSAO|CANCELAMENTO/.test(texto)) {
+    return "log-acao alerta";
+  }
+  return "log-acao sucesso";
+};
 
 const formatarEstoque = (quantidade) => {
   const total = Number(quantidade || 0);
@@ -276,9 +332,24 @@ function App() {
   const [modoAutenticacao, setModoAutenticacao] = useState("login");
   const [formUsuario, setFormUsuario] = useState(FORM_USUARIO_VAZIO);
   const [formLogin, setFormLogin] = useState(FORM_LOGIN_VAZIO);
+  const [formRecuperacao, setFormRecuperacao] = useState(FORM_RECUPERACAO_VAZIO);
+  const [emailPendente, setEmailPendente] = useState("");
+  const [codigo2FA, setCodigo2FA] = useState("");
+  const [avisoAutenticacao, setAvisoAutenticacao] = useState(null);
   const [salvando, setSalvando] = useState(false);
 
+  const [formConta, setFormConta] = useState(FORM_CONTA_VAZIO);
+  const [usuariosGestao, setUsuariosGestao] = useState([]);
+  const [filtroUsuarios, setFiltroUsuarios] = useState("");
+  const [usuarioGestao, setUsuarioGestao] = useState(null);
+  const [reservasGestao, setReservasGestao] = useState([]);
+  const [logs, setLogs] = useState([]);
+  const [filtroLogs, setFiltroLogs] = useState(FILTRO_LOGS_VAZIO);
+  const [carregandoPainel, setCarregandoPainel] = useState(false);
+
   const usuarioId = usuario ? usuario.id : null;
+  const ehFuncionario = Boolean(usuario && usuario.tipo === "FUNCIONARIO");
+  const ehEstudante = Boolean(usuario && usuario.tipo === "ESTUDANTE");
 
   const idsFavoritos = useMemo(
     () => new Set(favoritos.map((livro) => livro.id)),
@@ -334,6 +405,45 @@ function App() {
     }
   }, []);
 
+  const carregarDadosDoUsuario = useCallback(
+    async (sessao) => {
+      if (sessao.tipo !== "ESTUDANTE") {
+        return;
+      }
+      await Promise.all([
+        carregarFavoritos(sessao.id),
+        carregarReservas(sessao.id),
+      ]);
+    },
+    [carregarFavoritos, carregarReservas]
+  );
+
+  const salvarSessao = (sessao) => {
+    try {
+      localStorage.setItem(CHAVE_SESSAO, JSON.stringify(sessao));
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const encerrarSessao = useCallback((mensagem) => {
+    try {
+      localStorage.removeItem(CHAVE_SESSAO);
+    } catch (e) {
+      console.error(e);
+    }
+    definirToken(null);
+    setUsuario(null);
+    setFavoritos([]);
+    setReservas([]);
+    setUsuariosGestao([]);
+    setUsuarioGestao(null);
+    setReservasGestao([]);
+    setLogs([]);
+    setPagina((atual) => (PAGINAS_PRIVADAS.includes(atual) ? "inicio" : atual));
+    setAviso(mensagem);
+  }, []);
+
   const restaurarSessao = useCallback(async () => {
     try {
       const salvo = localStorage.getItem(CHAVE_SESSAO);
@@ -341,15 +451,17 @@ function App() {
         return;
       }
       const sessao = JSON.parse(salvo);
+      if (!sessao.token || tokenExpirado(sessao.token)) {
+        localStorage.removeItem(CHAVE_SESSAO);
+        return;
+      }
+      definirToken(sessao.token);
       setUsuario(sessao);
-      await Promise.all([
-        carregarFavoritos(sessao.id),
-        carregarReservas(sessao.id),
-      ]);
+      await carregarDadosDoUsuario(sessao);
     } catch (e) {
       console.error(e);
     }
-  }, [carregarFavoritos, carregarReservas]);
+  }, [carregarDadosDoUsuario]);
 
   useEffect(() => {
     carregarLivros();
@@ -357,51 +469,171 @@ function App() {
     restaurarSessao();
   }, [carregarLivros, carregarMaterias, restaurarSessao]);
 
-  const abrirAutenticacao = (modo) => {
-    setModoAutenticacao(modo || "login");
+  useEffect(() => {
+    definirAoExpirarSessao(() =>
+      encerrarSessao("Sua sessão expirou. Entre novamente.")
+    );
+  }, [encerrarSessao]);
+
+  useEffect(() => {
+    if (!usuario || !usuario.token) {
+      return undefined;
+    }
+    const dados = lerDadosDoToken(usuario.token);
+    if (!dados || !dados.exp) {
+      return undefined;
+    }
+    const temporizador = setTimeout(
+      () => encerrarSessao("Sua sessão expirou. Entre novamente."),
+      Math.max(dados.exp * 1000 - Date.now(), 0)
+    );
+    return () => clearTimeout(temporizador);
+  }, [usuario, encerrarSessao]);
+
+  const trocarModoAutenticacao = (modo) => {
+    setModoAutenticacao(modo);
     setErro(null);
+    setAvisoAutenticacao(null);
+  };
+
+  const abrirAutenticacao = (modo) => {
+    trocarModoAutenticacao(modo || "login");
     setMostrarAutenticacao(true);
   };
 
   const fecharAutenticacao = () => {
     setMostrarAutenticacao(false);
     setErro(null);
+    setAvisoAutenticacao(null);
   };
 
-  const iniciarSessao = async (autenticado) => {
+  const iniciarSessao = async (resposta) => {
     const sessao = {
-      id: autenticado.id,
-      nome: autenticado.nome,
-      email: autenticado.email,
+      id: resposta.usuario.id,
+      nome: resposta.usuario.nome,
+      email: resposta.usuario.email,
+      tipo: resposta.usuario.tipo,
+      token: resposta.token,
     };
-    try {
-      localStorage.setItem(CHAVE_SESSAO, JSON.stringify(sessao));
-    } catch (e) {
-      console.error(e);
-    }
+    salvarSessao(sessao);
+    definirToken(sessao.token);
     setUsuario(sessao);
     setMostrarAutenticacao(false);
-    await Promise.all([
-      carregarFavoritos(sessao.id),
-      carregarReservas(sessao.id),
-    ]);
+    await carregarDadosDoUsuario(sessao);
   };
 
   const entrar = async (evento) => {
+    evento.preventDefault();
+    const email = formLogin.email.trim();
+
+    try {
+      setSalvando(true);
+      setErro(null);
+      setAvisoAutenticacao(null);
+      await usuariosApi.login(email, formLogin.senha);
+      setEmailPendente(email);
+      setCodigo2FA("");
+      setModoAutenticacao("2fa");
+      setAvisoAutenticacao("Enviamos um código de acesso para o seu e-mail.");
+    } catch (e) {
+      setErro(mensagemDeErro(e, "Não foi possível entrar. Tente novamente."));
+      console.error(e);
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  const reenviarCodigo2FA = async () => {
+    try {
+      setSalvando(true);
+      setErro(null);
+      await usuariosApi.login(emailPendente, formLogin.senha);
+      setAvisoAutenticacao("Enviamos um novo código para o seu e-mail.");
+    } catch (e) {
+      setErro(mensagemDeErro(e, "Não foi possível reenviar o código."));
+      console.error(e);
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  const confirmarCodigo2FA = async (evento) => {
     evento.preventDefault();
 
     try {
       setSalvando(true);
       setErro(null);
-      const autenticado = await usuariosApi.login(
-        formLogin.email.trim(),
-        formLogin.senha
+      const resposta = await usuariosApi.verificar2FA(
+        emailPendente,
+        codigo2FA.trim()
       );
       setFormLogin(FORM_LOGIN_VAZIO);
-      await iniciarSessao(autenticado);
-      setAviso("Bem-vindo(a), " + autenticado.nome + "!");
+      setCodigo2FA("");
+      setEmailPendente("");
+      setAvisoAutenticacao(null);
+      await iniciarSessao(resposta);
+      setAviso("Bem-vindo(a), " + resposta.usuario.nome + "!");
     } catch (e) {
-      setErro("E-mail ou senha incorretos.");
+      setErro(mensagemDeErro(e, "Código inválido ou expirado."));
+      console.error(e);
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  const enviarCodigoRecuperacao = async (email) => {
+    try {
+      setSalvando(true);
+      setErro(null);
+      await usuariosApi.recuperarSenha(email);
+      setFormRecuperacao({ ...FORM_RECUPERACAO_VAZIO, email });
+      setModoAutenticacao("redefinir");
+      setAvisoAutenticacao("Enviamos um código de recuperação para " + email + ".");
+    } catch (e) {
+      setErro(mensagemDeErro(e, "Não foi possível enviar o código."));
+      console.error(e);
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  const solicitarRecuperacao = async (evento) => {
+    evento.preventDefault();
+    await enviarCodigoRecuperacao(formRecuperacao.email.trim());
+  };
+
+  const redefinirSenha = async (evento) => {
+    evento.preventDefault();
+
+    if (!REGRA_SENHA.test(formRecuperacao.novaSenha)) {
+      setErro(DICA_SENHA);
+      return;
+    }
+    if (formRecuperacao.novaSenha !== formRecuperacao.confirmarSenha) {
+      setErro("As senhas não conferem.");
+      return;
+    }
+
+    try {
+      setSalvando(true);
+      setErro(null);
+      await usuariosApi.redefinirSenha(
+        formRecuperacao.email,
+        formRecuperacao.codigo.trim(),
+        formRecuperacao.novaSenha
+      );
+      const email = formRecuperacao.email;
+      setFormRecuperacao(FORM_RECUPERACAO_VAZIO);
+      if (usuario) {
+        fecharAutenticacao();
+        setAviso("Sua senha foi alterada.");
+        return;
+      }
+      setFormLogin({ email, senha: "" });
+      setModoAutenticacao("login");
+      setAvisoAutenticacao("Senha redefinida. Entre com a nova senha.");
+    } catch (e) {
+      setErro(mensagemDeErro(e, "Não foi possível redefinir a senha."));
       console.error(e);
     } finally {
       setSalvando(false);
@@ -409,18 +641,7 @@ function App() {
   };
 
   const sair = () => {
-    try {
-      localStorage.removeItem(CHAVE_SESSAO);
-    } catch (e) {
-      console.error(e);
-    }
-    setUsuario(null);
-    setFavoritos([]);
-    setReservas([]);
-    setPagina((atual) =>
-      atual === "favoritos" || atual === "reservas" ? "inicio" : atual
-    );
-    setAviso("Você saiu da sua conta.");
+    encerrarSessao("Você saiu da sua conta.");
   };
 
   const limparFiltro = () => {
@@ -451,37 +672,148 @@ function App() {
     limparFiltro();
   };
 
-  const irParaFavoritos = () => {
-    setPagina("favoritos");
+  const abrirPagina = (nome) => {
+    setPagina(nome);
     setLivroAbertoId(null);
     setFormEdicao(null);
     setErro(null);
     window.scrollTo({ top: 0 });
+  };
+
+  const irParaFavoritos = () => {
+    abrirPagina("favoritos");
+  };
+
+  const irParaConta = () => {
+    abrirPagina("conta");
+    setFormConta({ nome: usuario.nome, email: usuario.email });
+  };
+
+  const carregarUsuariosGestao = async () => {
+    try {
+      setUsuariosGestao(await usuariosApi.listar());
+    } catch (e) {
+      setErro(mensagemDeErro(e, "Não foi possível carregar os usuários."));
+      console.error(e);
+    }
+  };
+
+  const irParaGestao = async () => {
+    abrirPagina("gestao");
+    setFiltroUsuarios("");
+    await carregarUsuariosGestao();
+  };
+
+  const selecionarUsuarioGestao = async (selecionado) => {
+    setUsuarioGestao(selecionado);
+    setReservasGestao([]);
+    try {
+      setCarregandoPainel(true);
+      setErro(null);
+      setReservasGestao(await reservasApi.listarPorUsuario(selecionado.id));
+    } catch (e) {
+      setErro(mensagemDeErro(e, "Não foi possível carregar as reservas."));
+      console.error(e);
+    } finally {
+      setCarregandoPainel(false);
+    }
+  };
+
+  const carregarLogs = async (idDoUsuario) => {
+    try {
+      setCarregandoPainel(true);
+      setErro(null);
+      setLogs(
+        idDoUsuario
+          ? await logsApi.listarPorUsuario(idDoUsuario)
+          : await logsApi.listar()
+      );
+    } catch (e) {
+      setErro(mensagemDeErro(e, "Não foi possível carregar os logs."));
+      console.error(e);
+    } finally {
+      setCarregandoPainel(false);
+    }
+  };
+
+  const irParaLogs = async () => {
+    abrirPagina("logs");
+    setFiltroLogs(FILTRO_LOGS_VAZIO);
+    await Promise.all([carregarLogs(""), carregarUsuariosGestao()]);
+  };
+
+  const atualizarConta = async (evento) => {
+    evento.preventDefault();
+    const nome = formConta.nome.trim();
+    const email = formConta.email.trim();
+    if (!nome || !email) {
+      setErro("Informe o nome e o e-mail.");
+      return;
+    }
+
+    try {
+      setSalvando(true);
+      setErro(null);
+      const atualizado = await usuariosApi.atualizar(usuario.id, { nome, email });
+      if (atualizado.email !== usuario.email) {
+        encerrarSessao("E-mail alterado. Entre novamente com o novo e-mail.");
+        setFormLogin({ email: atualizado.email, senha: "" });
+        abrirAutenticacao("login");
+        return;
+      }
+      const sessao = { ...usuario, nome: atualizado.nome };
+      salvarSessao(sessao);
+      setUsuario(sessao);
+      setAviso("Seus dados foram atualizados.");
+    } catch (e) {
+      setErro(mensagemDeErro(e, "Não foi possível atualizar seus dados."));
+      console.error(e);
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  const iniciarTrocaDeSenha = async () => {
+    setFormRecuperacao({ ...FORM_RECUPERACAO_VAZIO, email: usuario.email });
+    setModoAutenticacao("recuperar");
+    setAvisoAutenticacao(null);
+    setMostrarAutenticacao(true);
+    await enviarCodigoRecuperacao(usuario.email);
+  };
+
+  const excluirConta = async () => {
+    if (
+      !window.confirm(
+        "Excluir sua conta? Seus dados pessoais serão anonimizados e esta ação não pode ser desfeita."
+      )
+    ) {
+      return;
+    }
+
+    try {
+      setSalvando(true);
+      setErro(null);
+      await usuariosApi.deletar(usuario.id);
+      encerrarSessao("Sua conta foi excluída.");
+    } catch (e) {
+      setErro(mensagemDeErro(e, "Não foi possível excluir a conta."));
+      console.error(e);
+    } finally {
+      setSalvando(false);
+    }
   };
 
   const irParaRanking = () => {
-    setPagina("ranking");
-    setLivroAbertoId(null);
-    setFormEdicao(null);
-    setErro(null);
-    window.scrollTo({ top: 0 });
+    abrirPagina("ranking");
   };
 
   const irParaMaterias = () => {
-    setPagina("materias");
-    setLivroAbertoId(null);
-    setFormEdicao(null);
-    setErro(null);
-    window.scrollTo({ top: 0 });
+    abrirPagina("materias");
   };
 
   const irParaReservas = async () => {
-    setPagina("reservas");
-    setLivroAbertoId(null);
-    setFormEdicao(null);
-    setErro(null);
-    window.scrollTo({ top: 0 });
-    if (usuarioId) {
+    abrirPagina("reservas");
+    if (ehEstudante) {
       await carregarReservas(usuarioId);
     }
   };
@@ -508,7 +840,7 @@ function App() {
 
       setFavoritos(await usuariosApi.listarFavoritos(usuarioId));
     } catch (e) {
-      setErro("Não foi possível atualizar os favoritos.");
+      setErro(mensagemDeErro(e, "Não foi possível atualizar os favoritos."));
       console.error(e);
     } finally {
       setFavoritoEmEdicao(null);
@@ -542,7 +874,9 @@ function App() {
       setAviso('"' + livro.titulo + '" foi reservado.');
       await Promise.all([carregarLivros(), carregarReservas(usuarioId)]);
     } catch (e) {
-      setErro("Não foi possível reservar o livro. Ele pode estar esgotado.");
+      setErro(
+        mensagemDeErro(e, "Não foi possível reservar o livro. Ele pode estar esgotado.")
+      );
       console.error(e);
     } finally {
       setReservaEmEdicao(null);
@@ -557,7 +891,7 @@ function App() {
       setAviso("Reserva de \"" + reserva.tituloLivro + "\" cancelada.");
       await Promise.all([carregarLivros(), carregarReservas(usuarioId)]);
     } catch (e) {
-      setErro("Não foi possível cancelar a reserva.");
+      setErro(mensagemDeErro(e, "Não foi possível cancelar a reserva."));
       console.error(e);
     } finally {
       setReservaEmEdicao(null);
@@ -570,9 +904,13 @@ function App() {
       setErro(null);
       await reservasApi.devolver(reserva.id);
       setAviso("\"" + reserva.tituloLivro + "\" foi devolvido.");
-      await Promise.all([carregarLivros(), carregarReservas(usuarioId)]);
+      const [, atualizadas] = await Promise.all([
+        carregarLivros(),
+        reservasApi.listarPorUsuario(usuarioGestao.id),
+      ]);
+      setReservasGestao(atualizadas);
     } catch (e) {
-      setErro("Não foi possível registrar a devolução.");
+      setErro(mensagemDeErro(e, "Não foi possível registrar a devolução."));
       console.error(e);
     } finally {
       setReservaEmEdicao(null);
@@ -645,7 +983,10 @@ function App() {
       limparFiltro();
     } catch (e) {
       setErro(
-        "Não foi possível cadastrar o livro. Confira o título na API de livros."
+        mensagemDeErro(
+          e,
+          "Não foi possível cadastrar o livro. Confira o título na API de livros."
+        )
       );
       console.error(e);
     } finally {
@@ -674,11 +1015,8 @@ function App() {
         atual.map((item) => (item.id === atualizado.id ? atualizado : item))
       );
       await Promise.all([carregarLivros(), carregarMaterias()]);
-      if (usuarioId) {
-        setFavoritos(await usuariosApi.listarFavoritos(usuarioId));
-      }
     } catch (e) {
-      setErro("Não foi possível atualizar o livro.");
+      setErro(mensagemDeErro(e, "Não foi possível atualizar o livro."));
       console.error(e);
     } finally {
       setSalvando(false);
@@ -717,12 +1055,6 @@ function App() {
       setCapaAmpliada(null);
       setAviso('"' + livro.titulo + '" foi removido do acervo.');
       await Promise.all([carregarLivros(), carregarMaterias()]);
-      if (usuarioId) {
-        await Promise.all([
-          carregarFavoritos(usuarioId),
-          carregarReservas(usuarioId),
-        ]);
-      }
       limparFiltro();
     } catch (e) {
       setErro(e.message || "Não foi possível remover o livro.");
@@ -734,19 +1066,36 @@ function App() {
 
   const cadastrarUsuario = async (evento) => {
     evento.preventDefault();
+    const email = formUsuario.email.trim();
+
+    if (!REGRA_SENHA.test(formUsuario.senha)) {
+      setErro(DICA_SENHA);
+      return;
+    }
+    if (formUsuario.tipo === "FUNCIONARIO" && !formUsuario.codigoAcesso.trim()) {
+      setErro("Informe o código de acesso de funcionário.");
+      return;
+    }
 
     try {
       setSalvando(true);
       setErro(null);
-      const criado = await usuariosApi.cadastrar({
-        ...formUsuario,
-        email: formUsuario.email.trim(),
+      await usuariosApi.cadastrar({
+        nome: formUsuario.nome.trim(),
+        email,
+        senha: formUsuario.senha,
+        tipo: formUsuario.tipo,
+        codigoAcesso:
+          formUsuario.tipo === "FUNCIONARIO"
+            ? formUsuario.codigoAcesso.trim()
+            : null,
       });
       setFormUsuario(FORM_USUARIO_VAZIO);
-      await iniciarSessao(criado);
-      setAviso("Conta criada. Agora você pode favoritar livros.");
+      setFormLogin({ email, senha: "" });
+      setModoAutenticacao("login");
+      setAvisoAutenticacao("Conta criada! Entre com seu e-mail e senha.");
     } catch (e) {
-      setErro("Não foi possível cadastrar o usuário. O e-mail já pode existir.");
+      setErro(mensagemDeErro(e, "Não foi possível criar a conta."));
       console.error(e);
     } finally {
       setSalvando(false);
@@ -770,6 +1119,30 @@ function App() {
       [...livros].sort((a, b) => (b.avalliacao || 0) - (a.avalliacao || 0)),
     [livros]
   );
+
+  const usuariosFiltrados = useMemo(() => {
+    const termo = filtroUsuarios.trim().toLowerCase();
+    return usuariosGestao
+      .filter((item) => item.tipo === "ESTUDANTE")
+      .filter(
+        (item) =>
+          !termo ||
+          String(item.nome || "").toLowerCase().includes(termo) ||
+          String(item.email || "").toLowerCase().includes(termo)
+      );
+  }, [usuariosGestao, filtroUsuarios]);
+
+  const logsExibidos = useMemo(() => {
+    const termo = filtroLogs.texto.trim().toLowerCase();
+    if (!termo) {
+      return logs;
+    }
+    return logs.filter((log) =>
+      [log.acao, log.descricao, log.usuarioEmail]
+        .map((valor) => String(valor || "").toLowerCase())
+        .some((valor) => valor.includes(termo))
+    );
+  }, [logs, filtroLogs.texto]);
 
   const reservasAtivas = useMemo(
     () => reservas.filter((reserva) => reserva.status === "RESERVADO"),
@@ -816,22 +1189,24 @@ function App() {
         ) : (
           <span>📘</span>
         )}
-        <button
-          type="button"
-          className={"favorite" + (idsFavoritos.has(livro.id) ? " ativo" : "")}
-          onClick={(e) => {
-            e.stopPropagation();
-            alternarFavorito(livro);
-          }}
-          disabled={favoritoEmEdicao === livro.id}
-          aria-label={
-            idsFavoritos.has(livro.id)
-              ? "Remover dos favoritos"
-              : "Adicionar aos favoritos"
-          }
-        >
-          {idsFavoritos.has(livro.id) ? "♥" : "♡"}
-        </button>
+        {!ehFuncionario && (
+          <button
+            type="button"
+            className={"favorite" + (idsFavoritos.has(livro.id) ? " ativo" : "")}
+            onClick={(e) => {
+              e.stopPropagation();
+              alternarFavorito(livro);
+            }}
+            disabled={favoritoEmEdicao === livro.id}
+            aria-label={
+              idsFavoritos.has(livro.id)
+                ? "Remover dos favoritos"
+                : "Adicionar aos favoritos"
+            }
+          >
+            {idsFavoritos.has(livro.id) ? "♥" : "♡"}
+          </button>
+        )}
       </div>
       <div className="book-info">
         <span className="book-category">{livro.materia}</span>
@@ -851,19 +1226,21 @@ function App() {
             {formatarEstoque(livro.estoque)}
           </span>
         </div>
-        <button
-          type="button"
-          className="reservar-button"
-          onClick={(e) => {
-            e.stopPropagation();
-            reservarLivro(livro);
-          }}
-          disabled={
-            reservaEmEdicao === livro.id || Number(livro.estoque || 0) <= 0
-          }
-        >
-          {Number(livro.estoque || 0) <= 0 ? "Indisponível" : "Reservar"}
-        </button>
+        {!ehFuncionario && (
+          <button
+            type="button"
+            className="reservar-button"
+            onClick={(e) => {
+              e.stopPropagation();
+              reservarLivro(livro);
+            }}
+            disabled={
+              reservaEmEdicao === livro.id || Number(livro.estoque || 0) <= 0
+            }
+          >
+            {Number(livro.estoque || 0) <= 0 ? "Indisponível" : "Reservar"}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -910,35 +1287,67 @@ function App() {
         >
           Ranking ♛
         </button>
-        <button
-          type="button"
-          className={
-            "nav-link" + (pagina === "favoritos" ? " active" : "")
-          }
-          onClick={irParaFavoritos}
-        >
-          Favoritos ♡ {favoritos.length > 0 && "(" + favoritos.length + ")"}
-        </button>
-        <button
-          type="button"
-          className={"nav-link" + (pagina === "reservas" ? " active" : "")}
-          onClick={irParaReservas}
-        >
-          Reservas{" "}
-          {reservasAtivas.length > 0 && "(" + reservasAtivas.length + ")"}
-        </button>
+        {!ehFuncionario && (
+          <button
+            type="button"
+            className={
+              "nav-link" + (pagina === "favoritos" ? " active" : "")
+            }
+            onClick={irParaFavoritos}
+          >
+            Favoritos ♡ {favoritos.length > 0 && "(" + favoritos.length + ")"}
+          </button>
+        )}
+        {!ehFuncionario && (
+          <button
+            type="button"
+            className={"nav-link" + (pagina === "reservas" ? " active" : "")}
+            onClick={irParaReservas}
+          >
+            Reservas{" "}
+            {reservasAtivas.length > 0 && "(" + reservasAtivas.length + ")"}
+          </button>
+        )}
+        {ehFuncionario && (
+          <button
+            type="button"
+            className={"nav-link" + (pagina === "gestao" ? " active" : "")}
+            onClick={irParaGestao}
+          >
+            Gestão
+          </button>
+        )}
+        {ehFuncionario && (
+          <button
+            type="button"
+            className={"nav-link" + (pagina === "logs" ? " active" : "")}
+            onClick={irParaLogs}
+          >
+            Logs
+          </button>
+        )}
       </nav>
       <div className="header-actions">
-        <button
-          type="button"
-          className="cadastro-button"
-          onClick={abrirCadastroLivro}
-        >
-          + Cadastrar livro
-        </button>
+        {ehFuncionario && (
+          <button
+            type="button"
+            className="cadastro-button"
+            onClick={abrirCadastroLivro}
+          >
+            + Cadastrar livro
+          </button>
+        )}
         {usuario ? (
           <div className="sessao">
-            <span className="sessao-nome">{usuario.nome}</span>
+            <button
+              type="button"
+              className={"sessao-nome" + (pagina === "conta" ? " ativo" : "")}
+              onClick={irParaConta}
+              title="Minha conta"
+            >
+              {usuario.nome}
+              <small>{ROTULO_TIPO_USUARIO[usuario.tipo] || ""}</small>
+            </button>
             <button type="button" className="login-button" onClick={sair}>
               Sair
             </button>
@@ -1036,51 +1445,64 @@ function App() {
     </div>
   );
 
+  const subtituloAutenticacao = {
+    login:
+      "Informe seu e-mail e senha. Depois enviaremos um código de confirmação para o seu e-mail.",
+    cadastro: "Crie sua conta de estudante ou de funcionário da biblioteca.",
+    "2fa":
+      "Digite o código de 6 dígitos enviado para " +
+      emailPendente +
+      ". Ele vale por 10 minutos.",
+    recuperar:
+      "Informe o e-mail da sua conta para receber um código de recuperação.",
+    redefinir:
+      "Digite o código enviado para " +
+      formRecuperacao.email +
+      " e escolha uma nova senha. O código vale por 15 minutos.",
+  }[modoAutenticacao];
+
   const modalAutenticacao = mostrarAutenticacao && (
     <div className="modal" onClick={fecharAutenticacao}>
       <div className="modal-box" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h3>{modoAutenticacao === "login" ? "Entrar" : "Criar conta"}</h3>
+          <h3>{TITULOS_AUTENTICACAO[modoAutenticacao]}</h3>
           <button type="button" onClick={fecharAutenticacao}>
             ✕
           </button>
         </div>
 
-        <div className="abas-autenticacao">
-          <button
-            type="button"
-            className={
-              "aba-autenticacao" + (modoAutenticacao === "login" ? " ativa" : "")
-            }
-            onClick={() => {
-              setModoAutenticacao("login");
-              setErro(null);
-            }}
-          >
-            Entrar
-          </button>
-          <button
-            type="button"
-            className={
-              "aba-autenticacao" +
-              (modoAutenticacao === "cadastro" ? " ativa" : "")
-            }
-            onClick={() => {
-              setModoAutenticacao("cadastro");
-              setErro(null);
-            }}
-          >
-            Criar conta
-          </button>
-        </div>
+        {(modoAutenticacao === "login" || modoAutenticacao === "cadastro") && (
+          <div className="abas-autenticacao">
+            <button
+              type="button"
+              className={
+                "aba-autenticacao" +
+                (modoAutenticacao === "login" ? " ativa" : "")
+              }
+              onClick={() => trocarModoAutenticacao("login")}
+            >
+              Entrar
+            </button>
+            <button
+              type="button"
+              className={
+                "aba-autenticacao" +
+                (modoAutenticacao === "cadastro" ? " ativa" : "")
+              }
+              onClick={() => trocarModoAutenticacao("cadastro")}
+            >
+              Criar conta
+            </button>
+          </div>
+        )}
 
-        <p className="modal-sub">
-          {modoAutenticacao === "login"
-            ? "Informe seu e-mail e senha para acessar seus favoritos."
-            : "Crie sua conta para salvar seus livros favoritos."}
-        </p>
+        <p className="modal-sub">{subtituloAutenticacao}</p>
 
-        {modoAutenticacao === "login" ? (
+        {avisoAutenticacao && (
+          <p className="aviso-modal">{avisoAutenticacao}</p>
+        )}
+
+        {modoAutenticacao === "login" && (
           <form className="modal-form" onSubmit={entrar}>
             <label>
               E-mail
@@ -1109,11 +1531,182 @@ function App() {
 
             <div className="modal-actions">
               <button type="submit" disabled={salvando}>
-                {salvando ? "Entrando..." : "Entrar"}
+                {salvando ? "Enviando código..." : "Entrar"}
+              </button>
+            </div>
+            <div className="links-autenticacao">
+              <button
+                type="button"
+                className="link-button"
+                onClick={() => {
+                  setFormRecuperacao({
+                    ...FORM_RECUPERACAO_VAZIO,
+                    email: formLogin.email.trim(),
+                  });
+                  trocarModoAutenticacao("recuperar");
+                }}
+              >
+                Esqueci minha senha
               </button>
             </div>
           </form>
-        ) : (
+        )}
+
+        {modoAutenticacao === "2fa" && (
+          <form className="modal-form" onSubmit={confirmarCodigo2FA}>
+            <label>
+              Código de verificação
+              <input
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                maxLength={6}
+                required
+                className="campo-codigo"
+                placeholder="000000"
+                value={codigo2FA}
+                onChange={(e) =>
+                  setCodigo2FA(e.target.value.replace(/\D/g, ""))
+                }
+              />
+            </label>
+
+            {erro && <p className="erro">{erro}</p>}
+
+            <div className="modal-actions">
+              <button type="submit" disabled={salvando || codigo2FA.length < 6}>
+                {salvando ? "Verificando..." : "Confirmar"}
+              </button>
+            </div>
+            <div className="links-autenticacao">
+              <button
+                type="button"
+                className="link-button"
+                onClick={reenviarCodigo2FA}
+                disabled={salvando}
+              >
+                Reenviar código
+              </button>
+              <button
+                type="button"
+                className="link-button"
+                onClick={() => trocarModoAutenticacao("login")}
+              >
+                Voltar
+              </button>
+            </div>
+          </form>
+        )}
+
+        {modoAutenticacao === "recuperar" && (
+          <form className="modal-form" onSubmit={solicitarRecuperacao}>
+            <label>
+              E-mail
+              <input
+                type="email"
+                required
+                value={formRecuperacao.email}
+                onChange={(e) =>
+                  setFormRecuperacao({
+                    ...formRecuperacao,
+                    email: e.target.value,
+                  })
+                }
+              />
+            </label>
+
+            {erro && <p className="erro">{erro}</p>}
+
+            <div className="modal-actions">
+              <button type="submit" disabled={salvando}>
+                {salvando ? "Enviando..." : "Enviar código"}
+              </button>
+            </div>
+            {!usuario && (
+              <div className="links-autenticacao">
+                <button
+                  type="button"
+                  className="link-button"
+                  onClick={() => trocarModoAutenticacao("login")}
+                >
+                  Voltar para o login
+                </button>
+              </div>
+            )}
+          </form>
+        )}
+
+        {modoAutenticacao === "redefinir" && (
+          <form className="modal-form" onSubmit={redefinirSenha}>
+            <label>
+              Código de recuperação
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                required
+                className="campo-codigo"
+                placeholder="000000"
+                value={formRecuperacao.codigo}
+                onChange={(e) =>
+                  setFormRecuperacao({
+                    ...formRecuperacao,
+                    codigo: e.target.value.replace(/\D/g, ""),
+                  })
+                }
+              />
+            </label>
+            <label>
+              Nova senha
+              <input
+                type="password"
+                required
+                value={formRecuperacao.novaSenha}
+                onChange={(e) =>
+                  setFormRecuperacao({
+                    ...formRecuperacao,
+                    novaSenha: e.target.value,
+                  })
+                }
+              />
+            </label>
+            <small className="dica-senha">{DICA_SENHA}</small>
+            <label>
+              Confirmar nova senha
+              <input
+                type="password"
+                required
+                value={formRecuperacao.confirmarSenha}
+                onChange={(e) =>
+                  setFormRecuperacao({
+                    ...formRecuperacao,
+                    confirmarSenha: e.target.value,
+                  })
+                }
+              />
+            </label>
+
+            {erro && <p className="erro">{erro}</p>}
+
+            <div className="modal-actions">
+              <button type="submit" disabled={salvando}>
+                {salvando ? "Salvando..." : "Redefinir senha"}
+              </button>
+            </div>
+            <div className="links-autenticacao">
+              <button
+                type="button"
+                className="link-button"
+                onClick={() => enviarCodigoRecuperacao(formRecuperacao.email)}
+                disabled={salvando}
+              >
+                Reenviar código
+              </button>
+            </div>
+          </form>
+        )}
+
+        {modoAutenticacao === "cadastro" && (
           <form className="modal-form" onSubmit={cadastrarUsuario}>
             <label>
               Nome
@@ -1148,6 +1741,39 @@ function App() {
                 }
               />
             </label>
+            <small className="dica-senha">{DICA_SENHA}</small>
+            <label>
+              Tipo de conta
+              <select
+                value={formUsuario.tipo}
+                onChange={(e) =>
+                  setFormUsuario({
+                    ...formUsuario,
+                    tipo: e.target.value,
+                    codigoAcesso: "",
+                  })
+                }
+              >
+                <option value="ESTUDANTE">Estudante</option>
+                <option value="FUNCIONARIO">Funcionário</option>
+              </select>
+            </label>
+            {formUsuario.tipo === "FUNCIONARIO" && (
+              <label>
+                Código de acesso de funcionário
+                <input
+                  type="password"
+                  required
+                  value={formUsuario.codigoAcesso}
+                  onChange={(e) =>
+                    setFormUsuario({
+                      ...formUsuario,
+                      codigoAcesso: e.target.value,
+                    })
+                  }
+                />
+              </label>
+            )}
 
             {erro && <p className="erro">{erro}</p>}
 
@@ -1161,6 +1787,343 @@ function App() {
       </div>
     </div>
   );
+
+  const avisoDaPagina = aviso && (
+    <p className="aviso" onAnimationEnd={() => setAviso(null)}>
+      {aviso}
+    </p>
+  );
+
+  if (pagina === "conta") {
+    return (
+      <div className="app">
+        {cabecalho}
+
+        <section className="section pagina-conta">
+          <div className="section-header">
+            <div>
+              <span className="section-label">SUA CONTA</span>
+              <h2>Minha conta</h2>
+            </div>
+            <button type="button" className="link-button" onClick={irParaInicio}>
+              Voltar ao acervo →
+            </button>
+          </div>
+
+          {avisoDaPagina}
+          {erro && <p className="erro">{erro}</p>}
+
+          {!usuario && <p>Entre na sua conta para ver seus dados.</p>}
+
+          {usuario && (
+            <div className="conta-grid">
+              <div className="livro-edicao">
+                <span className="section-label">DADOS PESSOAIS</span>
+                <h2>Atualizar informações</h2>
+
+                <form className="modal-form" onSubmit={atualizarConta}>
+                  <label>
+                    Nome
+                    <input
+                      type="text"
+                      required
+                      value={formConta.nome}
+                      onChange={(e) =>
+                        setFormConta({ ...formConta, nome: e.target.value })
+                      }
+                    />
+                  </label>
+                  <label>
+                    E-mail
+                    <input
+                      type="email"
+                      required
+                      value={formConta.email}
+                      onChange={(e) =>
+                        setFormConta({ ...formConta, email: e.target.value })
+                      }
+                    />
+                  </label>
+                  <small className="dica-senha">
+                    Se você alterar o e-mail, precisará entrar novamente.
+                  </small>
+
+                  <div className="modal-actions">
+                    <button type="submit" disabled={salvando}>
+                      {salvando ? "Salvando..." : "Salvar alterações"}
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              <div className="conta-lateral">
+                <div className="conta-card">
+                  <small>Tipo de conta</small>
+                  <strong>{ROTULO_TIPO_USUARIO[usuario.tipo] || usuario.tipo}</strong>
+                </div>
+
+                <div className="conta-card">
+                  <small>Senha</small>
+                  <p>
+                    Para trocar sua senha, enviaremos um código de confirmação
+                    para o seu e-mail.
+                  </p>
+                  <button
+                    type="button"
+                    className="favoritar-button"
+                    onClick={iniciarTrocaDeSenha}
+                    disabled={salvando}
+                  >
+                    Alterar senha
+                  </button>
+                </div>
+
+                <div className="conta-card perigo-card">
+                  <small>Excluir conta</small>
+                  <p>
+                    Seus dados pessoais serão anonimizados e você perderá o
+                    acesso aos seus favoritos e reservas.
+                  </p>
+                  <button
+                    type="button"
+                    className="perigo"
+                    onClick={excluirConta}
+                    disabled={salvando}
+                  >
+                    Excluir minha conta
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </section>
+
+        {modalCadastroLivro}
+        {modalAutenticacao}
+      </div>
+    );
+  }
+
+  if (pagina === "gestao") {
+    return (
+      <div className="app">
+        {cabecalho}
+
+        <section className="section pagina-gestao">
+          <div className="section-header">
+            <div>
+              <span className="section-label">FUNCIONÁRIO</span>
+              <h2>Gestão de reservas</h2>
+            </div>
+            <button type="button" className="link-button" onClick={irParaInicio}>
+              Voltar ao acervo →
+            </button>
+          </div>
+
+          <p className="materias-sub">
+            Selecione um estudante para ver as reservas dele e registrar as
+            devoluções.
+          </p>
+
+          {avisoDaPagina}
+          {erro && <p className="erro">{erro}</p>}
+
+          {!ehFuncionario && <p>Área restrita a funcionários.</p>}
+
+          {ehFuncionario && (
+            <div className="gestao">
+              <aside className="gestao-usuarios">
+                <input
+                  type="text"
+                  className="gestao-busca"
+                  placeholder="Filtrar por nome ou e-mail"
+                  value={filtroUsuarios}
+                  onChange={(e) => setFiltroUsuarios(e.target.value)}
+                />
+                {usuariosFiltrados.length === 0 && (
+                  <p className="best-subtitle">Nenhum estudante encontrado.</p>
+                )}
+                {usuariosFiltrados.map((item) => (
+                  <button
+                    type="button"
+                    key={item.id}
+                    className={
+                      "gestao-usuario" +
+                      (usuarioGestao && usuarioGestao.id === item.id
+                        ? " ativo"
+                        : "")
+                    }
+                    onClick={() => selecionarUsuarioGestao(item)}
+                  >
+                    <strong>{item.nome}</strong>
+                    <small>{item.email}</small>
+                  </button>
+                ))}
+              </aside>
+
+              <div className="gestao-reservas">
+                {!usuarioGestao && (
+                  <p>Nenhum estudante selecionado.</p>
+                )}
+                {usuarioGestao && (
+                  <h3 className="gestao-titulo">
+                    Reservas de {usuarioGestao.nome}
+                  </h3>
+                )}
+                {usuarioGestao && carregandoPainel && <p>Carregando reservas...</p>}
+                {usuarioGestao &&
+                  !carregandoPainel &&
+                  reservasGestao.length === 0 && (
+                    <p>Este estudante ainda não fez reservas.</p>
+                  )}
+
+                {usuarioGestao && reservasGestao.length > 0 && (
+                  <div className="reservas">
+                    {reservasGestao.map((reserva) => (
+                      <div className="reserva-card" key={reserva.id}>
+                        <div className="reserva-info">
+                          <span
+                            className={
+                              "reserva-status " + reserva.status.toLowerCase()
+                            }
+                          >
+                            {ROTULO_STATUS_RESERVA[reserva.status] ||
+                              reserva.status}
+                          </span>
+                          <h3>{reserva.tituloLivro}</h3>
+                          <small>
+                            Reservado em {formatarData(reserva.dataReserva)}
+                          </small>
+                        </div>
+
+                        {reserva.status === "RESERVADO" && (
+                          <div className="reserva-acoes">
+                            <button
+                              type="button"
+                              className="reservar-button"
+                              onClick={() => devolverLivro(reserva)}
+                              disabled={reservaEmEdicao === reserva.id}
+                            >
+                              Registrar devolução
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </section>
+
+        {modalCadastroLivro}
+        {modalAutenticacao}
+      </div>
+    );
+  }
+
+  if (pagina === "logs") {
+    return (
+      <div className="app">
+        {cabecalho}
+
+        <section className="section pagina-logs">
+          <div className="section-header">
+            <div>
+              <span className="section-label">AUDITORIA</span>
+              <h2>Logs do sistema</h2>
+            </div>
+            <button type="button" className="link-button" onClick={irParaInicio}>
+              Voltar ao acervo →
+            </button>
+          </div>
+
+          <p className="materias-sub">
+            Registro das ações feitas no sistema, das mais recentes para as mais
+            antigas.
+          </p>
+
+          {erro && <p className="erro">{erro}</p>}
+
+          {!ehFuncionario && <p>Área restrita a funcionários.</p>}
+
+          {ehFuncionario && (
+            <>
+              <div className="logs-filtros">
+                <select
+                  value={filtroLogs.usuarioId}
+                  onChange={(e) => {
+                    setFiltroLogs({ ...filtroLogs, usuarioId: e.target.value });
+                    carregarLogs(e.target.value);
+                  }}
+                >
+                  <option value="">Todos os usuários</option>
+                  {usuariosGestao.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.nome} ({item.email})
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="text"
+                  placeholder="Filtrar por ação, descrição ou e-mail"
+                  value={filtroLogs.texto}
+                  onChange={(e) =>
+                    setFiltroLogs({ ...filtroLogs, texto: e.target.value })
+                  }
+                />
+                <button
+                  type="button"
+                  className="favoritar-button"
+                  onClick={() => carregarLogs(filtroLogs.usuarioId)}
+                  disabled={carregandoPainel}
+                >
+                  {carregandoPainel ? "Carregando..." : "Atualizar"}
+                </button>
+              </div>
+
+              {!carregandoPainel && logsExibidos.length === 0 && (
+                <p>Nenhum registro encontrado.</p>
+              )}
+
+              {logsExibidos.length > 0 && (
+                <div className="logs-tabela-container">
+                  <table className="logs-tabela">
+                    <thead>
+                      <tr>
+                        <th>Data</th>
+                        <th>Ação</th>
+                        <th>Usuário</th>
+                        <th>Descrição</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {logsExibidos.map((log) => (
+                        <tr key={log.id}>
+                          <td className="logs-data">{formatarData(log.dataHora)}</td>
+                          <td>
+                            <span className={classeDaAcao(log.acao)}>
+                              {log.acao}
+                            </span>
+                          </td>
+                          <td>{log.usuarioEmail || "—"}</td>
+                          <td>{log.descricao}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
+        </section>
+
+        {modalCadastroLivro}
+        {modalAutenticacao}
+      </div>
+    );
+  }
 
   if (pagina === "materias") {
     return (
@@ -1310,6 +2273,12 @@ function App() {
           {erro && <p className="erro">{erro}</p>}
 
           {!usuario && <p>Entre na sua conta para ver suas reservas.</p>}
+          {usuario && reservas.length > 0 && (
+            <p className="materias-sub">
+              Para devolver um livro, leve-o até a biblioteca. Um funcionário
+              registrará a devolução.
+            </p>
+          )}
           {usuario && reservas.length === 0 && (
             <p>Você ainda não reservou nenhum livro.</p>
           )}
@@ -1332,14 +2301,6 @@ function App() {
 
                   {reserva.status === "RESERVADO" && (
                     <div className="reserva-acoes">
-                      <button
-                        type="button"
-                        className="reservar-button"
-                        onClick={() => devolverLivro(reserva)}
-                        disabled={reservaEmEdicao === reserva.id}
-                      >
-                        Devolver
-                      </button>
                       <button
                         type="button"
                         className="reservar-button cancelar"
@@ -1486,15 +2447,17 @@ function App() {
               </div>
 
               <div className="livro-acoes">
-                <button
-                  type="button"
-                  className={"favoritar-button" + (favoritado ? " ativo" : "")}
-                  onClick={() => alternarFavorito(livroAberto)}
-                  disabled={favoritoEmEdicao === livroAberto.id}
-                >
-                  {favoritado ? "♥ Remover dos favoritos" : "♡ Favoritar"}
-                </button>
-                {reservaAberta ? (
+                {!ehFuncionario && (
+                  <button
+                    type="button"
+                    className={"favoritar-button" + (favoritado ? " ativo" : "")}
+                    onClick={() => alternarFavorito(livroAberto)}
+                    disabled={favoritoEmEdicao === livroAberto.id}
+                  >
+                    {favoritado ? "♥ Remover dos favoritos" : "♡ Favoritar"}
+                  </button>
+                )}
+                {ehFuncionario ? null : reservaAberta ? (
                   <button
                     type="button"
                     className="reservar-button cancelar"
@@ -1518,126 +2481,130 @@ function App() {
                       : "Reservar livro"}
                   </button>
                 )}
-                <button
-                  type="button"
-                  className="perigo"
-                  onClick={() => deletarLivro(livroAberto)}
-                  disabled={salvando}
-                >
-                  Excluir livro
-                </button>
+                {ehFuncionario && (
+                  <button
+                    type="button"
+                    className="perigo"
+                    onClick={() => deletarLivro(livroAberto)}
+                    disabled={salvando}
+                  >
+                    Excluir livro
+                  </button>
+                )}
               </div>
             </div>
           </div>
 
-          <div className="livro-edicao">
-            <span className="section-label">EDITAR</span>
-            <h2>Atualizar informações</h2>
+          {ehFuncionario && (
+            <div className="livro-edicao">
+              <span className="section-label">EDITAR</span>
+              <h2>Atualizar informações</h2>
 
-            <form className="modal-form" onSubmit={atualizarLivro}>
-              <label>
-                Título
-                <input
-                  type="text"
-                  value={formEdicao.titulo || ""}
-                  onChange={(e) =>
-                    setFormEdicao({ ...formEdicao, titulo: e.target.value })
-                  }
-                />
-              </label>
-              <label>
-                Matéria
-                <select
-                  value={nomeDaMateria(formEdicao.materia)}
-                  onChange={(e) =>
-                    setFormEdicao({ ...formEdicao, materia: e.target.value })
-                  }
-                >
-                  <option value="">Sem matéria</option>
-                  {materias.map((materia) => (
-                    <option key={materia.nome} value={materia.nome}>
-                      {materia.rotulo}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Ano de lançamento
-                <input
-                  type="text"
-                  value={formEdicao.anoLancamento || ""}
-                  onChange={(e) =>
-                    setFormEdicao({
-                      ...formEdicao,
-                      anoLancamento: e.target.value,
-                    })
-                  }
-                />
-              </label>
-              <label>
-                Páginas
-                <input
-                  type="number"
-                  min="0"
-                  value={formEdicao.numeroPagina || 0}
-                  onChange={(e) =>
-                    setFormEdicao({
-                      ...formEdicao,
-                      numeroPagina: e.target.value,
-                    })
-                  }
-                />
-              </label>
-              <label>
-                Preço
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formEdicao.preco || 0}
-                  onChange={(e) =>
-                    setFormEdicao({ ...formEdicao, preco: e.target.value })
-                  }
-                />
-              </label>
-              <label>
-                Estoque
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={
-                    formEdicao.estoque === undefined ||
-                    formEdicao.estoque === null
-                      ? 0
-                      : formEdicao.estoque
-                  }
-                  onChange={(e) =>
-                    setFormEdicao({ ...formEdicao, estoque: e.target.value })
-                  }
-                />
-              </label>
-              <label>
-                Avaliação
-                <input
-                  type="number"
-                  min="0"
-                  max="5"
-                  step="0.1"
-                  value={formEdicao.avalliacao || 0}
-                  onChange={(e) =>
-                    setFormEdicao({ ...formEdicao, avalliacao: e.target.value })
-                  }
-                />
-              </label>
+              <form className="modal-form" onSubmit={atualizarLivro}>
+                <label>
+                  Título
+                  <input
+                    type="text"
+                    value={formEdicao.titulo || ""}
+                    onChange={(e) =>
+                      setFormEdicao({ ...formEdicao, titulo: e.target.value })
+                    }
+                  />
+                </label>
+                <label>
+                  Matéria
+                  <select
+                    value={nomeDaMateria(formEdicao.materia)}
+                    onChange={(e) =>
+                      setFormEdicao({ ...formEdicao, materia: e.target.value })
+                    }
+                  >
+                    <option value="">Sem matéria</option>
+                    {materias.map((materia) => (
+                      <option key={materia.nome} value={materia.nome}>
+                        {materia.rotulo}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Ano de lançamento
+                  <input
+                    type="text"
+                    value={formEdicao.anoLancamento || ""}
+                    onChange={(e) =>
+                      setFormEdicao({
+                        ...formEdicao,
+                        anoLancamento: e.target.value,
+                      })
+                    }
+                  />
+                </label>
+                <label>
+                  Páginas
+                  <input
+                    type="number"
+                    min="0"
+                    value={formEdicao.numeroPagina || 0}
+                    onChange={(e) =>
+                      setFormEdicao({
+                        ...formEdicao,
+                        numeroPagina: e.target.value,
+                      })
+                    }
+                  />
+                </label>
+                <label>
+                  Preço
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={formEdicao.preco || 0}
+                    onChange={(e) =>
+                      setFormEdicao({ ...formEdicao, preco: e.target.value })
+                    }
+                  />
+                </label>
+                <label>
+                  Estoque
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={
+                      formEdicao.estoque === undefined ||
+                      formEdicao.estoque === null
+                        ? 0
+                        : formEdicao.estoque
+                    }
+                    onChange={(e) =>
+                      setFormEdicao({ ...formEdicao, estoque: e.target.value })
+                    }
+                  />
+                </label>
+                <label>
+                  Avaliação
+                  <input
+                    type="number"
+                    min="0"
+                    max="5"
+                    step="0.1"
+                    value={formEdicao.avalliacao || 0}
+                    onChange={(e) =>
+                      setFormEdicao({ ...formEdicao, avalliacao: e.target.value })
+                    }
+                  />
+                </label>
 
-              <div className="modal-actions">
-                <button type="submit" disabled={salvando}>
-                  {salvando ? "Salvando..." : "Atualizar livro"}
-                </button>
-              </div>
-            </form>
-          </div>
+                <div className="modal-actions">
+                  <button type="submit" disabled={salvando}>
+                    {salvando ? "Salvando..." : "Atualizar livro"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
         </section>
 
         {capaAmpliada && (
@@ -1693,13 +2660,15 @@ function App() {
             <h2>{tituloDaLista}</h2>
           </div>
           <div className="section-actions">
-            <button
-              type="button"
-              className="cadastro-button"
-              onClick={abrirCadastroLivro}
-            >
-              + Cadastrar livro
-            </button>
+            {ehFuncionario && (
+              <button
+                type="button"
+                className="cadastro-button"
+                onClick={abrirCadastroLivro}
+              >
+                + Cadastrar livro
+              </button>
+            )}
             {filtro.tipo !== "todos" && (
               <button
                 type="button"

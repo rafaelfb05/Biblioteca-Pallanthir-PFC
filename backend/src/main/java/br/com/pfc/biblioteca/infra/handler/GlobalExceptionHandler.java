@@ -3,6 +3,7 @@ package br.com.pfc.biblioteca.infra.handler;
 import br.com.pfc.biblioteca.infra.exception.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -31,6 +32,16 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErroResposta> tratarCredenciaisInvalidas(CredenciaisInvalidasException e){
         ErroResposta erro = new ErroResposta(401, "Não autorizado", e.getMessage());
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(erro);
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ErroResposta> tratarValidacao(MethodArgumentNotValidException e){
+        String mensagem = e.getBindingResult().getFieldErrors().stream()
+                .findFirst()
+                .map(campo -> campo.getDefaultMessage())
+                .orElse("Dados inválidos");
+        ErroResposta erro = new ErroResposta(400, "Dados inválidos", mensagem);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(erro);
     }
 
     @ExceptionHandler(Exception.class)

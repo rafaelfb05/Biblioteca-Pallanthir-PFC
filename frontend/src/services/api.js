@@ -2,19 +2,62 @@ const API_URL = (
   process.env.REACT_APP_API_URL || "http://localhost:8080"
 ).replace(/\/$/, "");
 
+let tokenAtual = null;
+let aoExpirarSessao = null;
+
+export const definirToken = (token) => {
+  tokenAtual = token || null;
+};
+
+export const definirAoExpirarSessao = (callback) => {
+  aoExpirarSessao = callback;
+};
+
+export const lerDadosDoToken = (token) => {
+  try {
+    const conteudo = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    return JSON.parse(atob(conteudo));
+  } catch (e) {
+    return null;
+  }
+};
+
+export const tokenExpirado = (token) => {
+  const dados = token ? lerDadosDoToken(token) : null;
+  return !dados || !dados.exp || dados.exp * 1000 <= Date.now();
+};
+
 async function request(caminho, opcoes = {}) {
+  if (tokenAtual && tokenExpirado(tokenAtual)) {
+    tokenAtual = null;
+    if (aoExpirarSessao) {
+      aoExpirarSessao();
+    }
+    const expirada = new Error("Sua sessão expirou. Entre novamente.");
+    expirada.status = 401;
+    throw expirada;
+  }
+
+  const cabecalhos = { "Content-Type": "application/json" };
+  if (tokenAtual) {
+    cabecalhos.Authorization = `Bearer ${tokenAtual}`;
+  }
+
   const resposta = await fetch(`${API_URL}${caminho}`, {
-    headers: { "Content-Type": "application/json" },
     ...opcoes,
+    headers: { ...cabecalhos, ...(opcoes.headers || {}) },
   });
 
   if (!resposta.ok) {
     const corpo = await resposta.text();
-    let mensagem = `Erro ${resposta.status} ao chamar ${caminho}`;
+    let mensagem =
+      resposta.status === 403
+        ? "Você não tem permissão para fazer isso."
+        : `Erro ${resposta.status} ao chamar ${caminho}`;
     try {
       const dados = JSON.parse(corpo);
-      if (dados && dados.message) {
-        mensagem = dados.message;
+      if (dados && (dados.mensagem || dados.message)) {
+        mensagem = dados.mensagem || dados.message;
       }
     } catch (e) {
       if (corpo) {
@@ -64,6 +107,21 @@ export const usuariosApi = {
       method: "POST",
       body: JSON.stringify({ email, senha }),
     }),
+  verificar2FA: (email, codigo) =>
+    request("/usuarios/verificar-2fa", {
+      method: "POST",
+      body: JSON.stringify({ email, codigo }),
+    }),
+  recuperarSenha: (email) =>
+    request("/usuarios/recuperar-senha", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    }),
+  redefinirSenha: (email, codigo, novaSenha) =>
+    request("/usuarios/redefinir-senha", {
+      method: "POST",
+      body: JSON.stringify({ email, codigo, novaSenha }),
+    }),
   cadastrar: (dados) =>
     request("/usuarios/cadastro", {
       method: "POST",
@@ -91,6 +149,11 @@ export const reservasApi = {
     request(`/reservas/${reservaId}/cancelar`, { method: "PUT" }),
   devolver: (reservaId) =>
     request(`/reservas/${reservaId}/devolver`, { method: "PUT" }),
+};
+
+export const logsApi = {
+  listar: () => request("/logs"),
+  listarPorUsuario: (usuarioId) => request(`/logs/usuarios/${usuarioId}`),
 };
 
 export { API_URL };

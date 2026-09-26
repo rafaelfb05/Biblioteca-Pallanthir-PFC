@@ -6,10 +6,9 @@ import br.com.pfc.biblioteca.entity.jpa.Usuario;
 public record UsuarioDTO(Long id,
                          String nome,
                          String email,
-                         String senha,
                          TipoUsuario tipo) {
 
     public UsuarioDTO(Usuario usuario){
-        this(usuario.getId(), usuario.getNome(), usuario.getEmail(), usuario.getSenha(), usuario.getTipo());
+        this(usuario.getId(), usuario.getNome(), usuario.getEmail(), usuario.getTipo());
     }
 }

@@ -39,6 +39,12 @@ public class ReservaService {
         Usuario usuario = usuarioRepository.findById(usuarioId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado"));
 
+        String emailLogado = SecurityContextHolder.getContext().getAuthentication().getName();
+        if(!usuario.getEmail().equals(emailLogado)){
+            logService.registrarLogUsuarioLogado("ACESSO_NEGADO", "Tentativa de reservar em nome do usuário " + usuarioId);
+            throw new RegraDeNegocioException("Você só pode reservar livros para a sua própria conta");
+        }
+
         Livro livro = livroRepository.buscarComLock(livroId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Livro não encontrado"));
 
@@ -81,6 +87,10 @@ public class ReservaService {
     public void devolverLivro(Long reservaId){
         Reserva reserva = repository.findById(reservaId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Reserva não encontrada!"));
+
+        if(reserva.getStatus() != StatusReserva.RESERVADO){
+            throw new RegraDeNegocioException("Só é possível devolver reservas em aberto");
+        }
 
         Livro livro = reserva.getLivro();
         livro.setEstoque(livro.getEstoque() + 1);

@@ -44,7 +44,7 @@ public class UsuarioService {
         return usuario.stream()
                 .map(u -> new UsuarioDTO(
                         u.getId(), u.getNome(),
-                        u.getEmail(), u.getSenha(), u.getTipo()))
+                        u.getEmail(), u.getTipo()))
                 .collect(Collectors.toList());
     }
 
@@ -76,14 +76,32 @@ public class UsuarioService {
         return converteDados(repository.findByAtivoTrue());
     }
 
+    private Usuario usuarioLogado(){
+        String emailLogado = SecurityContextHolder.getContext().getAuthentication().getName();
+        return repository.findByEmailAndAtivoTrue(emailLogado)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado"));
+    }
+
+    private void garantirPropriaConta(Long usuarioId, String acao){
+        Usuario logado = usuarioLogado();
+        if(!logado.getId().equals(usuarioId)){
+            logService.registrarLog(logado.getId(), logado.getEmail(), "ACESSO_NEGADO", "Tentativa de " + acao + " do usuário " + usuarioId);
+            throw new RegraDeNegocioException("Você só pode alterar a sua própria conta");
+        }
+    }
+
     public Usuario atualizarUsuario(Long id, UsuarioRequest request) {
-        Usuario usuario = repository.findById(id).orElse(null);
-        if(request.nome() != null){
+        garantirPropriaConta(id, "atualizar a conta");
+        Usuario usuario = repository.findById(id)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado"));
+        if(request.nome() != null && !request.nome().isBlank()){
             usuario.setNome(request.nome());
         }
-        if(request.email() != null){
+        if(request.email() != null && !request.email().isBlank() && !request.email().equals(usuario.getEmail())){
+            if(repository.findByEmailAndAtivoTrue(request.email()).isPresent()){
+                throw new ConflitoException("Já existe um usuário ativo com esse email");
+            }
             usuario.setEmail(request.email());
-
         }
         Usuario salvo = repository.save(usuario);
         logService.registrarLog(salvo.getId(), salvo.getEmail(), "ATUALIZACAO_USUARIO", "Dados do usuário atualizados");
@@ -110,6 +128,7 @@ public class UsuarioService {
     }
     @Transactional
     public void adicionarFavorito(Long usuarioId, Long livroId){
+        garantirPropriaConta(usuarioId, "favoritar livros");
         Usuario usuario = repository.findById(usuarioId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado"));
 
@@ -128,6 +147,7 @@ public class UsuarioService {
 
     @Transactional
     public void removerFavorito(Long usuarioId, Long livroId) {
+        garantirPropriaConta(usuarioId, "remover favoritos");
         Usuario usuario = repository.findById(usuarioId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado"));
         usuario.getFavoritos().removeIf(l -> l.getId().equals(livroId));
@@ -137,6 +157,7 @@ public class UsuarioService {
     }
 
     public List<LivroDTO> listarFavoritos(Long usuarioId) {
+        garantirPropriaConta(usuarioId, "listar os favoritos");
         Usuario usuario = repository.findById(usuarioId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado"));
 
