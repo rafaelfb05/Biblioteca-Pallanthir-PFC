@@ -42,6 +42,44 @@ const FORM_RECUPERACAO_VAZIO = {
 const FORM_CONTA_VAZIO = { nome: "", email: "" };
 const FILTRO_LOGS_VAZIO = { usuarioId: "", texto: "" };
 const CHAVE_SESSAO = "pallanthir:usuario";
+const CHAVE_ULTIMA_ATIVIDADE = "pallanthir:ultimaAtividade";
+const TEMPO_LIMITE_INATIVIDADE = 15 * 60 * 1000;
+const RENOVAR_TOKEN_ANTES_DE = 5 * 60 * 1000;
+const INTERVALO_VERIFICACAO_SESSAO = 30 * 1000;
+const INTERVALO_MINIMO_ATIVIDADE = 5 * 1000;
+const EVENTOS_DE_ATIVIDADE = [
+  "mousemove",
+  "mousedown",
+  "keydown",
+  "scroll",
+  "touchstart",
+];
+const MENSAGEM_INATIVIDADE =
+  "Você foi desconectado após 15 minutos sem atividade.";
+
+const salvarSessao = (sessao) => {
+  try {
+    localStorage.setItem(CHAVE_SESSAO, JSON.stringify(sessao));
+  } catch (e) {
+    console.error(e);
+  }
+};
+
+const salvarUltimaAtividade = (momento) => {
+  try {
+    localStorage.setItem(CHAVE_ULTIMA_ATIVIDADE, String(momento));
+  } catch (e) {
+    console.error(e);
+  }
+};
+
+const lerUltimaAtividade = () => {
+  try {
+    return Number(localStorage.getItem(CHAVE_ULTIMA_ATIVIDADE)) || 0;
+  } catch (e) {
+    return 0;
+  }
+};
 
 const REGRA_SENHA = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@#$%^&+=!]).{8,}$/;
 const DICA_SENHA =
@@ -447,17 +485,13 @@ function App() {
     [carregarFavoritos, carregarReservas]
   );
 
-  const salvarSessao = (sessao) => {
-    try {
-      localStorage.setItem(CHAVE_SESSAO, JSON.stringify(sessao));
-    } catch (e) {
-      console.error(e);
-    }
-  };
+  const ultimaAtividade = useRef(0);
+  const renovandoToken = useRef(false);
 
   const encerrarSessao = useCallback((mensagem) => {
     try {
       localStorage.removeItem(CHAVE_SESSAO);
+      localStorage.removeItem(CHAVE_ULTIMA_ATIVIDADE);
     } catch (e) {
       console.error(e);
     }
@@ -480,10 +514,17 @@ function App() {
         return;
       }
       const sessao = JSON.parse(salvo);
-      if (!sessao.token || tokenExpirado(sessao.token)) {
+      const ultima = lerUltimaAtividade();
+      if (
+        !sessao.token ||
+        tokenExpirado(sessao.token) ||
+        Date.now() - ultima >= TEMPO_LIMITE_INATIVIDADE
+      ) {
         localStorage.removeItem(CHAVE_SESSAO);
+        localStorage.removeItem(CHAVE_ULTIMA_ATIVIDADE);
         return;
       }
+      ultimaAtividade.current = ultima;
       definirToken(sessao.token);
       setUsuario(sessao);
       await carregarDadosDoUsuario(sessao);
@@ -519,6 +560,77 @@ function App() {
     return () => clearTimeout(temporizador);
   }, [usuario, encerrarSessao]);
 
+  const sessaoAtiva = Boolean(usuario);
+
+  useEffect(() => {
+    if (!sessaoAtiva) {
+      return undefined;
+    }
+    const registrarAtividade = () => {
+      const agora = Date.now();
+      if (agora - ultimaAtividade.current < INTERVALO_MINIMO_ATIVIDADE) {
+        return;
+      }
+      ultimaAtividade.current = agora;
+      salvarUltimaAtividade(agora);
+    };
+    EVENTOS_DE_ATIVIDADE.forEach((evento) =>
+      window.addEventListener(evento, registrarAtividade, { passive: true })
+    );
+    return () =>
+      EVENTOS_DE_ATIVIDADE.forEach((evento) =>
+        window.removeEventListener(evento, registrarAtividade)
+      );
+  }, [sessaoAtiva]);
+
+  useEffect(() => {
+    if (!usuario || !usuario.token) {
+      return undefined;
+    }
+
+    const verificarSessao = async () => {
+      const agora = Date.now();
+      const ultima = Math.max(ultimaAtividade.current, lerUltimaAtividade());
+      if (agora - ultima >= TEMPO_LIMITE_INATIVIDADE) {
+        encerrarSessao(MENSAGEM_INATIVIDADE);
+        return;
+      }
+
+      const dados = lerDadosDoToken(usuario.token);
+      if (
+        !dados ||
+        !dados.exp ||
+        renovandoToken.current ||
+        dados.exp * 1000 - agora > RENOVAR_TOKEN_ANTES_DE
+      ) {
+        return;
+      }
+
+      try {
+        renovandoToken.current = true;
+        const resposta = await usuariosApi.renovarToken();
+        const sessao = {
+          ...usuario,
+          nome: resposta.usuario.nome,
+          token: resposta.token,
+        };
+        salvarSessao(sessao);
+        definirToken(sessao.token);
+        setUsuario(sessao);
+      } catch (e) {
+        console.error(e);
+        if (e.status) {
+          encerrarSessao("Sua sessão expirou. Entre novamente.");
+        }
+      } finally {
+        renovandoToken.current = false;
+      }
+    };
+
+    const intervalo = setInterval(verificarSessao, INTERVALO_VERIFICACAO_SESSAO);
+    return () => clearInterval(intervalo);
+  }, [usuario, encerrarSessao]);
+
   const trocarModoAutenticacao = (modo) => {
     setModoAutenticacao(modo);
     setErro(null);
@@ -544,6 +656,9 @@ function App() {
       tipo: resposta.usuario.tipo,
       token: resposta.token,
     };
+    const agora = Date.now();
+    ultimaAtividade.current = agora;
+    salvarUltimaAtividade(agora);
     salvarSessao(sessao);
     definirToken(sessao.token);
     setUsuario(sessao);

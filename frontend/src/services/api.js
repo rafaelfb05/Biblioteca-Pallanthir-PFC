@@ -112,6 +112,7 @@ export const usuariosApi = {
       method: "POST",
       body: JSON.stringify({ email, codigo }),
     }),
+  renovarToken: () => request("/usuarios/renovar-token", { method: "POST" }),
   recuperarSenha: (email) =>
     request("/usuarios/recuperar-senha", {
       method: "POST",

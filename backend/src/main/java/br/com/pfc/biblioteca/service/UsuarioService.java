@@ -213,6 +213,11 @@ public class UsuarioService {
         return String.valueOf((int) (Math.random() * 900000) + 100000);
     }
 
+    public LoginResponse renovarToken(){
+        Usuario usuario = usuarioLogado();
+        return new LoginResponse(new UsuarioDTO(usuario), jwtService.gerarToken(usuario));
+    }
+
     public LoginResponse confirmar2FA(Confirmar2FARequest request){
         Usuario usuario = repository.findByEmailAndAtivoTrue(request.email())
                 .orElseThrow(() -> {

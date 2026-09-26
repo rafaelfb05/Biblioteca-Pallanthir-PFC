@@ -64,6 +64,11 @@ public class UsuarioController {
         return ResponseEntity.ok().build();
     }
 
+    @PostMapping("/renovar-token")
+    public ResponseEntity<LoginResponse> renovarToken(){
+        return ResponseEntity.ok(service.renovarToken());
+    }
+
     @PostMapping("/verificar-2fa")
     public ResponseEntity<LoginResponse> confirmar2FA(@RequestBody Confirmar2FARequest request){
         return ResponseEntity.ok(service.confirmar2FA(request));
