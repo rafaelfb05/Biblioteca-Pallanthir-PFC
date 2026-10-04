@@ -1,6 +1,6 @@
 package br.com.pfc.biblioteca.repository;
 
-import br.com.pfc.biblioteca.entity.Usuario;
+import br.com.pfc.biblioteca.entity.jpa.Usuario;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 

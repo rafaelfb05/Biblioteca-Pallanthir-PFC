@@ -1,4 +1,4 @@
-package br.com.pfc.biblioteca.entity;
+package br.com.pfc.biblioteca.entity.jpa;
 
 import br.com.pfc.biblioteca.dto.DadosLivro;
 import br.com.pfc.biblioteca.enums.Materia;
@@ -24,7 +24,7 @@ public class Livro {
     private Double preco = 0.0;
     private double avaliacao;
     @Column(nullable = false)
-    @ColumnDefault("false")
+    @ColumnDefault("true")
     private boolean ativo = true;
 
     public Livro(){}

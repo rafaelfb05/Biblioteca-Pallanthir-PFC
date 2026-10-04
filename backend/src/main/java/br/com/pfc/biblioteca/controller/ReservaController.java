@@ -29,6 +29,12 @@ public class ReservaController {
         return ResponseEntity.ok().build();
     }
 
+    @PutMapping("/{reservaId}/entregar")
+    public ResponseEntity<Void> entregar(@PathVariable Long reservaId){
+        service.entregarLivro(reservaId);
+        return ResponseEntity.ok().build();
+    }
+
     @PutMapping("/{reservaId}/devolver")
     public ResponseEntity<Void> devolver(@PathVariable Long reservaId){
         service.devolverLivro(reservaId);

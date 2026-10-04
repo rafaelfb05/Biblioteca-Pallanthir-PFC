@@ -5,9 +5,9 @@ import br.com.pfc.biblioteca.enums.StatusReserva;
 import br.com.pfc.biblioteca.infra.exception.ConflitoException;
 import br.com.pfc.biblioteca.infra.exception.RecursoNaoEncontradoException;
 import br.com.pfc.biblioteca.infra.exception.RegraDeNegocioException;
-import br.com.pfc.biblioteca.entity.Livro;
-import br.com.pfc.biblioteca.entity.Reserva;
-import br.com.pfc.biblioteca.entity.Usuario;
+import br.com.pfc.biblioteca.entity.jpa.Livro;
+import br.com.pfc.biblioteca.entity.jpa.Reserva;
+import br.com.pfc.biblioteca.entity.jpa.Usuario;
 import br.com.pfc.biblioteca.repository.LivroRepository;
 import br.com.pfc.biblioteca.repository.ReservaRepository;
 import br.com.pfc.biblioteca.repository.UsuarioRepository;
@@ -25,11 +25,13 @@ public class ReservaService {
     private final ReservaRepository repository;
     private final LivroRepository livroRepository;
     private final UsuarioRepository usuarioRepository;
+    private final LogAuditoriaService logService;
 
-    public ReservaService(ReservaRepository repository, LivroRepository livroRepository, UsuarioRepository usuarioRepository) {
+    public ReservaService(ReservaRepository repository, LivroRepository livroRepository, UsuarioRepository usuarioRepository, LogAuditoriaService logService) {
         this.repository = repository;
         this.livroRepository = livroRepository;
         this.usuarioRepository = usuarioRepository;
+        this.logService = logService;
     }
 
     @Transactional
@@ -37,17 +39,25 @@ public class ReservaService {
         Usuario usuario = usuarioRepository.findById(usuarioId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado"));
 
+        String emailLogado = SecurityContextHolder.getContext().getAuthentication().getName();
+        if(!usuario.getEmail().equals(emailLogado)){
+            logService.registrarLogUsuarioLogado("ACESSO_NEGADO", "Tentativa de reservar em nome do usuário " + usuarioId);
+            throw new RegraDeNegocioException("Você só pode reservar livros para a sua própria conta");
+        }
+
         Livro livro = livroRepository.buscarComLock(livroId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Livro não encontrado"));
 
         if(livro.getEstoque() == null || livro.getEstoque() <= 0){
+            logService.registrarLog(usuario.getId(), usuario.getEmail(), "FALHA_RESERVA", "Livro " + livro.getId() + " esgotado");
             throw new ConflitoException("Livro esgotado no momento!");
         }
         livro.setEstoque(livro.getEstoque() -1);
         livroRepository.save(livro);
 
-        Reserva reserva = new Reserva(usuario, livro);
-        return repository.save(reserva);
+        Reserva reserva = repository.save(new Reserva(usuario, livro));
+        logService.registrarLog(usuario.getId(), usuario.getEmail(), "RESERVA_LIVRO", "Reserva " + reserva.getId() + " do livro " + livro.getId() + " criada");
+        return reserva;
     }
 
     @Transactional
@@ -58,17 +68,35 @@ public class ReservaService {
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Reserva não encontrada!"));
 
         if(!reserva.getUsuario().getEmail().equals(emailLogado)){
+            logService.registrarLogUsuarioLogado("ACESSO_NEGADO", "Tentativa de cancelar a reserva " + reservaId + " de outro usuário");
             throw new RegraDeNegocioException("Reserva não encontrada");
         }
 
-        if(reserva.getStatus() == StatusReserva.RESERVADO){
-            Livro livro = reserva.getLivro();
-            livro.setEstoque(livro.getEstoque() + 1);
-            livroRepository.save(livro);
+        if(reserva.getStatus() != StatusReserva.RESERVADO){
+            throw new RegraDeNegocioException("Só é possível cancelar reservas que ainda não foram entregues");
         }
+
+        Livro livro = reserva.getLivro();
+        livro.setEstoque(livro.getEstoque() + 1);
+        livroRepository.save(livro);
 
         reserva.setStatus(StatusReserva.CANCELADO);
         repository.save(reserva);
+        logService.registrarLog(reserva.getUsuario().getId(), emailLogado, "CANCELAMENTO_RESERVA", "Reserva " + reservaId + " cancelada");
+    }
+
+    @Transactional
+    public void entregarLivro(Long reservaId){
+        Reserva reserva = repository.findById(reservaId)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Reserva não encontrada!"));
+
+        if(reserva.getStatus() != StatusReserva.RESERVADO){
+            throw new RegraDeNegocioException("Só é possível entregar livros de reservas em aberto");
+        }
+
+        reserva.setStatus(StatusReserva.ENTREGUE);
+        repository.save(reserva);
+        logService.registrarLogUsuarioLogado("ENTREGA_LIVRO", "Reserva " + reservaId + " do usuário " + reserva.getUsuario().getId() + " entregue");
     }
 
     @Transactional
@@ -76,12 +104,17 @@ public class ReservaService {
         Reserva reserva = repository.findById(reservaId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Reserva não encontrada!"));
 
+        if(reserva.getStatus() != StatusReserva.ENTREGUE){
+            throw new RegraDeNegocioException("Só é possível devolver livros que já foram entregues");
+        }
+
         Livro livro = reserva.getLivro();
         livro.setEstoque(livro.getEstoque() + 1);
         livroRepository.save(livro);
 
         reserva.setStatus(StatusReserva.DEVOLVIDO);
         repository.save(reserva);
+        logService.registrarLogUsuarioLogado("DEVOLUCAO_LIVRO", "Reserva " + reservaId + " do usuário " + reserva.getUsuario().getId() + " devolvida");
     }
 
     public List<ReservaDTO> listarReservasPorUsuario(Long usuarioId) {
@@ -95,6 +128,7 @@ public class ReservaService {
                     .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado"));
 
             if(!usuarioLogado.getId().equals(usuarioId)){
+                logService.registrarLog(usuarioLogado.getId(), usuarioLogado.getEmail(), "ACESSO_NEGADO", "Tentativa de listar as reservas do usuário " + usuarioId);
                 throw new RegraDeNegocioException("Você só pode ver suas próprias reservas");
             }
         }

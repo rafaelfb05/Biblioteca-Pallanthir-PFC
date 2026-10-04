@@ -2,7 +2,7 @@ package br.com.pfc.biblioteca.repository;
 
 
 import br.com.pfc.biblioteca.enums.Materia;
-import br.com.pfc.biblioteca.entity.Livro;
+import br.com.pfc.biblioteca.entity.jpa.Livro;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;

@@ -83,7 +83,7 @@ Biblioteca-Pallanthir-PFC/
 |---|---|---|
 | `REACT_APP_API_URL` | Sim | Endereço da API. Em desenvolvimento `http://localhost:8080`, em produção a URL da Render |
 
-O front-end já traz `.env.development` e `.env.production` versionados. Para sobrescrever localmente sem alterar o repositório, copie `frontend/.env.example` para `frontend/.env.local`.
+O front-end já traz `.env.development` e `.env.production` versionados. Para sobrescrever localmente sem alterar o repositório, copie `../frontend/.env.example` para `frontend/.env.local`.
 
 ---
 
@@ -202,10 +202,10 @@ docker run -p 8080:8080 \
 1. Acesse [render.com](https://render.com) e conecte sua conta do GitHub.
 2. Clique em **New → Web Service** e selecione o repositório.
 3. Configure:
-   - **Runtime:** Docker (a Render detecta o `Dockerfile` na raiz)
+   - **Runtime:** Docker (a Render detecta o `../Dockerfile` na raiz)
    - **Root Directory:** deixe em branco (a raiz do repositório)
    - **Branch:** `main`
-   - **Instance Type:** Free já atende (o `Dockerfile` limita a JVM a 400 MB)
+   - **Instance Type:** Free já atende (o `../Dockerfile` limita a JVM a 400 MB)
 4. Em **Environment → Environment Variables**, cadastre:
    - `SUPABASE_URL`
    - `SUPABASE_USER`

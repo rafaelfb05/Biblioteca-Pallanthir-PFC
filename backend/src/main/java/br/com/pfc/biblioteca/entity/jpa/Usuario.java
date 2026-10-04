@@ -1,4 +1,4 @@
-package br.com.pfc.biblioteca.entity;
+package br.com.pfc.biblioteca.entity.jpa;
 
 import br.com.pfc.biblioteca.dto.UsuarioRequest;
 import br.com.pfc.biblioteca.enums.TipoUsuario;
@@ -29,7 +29,7 @@ public class Usuario {
     @ManyToMany
     private List<Livro> favoritos = new ArrayList<>();
     @Column(nullable = false)
-    @ColumnDefault("false")
+    @ColumnDefault("true")
     private boolean ativo = true;
     private Integer tentativasFalhas = 0;
     private LocalDateTime tempoBloqueio;
@@ -37,6 +37,7 @@ public class Usuario {
     private LocalDateTime expiracaoCodigo;
     private String codigo2FA;
     private LocalDateTime expiracao2FA;
+    private LocalDateTime dataAceiteTermos;
 
     public Usuario(){}
 
@@ -45,6 +46,14 @@ public class Usuario {
         this.email=request.email();
         this.senha=request.senha();
         this.tipo=request.tipo();
+    }
+
+    public LocalDateTime getDataAceiteTermos() {
+        return dataAceiteTermos;
+    }
+
+    public void setDataAceiteTermos(LocalDateTime dataAceiteTermos) {
+        this.dataAceiteTermos = dataAceiteTermos;
     }
 
     public Long getId() {
