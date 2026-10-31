@@ -68,7 +68,7 @@ public class LivroService {
                 .map(s -> new LivroDTO(s.getId(), s.getTitulo(), s.getAutores(),
                         s.getAnoLancamento(), s.getNumeroPagina(),
                         s.getCapaUrl(), s.getMateria(), s.getPreco(),
-                        s.getEstoque(), s.getAvaliacao()))
+                        s.getEstoque()))
                 .collect(Collectors.toList());
     }
 
@@ -86,9 +86,6 @@ public class LivroService {
         }
         if (request.numeroPagina() != null) {
             livro.setNumeroPagina(request.numeroPagina());
-        }
-        if (request.avaliacao() != null) {
-            livro.setAvaliacao(request.avaliacao());
         }
         if (request.materia() != null) {
             livro.setMateria(request.materia());

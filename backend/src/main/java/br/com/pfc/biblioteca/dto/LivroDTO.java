@@ -13,14 +13,13 @@ public record LivroDTO(Long id,
                        String capaUrl,
                        Materia materia,
                        double preco,
-                       Integer estoque,
-                       double avalliacao) {
+                       Integer estoque) {
 
     public LivroDTO(Livro livro) {
         this(livro.getId(), livro.getTitulo(),
                 livro.getAutores(), livro.getAnoLancamento(),
                 livro.getNumeroPagina(), livro.getCapaUrl(),
                 livro.getMateria(), livro.getPreco(),
-                livro.getEstoque(), livro.getAvaliacao());
+                livro.getEstoque());
     }
 }
