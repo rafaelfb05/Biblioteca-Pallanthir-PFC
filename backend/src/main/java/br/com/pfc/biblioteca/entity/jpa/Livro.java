@@ -22,7 +22,6 @@ public class Livro {
     private Materia materia;
     private Integer estoque = 1;
     private Double preco = 0.0;
-    private double avaliacao;
     @Column(nullable = false)
     @ColumnDefault("true")
     private boolean ativo = true;
@@ -84,14 +83,6 @@ public class Livro {
 
     public void setNumeroPagina(int numeroPagina) {
         this.numeroPagina = numeroPagina;
-    }
-
-    public double getAvaliacao() {
-        return avaliacao;
-    }
-
-    public void setAvaliacao(double avaliacao) {
-        this.avaliacao = avaliacao;
     }
 
     public String getCapaUrl() {
