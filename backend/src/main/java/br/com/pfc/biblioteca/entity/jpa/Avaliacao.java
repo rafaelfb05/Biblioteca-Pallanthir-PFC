@@ -21,6 +21,8 @@ public class Avaliacao {
     private LocalDateTime dataAvaliacao;
     private boolean ativo = true;
 
+    public Avaliacao(){}
+
     public Avaliacao(Usuario usuario, Livro livro, Integer nota, String comentario) {
         this.usuario = usuario;
         this.livro = livro;

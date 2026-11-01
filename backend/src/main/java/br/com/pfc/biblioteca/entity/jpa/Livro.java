@@ -138,7 +138,6 @@ public class Livro {
                 ", capa = " + capaUrl +
                 ", matéria = " + materia +
                 ", preço = " + preco +
-                ", quantidade em estooque = " + estoque +
-                ", avaliacao = " + avaliacao;
+                ", quantidade em estooque = " + estoque;
     }
 }

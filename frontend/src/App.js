@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 import ModalDocumento from "./Componentes/ModalDocumento";
 import {
+  avaliacoesApi,
   definirAoExpirarSessao,
   definirToken,
   lerDadosDoToken,
@@ -42,6 +43,10 @@ const FORM_RECUPERACAO_VAZIO = {
   confirmarSenha: "",
 };
 const FORM_CONTA_VAZIO = { nome: "", email: "" };
+const FORM_AVALIACAO_VAZIO = { nota: 0, comentario: "" };
+const RESUMO_AVALIACOES_VAZIO = { media: 0, total: 0, avaliacoes: [] };
+const LIMITE_COMENTARIO = 500;
+const NOTAS = [1, 2, 3, 4, 5];
 const FILTRO_LOGS_VAZIO = { usuarioId: "", texto: "" };
 const CHAVE_SESSAO = "pallanthir:usuario";
 const CHAVE_ULTIMA_ATIVIDADE = "pallanthir:ultimaAtividade";
@@ -131,6 +136,18 @@ const ROTULO_STATUS_RESERVA = {
   CANCELADO: "Cancelado",
 };
 
+const formatarNota = (valor) => Number(valor || 0).toFixed(1);
+
+const formatarTotalAvaliacoes = (quantidade) => {
+  const total = Number(quantidade || 0);
+  return total + (total === 1 ? " avaliação" : " avaliações");
+};
+
+const estrelasDaNota = (nota) => {
+  const cheias = Math.round(Number(nota || 0));
+  return "★".repeat(cheias) + "☆".repeat(5 - cheias);
+};
+
 const formatarData = (valor) => {
   if (!valor) {
     return "—";
@@ -203,6 +220,19 @@ function CampoSenha({ rotulo, valor, aoMudar, autoComplete }) {
         </button>
       </div>
     </label>
+  );
+}
+
+function CapaGenerica({ titulo, tamanho }) {
+  return (
+    <div
+      className={"capa-generica " + tamanho}
+      role="img"
+      aria-label={"Capa genérica de " + titulo}
+    >
+      <span className="capa-generica-titulo">{titulo}</span>
+      <span className="capa-generica-marca">Pallanthir</span>
+    </div>
   );
 }
 
@@ -418,6 +448,16 @@ function App() {
   const [filtroLogs, setFiltroLogs] = useState(FILTRO_LOGS_VAZIO);
   const [carregandoPainel, setCarregandoPainel] = useState(false);
 
+  const [resumoAvaliacoes, setResumoAvaliacoes] = useState(
+    RESUMO_AVALIACOES_VAZIO
+  );
+  const [carregandoAvaliacoes, setCarregandoAvaliacoes] = useState(false);
+  const [formAvaliacao, setFormAvaliacao] = useState(FORM_AVALIACAO_VAZIO);
+  const [salvandoAvaliacao, setSalvandoAvaliacao] = useState(false);
+  const [ranking, setRanking] = useState([]);
+  const [carregandoRanking, setCarregandoRanking] = useState(false);
+  const [erroRanking, setErroRanking] = useState(null);
+
   const usuarioId = usuario ? usuario.id : null;
   const ehFuncionario = Boolean(usuario && usuario.tipo === "FUNCIONARIO");
   const ehEstudante = Boolean(usuario && usuario.tipo === "ESTUDANTE");
@@ -473,6 +513,36 @@ function App() {
       setReservas(await reservasApi.listarPorUsuario(id));
     } catch (e) {
       console.error(e);
+    }
+  }, []);
+
+  const carregarAvaliacoes = useCallback(async (livroId) => {
+    try {
+      setCarregandoAvaliacoes(true);
+      setResumoAvaliacoes(
+        (await avaliacoesApi.resumo(livroId)) || RESUMO_AVALIACOES_VAZIO
+      );
+    } catch (e) {
+      setResumoAvaliacoes(RESUMO_AVALIACOES_VAZIO);
+      console.error(e);
+    } finally {
+      setCarregandoAvaliacoes(false);
+    }
+  }, []);
+
+  const carregarRanking = useCallback(async () => {
+    try {
+      setCarregandoRanking(true);
+      setErroRanking(null);
+      setRanking((await avaliacoesApi.ranking()) || []);
+    } catch (e) {
+      setRanking([]);
+      setErroRanking(
+        mensagemDeErro(e, "Não foi possível carregar o ranking de avaliações.")
+      );
+      console.error(e);
+    } finally {
+      setCarregandoRanking(false);
     }
   }, []);
 
@@ -563,6 +633,35 @@ function App() {
     );
     return () => clearTimeout(temporizador);
   }, [usuario, encerrarSessao]);
+
+  useEffect(() => {
+    if (pagina !== "livro" || livroAbertoId === null) {
+      return;
+    }
+    setResumoAvaliacoes(RESUMO_AVALIACOES_VAZIO);
+    carregarAvaliacoes(livroAbertoId);
+  }, [pagina, livroAbertoId, carregarAvaliacoes]);
+
+  const minhaAvaliacao = useMemo(
+    () =>
+      (usuario &&
+        (resumoAvaliacoes.avaliacoes || []).find(
+          (avaliacao) => avaliacao.nomeUsuario === usuario.nome
+        )) ||
+      null,
+    [usuario, resumoAvaliacoes]
+  );
+
+  useEffect(() => {
+    setFormAvaliacao(
+      minhaAvaliacao
+        ? {
+            nota: minhaAvaliacao.nota,
+            comentario: minhaAvaliacao.comentario || "",
+          }
+        : FORM_AVALIACAO_VAZIO
+    );
+  }, [minhaAvaliacao]);
 
   const sessaoAtiva = Boolean(usuario);
 
@@ -958,8 +1057,60 @@ function App() {
     }
   };
 
-  const irParaRanking = () => {
+  const irParaRanking = async () => {
     abrirPagina("ranking");
+    await carregarRanking();
+  };
+
+  const enviarAvaliacao = async (evento) => {
+    evento.preventDefault();
+    if (!usuarioId) {
+      setErro("Entre na sua conta para avaliar livros.");
+      abrirAutenticacao("login");
+      return;
+    }
+    if (!formAvaliacao.nota) {
+      setErro("Escolha uma nota de 1 a 5 estrelas.");
+      return;
+    }
+
+    try {
+      setSalvandoAvaliacao(true);
+      setErro(null);
+      await avaliacoesApi.avaliar(
+        livroAbertoId,
+        formAvaliacao.nota,
+        formAvaliacao.comentario.trim() || null
+      );
+      setAviso(
+        minhaAvaliacao ? "Sua avaliação foi atualizada." : "Obrigado pela avaliação!"
+      );
+      await carregarAvaliacoes(livroAbertoId);
+    } catch (e) {
+      setErro(mensagemDeErro(e, "Não foi possível registrar sua avaliação."));
+      console.error(e);
+    } finally {
+      setSalvandoAvaliacao(false);
+    }
+  };
+
+  const removerAvaliacao = async () => {
+    if (!minhaAvaliacao || !window.confirm("Remover sua avaliação deste livro?")) {
+      return;
+    }
+
+    try {
+      setSalvandoAvaliacao(true);
+      setErro(null);
+      await avaliacoesApi.remover(minhaAvaliacao.id);
+      setAviso("Sua avaliação foi removida.");
+      await carregarAvaliacoes(livroAbertoId);
+    } catch (e) {
+      setErro(mensagemDeErro(e, "Não foi possível remover sua avaliação."));
+      console.error(e);
+    } finally {
+      setSalvandoAvaliacao(false);
+    }
   };
 
   const irParaMaterias = () => {
@@ -1179,7 +1330,6 @@ function App() {
         materia: nomeDaMateria(formEdicao.materia) || null,
         preco: Number(String(formEdicao.preco).replace(",", ".")) || 0,
         estoque: Number(formEdicao.estoque) || 0,
-        avaliacao: Number(formEdicao.avalliacao) || 0,
       });
       setAviso('"' + atualizado.titulo + '" foi atualizado.');
       setFormEdicao({ ...atualizado });
@@ -1299,8 +1449,11 @@ function App() {
 
   const rankingDeLivros = useMemo(
     () =>
-      [...livros].sort((a, b) => (b.avalliacao || 0) - (a.avalliacao || 0)),
-    [livros]
+      ranking.map((item) => ({
+        ...(livros.find((livro) => livro.id === item.id) || {}),
+        ...item,
+      })),
+    [ranking, livros]
   );
 
   const usuariosFiltrados = useMemo(() => {
@@ -1373,7 +1526,7 @@ function App() {
             loading="lazy"
           />
         ) : (
-          <span>📘</span>
+          <CapaGenerica titulo={livro.titulo} tamanho="cartao" />
         )}
         {!ehFuncionario && (
           <button
@@ -1398,10 +1551,6 @@ function App() {
         <span className="book-category">{livro.materia}</span>
         <h3>{livro.titulo}</h3>
         <p>{(livro.autores || []).join(", ")}</p>
-        <div className="rating">
-          ★★★★★
-          <small> {Number(livro.avalliacao || 0).toFixed(1)}</small>
-        </div>
         <div className="book-footer">
           <strong>{formatarPreco(livro.preco)}</strong>
           <span
@@ -2445,7 +2594,7 @@ function App() {
           <div className="section-header">
             <div>
               <span className="section-label">RANKING</span>
-              <h2>Mais bem avaliados</h2>
+              <h2>Top 10 mais bem avaliados</h2>
             </div>
             <button type="button" className="link-button" onClick={irParaInicio}>
               Voltar ao acervo →
@@ -2453,13 +2602,16 @@ function App() {
           </div>
 
           <p className="materias-sub">
-            Os livros do acervo ordenados pela nota de avaliação.
+            Os 10 livros com a maior média de notas dadas pelos estudantes.
+            Entram no ranking os livros com pelo menos 3 avaliações.
           </p>
 
-          {carregando && <p>Carregando livros...</p>}
-          {!carregando && erro && <p className="erro">{erro}</p>}
-          {!carregando && !erro && rankingDeLivros.length === 0 && (
-            <p>Nenhum livro no acervo ainda.</p>
+          {carregandoRanking && <p>Carregando ranking...</p>}
+          {!carregandoRanking && erroRanking && (
+            <p className="erro">{erroRanking}</p>
+          )}
+          {!carregandoRanking && !erroRanking && rankingDeLivros.length === 0 && (
+            <p>Nenhum livro tem avaliações suficientes para o ranking ainda.</p>
           )}
 
           <ol className="ranking-lista">
@@ -2481,17 +2633,22 @@ function App() {
                         loading="lazy"
                       />
                     ) : (
-                      <span>📘</span>
+                      <CapaGenerica titulo={livro.titulo} tamanho="mini" />
                     )}
                   </div>
                   <div className="ranking-info">
-                    <span className="book-category">{livro.materia}</span>
+                    {livro.materia && (
+                      <span className="book-category">{livro.materia}</span>
+                    )}
                     <strong>{livro.titulo}</strong>
-                    <small>{(livro.autores || []).join(", ")}</small>
+                    {(livro.autores || []).length > 0 && (
+                      <small>{livro.autores.join(", ")}</small>
+                    )}
+                    <small>{formatarTotalAvaliacoes(livro.total)}</small>
                   </div>
                   <div className="ranking-nota">
                     <span>★</span>
-                    {Number(livro.avalliacao || 0).toFixed(1)}
+                    {formatarNota(livro.media)}
                   </div>
                 </button>
               </li>
@@ -2661,7 +2818,7 @@ function App() {
                   <span className="capa-lupa">🔍 Ampliar</span>
                 </button>
               ) : (
-                <span>📘</span>
+                <CapaGenerica titulo={livroAberto.titulo} tamanho="grande" />
               )}
             </div>
 
@@ -2694,7 +2851,9 @@ function App() {
                 <div>
                   <small>Avaliação</small>
                   <strong>
-                    ★ {Number(livroAberto.avalliacao || 0).toFixed(1)}
+                    {resumoAvaliacoes.total > 0
+                      ? "★ " + formatarNota(resumoAvaliacoes.media)
+                      : "Sem avaliações"}
                   </strong>
                 </div>
                 <div>
@@ -2755,6 +2914,131 @@ function App() {
                 )}
               </div>
             </div>
+          </div>
+
+          <div className="avaliacoes">
+            <div className="avaliacoes-cabecalho">
+              <div>
+                <span className="section-label">AVALIAÇÕES</span>
+                <h2>O que os estudantes acham</h2>
+              </div>
+              <div className="avaliacoes-media">
+                <strong>{formatarNota(resumoAvaliacoes.media)}</strong>
+                <div>
+                  <span className="estrelas">
+                    {estrelasDaNota(resumoAvaliacoes.media)}
+                  </span>
+                  <small>{formatarTotalAvaliacoes(resumoAvaliacoes.total)}</small>
+                </div>
+              </div>
+            </div>
+
+            {!usuario && (
+              <p className="avaliacoes-dica">
+                <button
+                  type="button"
+                  className="link-button"
+                  onClick={() => abrirAutenticacao("login")}
+                >
+                  Entre na sua conta
+                </button>{" "}
+                para avaliar este livro.
+              </p>
+            )}
+
+            {ehEstudante && (
+              <form className="avaliacao-form" onSubmit={enviarAvaliacao}>
+                <span className="avaliacao-form-titulo">
+                  {minhaAvaliacao ? "Sua avaliação" : "Avalie este livro"}
+                </span>
+                <div
+                  className="seletor-estrelas"
+                  role="radiogroup"
+                  aria-label="Nota"
+                >
+                  {NOTAS.map((nota) => (
+                    <button
+                      type="button"
+                      key={nota}
+                      role="radio"
+                      aria-checked={formAvaliacao.nota === nota}
+                      aria-label={nota + (nota === 1 ? " estrela" : " estrelas")}
+                      className={nota <= formAvaliacao.nota ? "marcada" : ""}
+                      onClick={() =>
+                        setFormAvaliacao({ ...formAvaliacao, nota })
+                      }
+                    >
+                      ★
+                    </button>
+                  ))}
+                </div>
+                <textarea
+                  placeholder="Conte o que achou do livro (opcional)"
+                  maxLength={LIMITE_COMENTARIO}
+                  value={formAvaliacao.comentario}
+                  onChange={(e) =>
+                    setFormAvaliacao({
+                      ...formAvaliacao,
+                      comentario: e.target.value,
+                    })
+                  }
+                />
+                <div className="avaliacao-form-rodape">
+                  <small>
+                    {formAvaliacao.comentario.length}/{LIMITE_COMENTARIO}
+                  </small>
+                  <div className="avaliacao-form-acoes">
+                    {minhaAvaliacao && (
+                      <button
+                        type="button"
+                        className="perigo"
+                        onClick={removerAvaliacao}
+                        disabled={salvandoAvaliacao}
+                      >
+                        Remover
+                      </button>
+                    )}
+                    <button type="submit" disabled={salvandoAvaliacao}>
+                      {salvandoAvaliacao
+                        ? "Enviando..."
+                        : minhaAvaliacao
+                        ? "Atualizar avaliação"
+                        : "Enviar avaliação"}
+                    </button>
+                  </div>
+                </div>
+              </form>
+            )}
+
+            {carregandoAvaliacoes && <p>Carregando avaliações...</p>}
+            {!carregandoAvaliacoes && resumoAvaliacoes.total === 0 && (
+              <p className="avaliacoes-dica">
+                Este livro ainda não foi avaliado.
+              </p>
+            )}
+
+            <ul className="avaliacoes-lista">
+              {(resumoAvaliacoes.avaliacoes || []).map((avaliacao) => (
+                <li
+                  key={avaliacao.id}
+                  className={
+                    "avaliacao-item" +
+                    (minhaAvaliacao && minhaAvaliacao.id === avaliacao.id
+                      ? " minha"
+                      : "")
+                  }
+                >
+                  <div className="avaliacao-item-topo">
+                    <strong>{avaliacao.nomeUsuario}</strong>
+                    <span className="estrelas">
+                      {estrelasDaNota(avaliacao.nota)}
+                    </span>
+                  </div>
+                  {avaliacao.comentario && <p>{avaliacao.comentario}</p>}
+                  <small>{formatarData(avaliacao.dataAvaliacao)}</small>
+                </li>
+              ))}
+            </ul>
           </div>
 
           {ehFuncionario && (
@@ -2845,20 +3129,6 @@ function App() {
                     }
                   />
                 </label>
-                <label>
-                  Avaliação
-                  <input
-                    type="number"
-                    min="0"
-                    max="5"
-                    step="0.1"
-                    value={formEdicao.avalliacao || 0}
-                    onChange={(e) =>
-                      setFormEdicao({ ...formEdicao, avalliacao: e.target.value })
-                    }
-                  />
-                </label>
-
                 <div className="modal-actions">
                   <button type="submit" disabled={salvando}>
                     {salvando ? "Salvando..." : "Atualizar livro"}

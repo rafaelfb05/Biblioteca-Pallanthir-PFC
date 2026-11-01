@@ -46,8 +46,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/reservas/**").authenticated()
                         .requestMatchers(HttpMethod.DELETE, "/usuarios/deletar/*").authenticated()
                         .requestMatchers(HttpMethod.GET, "/avaliacoes/**").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/avaliacoes/**").hasRole("ALUNO")
-                        .requestMatchers(HttpMethod.DELETE, "/avaliacoes/*").hasRole("ALUNO")
+                        .requestMatchers(HttpMethod.POST, "/avaliacoes/**").hasRole("ESTUDANTE")
+                        .requestMatchers(HttpMethod.DELETE, "/avaliacoes/**").hasRole("ESTUDANTE")
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
