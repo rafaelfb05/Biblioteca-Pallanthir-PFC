@@ -16,7 +16,7 @@ public interface AvaliacaoRepository extends JpaRepository<Avaliacao, Long> {
 
     List<Avaliacao> findByLivroIdAndAtivoTrueOrderByDataAvaliacaoDesc(Long livroId);
 
-    long countByLivroAndAtivoTrue(Long livroId);
+    long countByLivroIdAndAtivoTrue(Long livroId);
 
     @Query("SELECT AVG(a.nota) FROM Avaliacao a WHERE a.livro.id = :livroId AND a.ativo = true")
     Double calcularMedia(long livroId);

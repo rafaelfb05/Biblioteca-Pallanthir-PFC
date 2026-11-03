@@ -154,6 +154,18 @@ export const reservasApi = {
     request(`/reservas/${reservaId}/devolver`, { method: "PUT" }),
 };
 
+export const avaliacoesApi = {
+  resumo: (livroId) => request(`/avaliacoes/livro/${livroId}`),
+  avaliar: (livroId, nota, comentario) =>
+    request(`/avaliacoes/livro/${livroId}`, {
+      method: "POST",
+      body: JSON.stringify({ nota, comentario }),
+    }),
+  remover: (avaliacaoId) =>
+    request(`/avaliacoes/livros/${avaliacaoId}`, { method: "DELETE" }),
+  ranking: () => request("/avaliacoes/ranking"),
+};
+
 export const logsApi = {
   listar: () => request("/logs"),
   listarPorUsuario: (usuarioId) => request(`/logs/usuarios/${usuarioId}`),
