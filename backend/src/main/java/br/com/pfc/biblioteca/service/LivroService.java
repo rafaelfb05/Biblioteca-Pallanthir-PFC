@@ -40,7 +40,7 @@ public class LivroService {
     }
 
 
-    public Livro salvarLivro(String titulo, Materia materia, Double preco, Integer estoque) {
+    public Livro salvarLivro(String titulo, Materia materia, Double preco, Integer estoqueReserva, Integer estoqueCompra) {
         var json = consumo.obterDados(ENDERECO + titulo.replace(" ", "+") + "&key=" + API_KEY);
         DadosLivro.DadosBusca dadosBusca = conversor.obterDados(json, DadosLivro.DadosBusca.class);
 
@@ -52,7 +52,8 @@ public class LivroService {
         Livro livro = new Livro(dados);
         livro.setMateria(materia);
         livro.setPreco(preco);
-        livro.setEstoque(estoque);
+        livro.setEstoqueReserva(estoqueReserva);
+        livro.setEstoqueCompra(estoqueCompra);
         Livro salvo = repository.save(livro);
         logService.registrarLogUsuarioLogado("CADASTRO_LIVRO", "Livro " + salvo.getId() + " (" + salvo.getTitulo() + ") cadastrado");
         return salvo;
@@ -68,7 +69,7 @@ public class LivroService {
                 .map(s -> new LivroDTO(s.getId(), s.getTitulo(), s.getAutores(),
                         s.getAnoLancamento(), s.getNumeroPagina(),
                         s.getCapaUrl(), s.getMateria(), s.getPreco(),
-                        s.getEstoque()))
+                        s.getEstoqueReserva(), s.getEstoqueCompra()))
                 .collect(Collectors.toList());
     }
 
@@ -93,8 +94,11 @@ public class LivroService {
         if (request.preco() != null){
             livro.setPreco(request.preco());
         }
-        if (request.estoque() != null) {
-            livro.setEstoque(request.estoque());
+        if (request.estoqueReserva() != null) {
+            livro.setEstoqueReserva(request.estoqueReserva());
+        }
+        if (request.estoqueCompra() != null) {
+            livro.setEstoqueCompra(request.estoqueCompra());
         }
         Livro salvo = repository.save(livro);
         logService.registrarLogUsuarioLogado("ATUALIZACAO_LIVRO", "Livro " + salvo.getId() + " (" + salvo.getTitulo() + ") atualizado");
