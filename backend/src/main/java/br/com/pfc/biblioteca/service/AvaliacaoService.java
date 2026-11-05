@@ -1,9 +1,9 @@
 package br.com.pfc.biblioteca.service;
 
-import br.com.pfc.biblioteca.dto.AvaliacaoDTO;
-import br.com.pfc.biblioteca.dto.AvaliacaoRequest;
-import br.com.pfc.biblioteca.dto.RankingLivroDTO;
-import br.com.pfc.biblioteca.dto.ResumoAvaliacoesDTO;
+import br.com.pfc.biblioteca.dto.avaliacao.AvaliacaoDTO;
+import br.com.pfc.biblioteca.dto.avaliacao.AvaliacaoRequest;
+import br.com.pfc.biblioteca.dto.livro.RankingLivroDTO;
+import br.com.pfc.biblioteca.dto.avaliacao.ResumoAvaliacoesDTO;
 import br.com.pfc.biblioteca.entity.jpa.Avaliacao;
 import br.com.pfc.biblioteca.entity.jpa.Livro;
 import br.com.pfc.biblioteca.entity.jpa.Usuario;
@@ -38,7 +38,7 @@ public class AvaliacaoService {
     }
 
     public AvaliacaoDTO avaliarLivro(Long livroId, AvaliacaoRequest request){
-        Usuario usuario = getUsuarioLogado();
+        Usuario usuario = UsuarioLogado();
 
         Livro livro = livroRepository.findById(livroId)
                 .filter(Livro::isAtivo)
@@ -72,7 +72,7 @@ public class AvaliacaoService {
     }
 
     public void removerAvaliacao(Long avaliacaoId){
-        Usuario usuario = getUsuarioLogado();
+        Usuario usuario = UsuarioLogado();
 
         Avaliacao avaliacao = repository.findById(avaliacaoId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Avaliação não encontrada"));
@@ -95,7 +95,7 @@ public class AvaliacaoService {
                 .collect(Collectors.toList());
     }
 
-    private Usuario getUsuarioLogado(){
+    private Usuario UsuarioLogado(){
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         return usuarioRepository.findByEmailAndAtivoTrue(email)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado"));

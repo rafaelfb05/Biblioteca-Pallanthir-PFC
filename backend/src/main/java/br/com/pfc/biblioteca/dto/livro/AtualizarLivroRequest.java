@@ -1,4 +1,4 @@
-package br.com.pfc.biblioteca.dto;
+package br.com.pfc.biblioteca.dto.livro;
 
 import br.com.pfc.biblioteca.enums.Materia;
 
@@ -10,5 +10,6 @@ public record AtualizarLivroRequest(String titulo,
                                     Integer numeroPagina,
                                     Materia materia,
                                     Double preco,
-                                    Integer estoque) {
+                                    Integer estoqueReserva,
+                                    Integer estoqueCompra) {
 }

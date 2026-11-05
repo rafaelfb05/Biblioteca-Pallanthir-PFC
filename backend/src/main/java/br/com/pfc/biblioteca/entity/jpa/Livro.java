@@ -1,6 +1,6 @@
 package br.com.pfc.biblioteca.entity.jpa;
 
-import br.com.pfc.biblioteca.dto.DadosLivro;
+import br.com.pfc.biblioteca.dto.livro.DadosLivro;
 import br.com.pfc.biblioteca.enums.Materia;
 import jakarta.persistence.*;
 import org.hibernate.annotations.ColumnDefault;
@@ -20,7 +20,8 @@ public class Livro {
     private String capaUrl;
     @Enumerated(EnumType.STRING)
     private Materia materia;
-    private Integer estoque = 1;
+    private Integer estoqueReserva = 1;
+    private Integer estoqueCompra = 0;
     private Double preco = 0.0;
     @Column(nullable = false)
     @ColumnDefault("true")
@@ -121,12 +122,20 @@ public class Livro {
         this.preco=preco;
     }
 
-    public Integer getEstoque() {
-        return estoque;
+    public Integer getEstoqueReserva() {
+        return estoqueReserva;
     }
 
-    public void setEstoque(Integer estoque) {
-        this.estoque = estoque;
+    public void setEstoqueReserva(Integer estoqueReserva) {
+        this.estoqueReserva = estoqueReserva;
+    }
+
+    public Integer getEstoqueCompra() {
+        return estoqueCompra;
+    }
+
+    public void setEstoqueCompra(Integer estoqueCompra) {
+        this.estoqueCompra = estoqueCompra;
     }
 
     @Override
@@ -138,6 +147,7 @@ public class Livro {
                 ", capa = " + capaUrl +
                 ", matéria = " + materia +
                 ", preço = " + preco +
-                ", quantidade em estooque = " + estoque;
+                ", quantidade em estooque para reservas = " + estoqueReserva +
+                ", quantidade em estoque para compra = " + estoqueCompra;
     }
 }

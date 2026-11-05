@@ -1,4 +1,4 @@
-package br.com.pfc.biblioteca.dto;
+package br.com.pfc.biblioteca.dto.avaliacao;
 
 import br.com.pfc.biblioteca.entity.jpa.Avaliacao;
 

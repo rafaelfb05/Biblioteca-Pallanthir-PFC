@@ -48,6 +48,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/avaliacoes/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/avaliacoes/**").hasRole("ESTUDANTE")
                         .requestMatchers(HttpMethod.DELETE, "/avaliacoes/**").hasRole("ESTUDANTE")
+                        .requestMatchers(HttpMethod.POST, "/pagamentos/webhook").permitAll()
+                        .requestMatchers("/carrinho/**").hasRole("ESTUDANTE")
+                        .requestMatchers("/pedidos/**").hasRole("ESTUDANTE")
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();

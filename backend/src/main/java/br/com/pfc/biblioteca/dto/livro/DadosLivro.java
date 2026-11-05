@@ -1,4 +1,4 @@
-package br.com.pfc.biblioteca.dto;
+package br.com.pfc.biblioteca.dto.livro;
 
 import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;

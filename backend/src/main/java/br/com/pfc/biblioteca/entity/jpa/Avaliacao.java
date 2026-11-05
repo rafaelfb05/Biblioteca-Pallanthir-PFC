@@ -86,4 +86,14 @@ public class Avaliacao {
     public void setAtivo(boolean ativo) {
         this.ativo = ativo;
     }
+
+    @Override
+    public String toString() {
+        return "Avaliacao: " +
+                "usuario = " + usuario +
+                ", livro = " + livro +
+                ", nota = " + nota +
+                ", comentario = " + comentario + '\'' +
+                ", dataAvaliacao = " + dataAvaliacao;
+    }
 }

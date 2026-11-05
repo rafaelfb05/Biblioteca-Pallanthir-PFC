@@ -1,6 +1,6 @@
 package br.com.pfc.biblioteca.service;
 
-import br.com.pfc.biblioteca.dto.ReservaDTO;
+import br.com.pfc.biblioteca.dto.reserva.ReservaDTO;
 import br.com.pfc.biblioteca.enums.StatusReserva;
 import br.com.pfc.biblioteca.infra.exception.ConflitoException;
 import br.com.pfc.biblioteca.infra.exception.RecursoNaoEncontradoException;
@@ -48,11 +48,11 @@ public class ReservaService {
         Livro livro = livroRepository.buscarComLock(livroId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Livro não encontrado"));
 
-        if(livro.getEstoque() == null || livro.getEstoque() <= 0){
+        if(livro.getEstoqueReserva() == null || livro.getEstoqueReserva() <= 0){
             logService.registrarLog(usuario.getId(), usuario.getEmail(), "FALHA_RESERVA", "Livro " + livro.getId() + " esgotado");
             throw new ConflitoException("Livro esgotado no momento!");
         }
-        livro.setEstoque(livro.getEstoque() -1);
+        livro.setEstoqueReserva(livro.getEstoqueReserva() -1);
         livroRepository.save(livro);
 
         Reserva reserva = repository.save(new Reserva(usuario, livro));
@@ -77,7 +77,7 @@ public class ReservaService {
         }
 
         Livro livro = reserva.getLivro();
-        livro.setEstoque(livro.getEstoque() + 1);
+        livro.setEstoqueReserva(livro.getEstoqueReserva() + 1);
         livroRepository.save(livro);
 
         reserva.setStatus(StatusReserva.CANCELADO);
@@ -109,7 +109,7 @@ public class ReservaService {
         }
 
         Livro livro = reserva.getLivro();
-        livro.setEstoque(livro.getEstoque() + 1);
+        livro.setEstoqueReserva(livro.getEstoqueReserva() + 1);
         livroRepository.save(livro);
 
         reserva.setStatus(StatusReserva.DEVOLVIDO);

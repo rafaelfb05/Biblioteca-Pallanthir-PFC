@@ -1,4 +1,4 @@
-package br.com.pfc.biblioteca.dto;
+package br.com.pfc.biblioteca.dto.livro;
 
 import br.com.pfc.biblioteca.enums.Materia;
 import br.com.pfc.biblioteca.entity.jpa.Livro;
@@ -13,13 +13,14 @@ public record LivroDTO(Long id,
                        String capaUrl,
                        Materia materia,
                        double preco,
-                       Integer estoque) {
+                       Integer estoqueReserva,
+                       Integer reservaCompra) {
 
     public LivroDTO(Livro livro) {
         this(livro.getId(), livro.getTitulo(),
                 livro.getAutores(), livro.getAnoLancamento(),
                 livro.getNumeroPagina(), livro.getCapaUrl(),
                 livro.getMateria(), livro.getPreco(),
-                livro.getEstoque());
+                livro.getEstoqueReserva(), livro.getEstoqueCompra());
     }
 }

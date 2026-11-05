@@ -1,6 +1,6 @@
 package br.com.pfc.biblioteca.repository;
 
-import br.com.pfc.biblioteca.dto.RankingLivroDTO;
+import br.com.pfc.biblioteca.dto.livro.RankingLivroDTO;
 import br.com.pfc.biblioteca.entity.jpa.Avaliacao;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;

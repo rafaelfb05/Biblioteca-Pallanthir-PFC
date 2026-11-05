@@ -1,6 +1,9 @@
 package br.com.pfc.biblioteca.controller;
 
-import br.com.pfc.biblioteca.dto.*;
+import br.com.pfc.biblioteca.dto.auth.*;
+import br.com.pfc.biblioteca.dto.livro.LivroDTO;
+import br.com.pfc.biblioteca.dto.usuario.UsuarioDTO;
+import br.com.pfc.biblioteca.dto.usuario.UsuarioRequest;
 import br.com.pfc.biblioteca.entity.jpa.Usuario;
 import br.com.pfc.biblioteca.service.UsuarioService;
 import jakarta.validation.Valid;

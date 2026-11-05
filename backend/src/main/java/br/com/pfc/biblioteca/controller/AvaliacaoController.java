@@ -1,9 +1,9 @@
 package br.com.pfc.biblioteca.controller;
 
-import br.com.pfc.biblioteca.dto.AvaliacaoDTO;
-import br.com.pfc.biblioteca.dto.AvaliacaoRequest;
-import br.com.pfc.biblioteca.dto.RankingLivroDTO;
-import br.com.pfc.biblioteca.dto.ResumoAvaliacoesDTO;
+import br.com.pfc.biblioteca.dto.avaliacao.AvaliacaoDTO;
+import br.com.pfc.biblioteca.dto.avaliacao.AvaliacaoRequest;
+import br.com.pfc.biblioteca.dto.livro.RankingLivroDTO;
+import br.com.pfc.biblioteca.dto.avaliacao.ResumoAvaliacoesDTO;
 import br.com.pfc.biblioteca.service.AvaliacaoService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;

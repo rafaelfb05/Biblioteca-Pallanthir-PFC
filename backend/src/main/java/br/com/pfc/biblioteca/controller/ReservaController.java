@@ -1,6 +1,6 @@
 package br.com.pfc.biblioteca.controller;
 
-import br.com.pfc.biblioteca.dto.ReservaDTO;
+import br.com.pfc.biblioteca.dto.reserva.ReservaDTO;
 import br.com.pfc.biblioteca.service.ReservaService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

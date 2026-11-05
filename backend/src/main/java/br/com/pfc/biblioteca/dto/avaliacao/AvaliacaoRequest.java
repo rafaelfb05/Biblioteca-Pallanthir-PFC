@@ -1,4 +1,4 @@
-package br.com.pfc.biblioteca.dto;
+package br.com.pfc.biblioteca.dto.avaliacao;
 
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
