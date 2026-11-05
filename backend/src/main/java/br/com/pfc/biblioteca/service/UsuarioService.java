@@ -1,6 +1,9 @@
 package br.com.pfc.biblioteca.service;
 
-import br.com.pfc.biblioteca.dto.*;
+import br.com.pfc.biblioteca.dto.auth.*;
+import br.com.pfc.biblioteca.dto.livro.LivroDTO;
+import br.com.pfc.biblioteca.dto.usuario.UsuarioDTO;
+import br.com.pfc.biblioteca.dto.usuario.UsuarioRequest;
 import br.com.pfc.biblioteca.enums.StatusReserva;
 import br.com.pfc.biblioteca.enums.TipoUsuario;
 import br.com.pfc.biblioteca.infra.exception.ConflitoException;

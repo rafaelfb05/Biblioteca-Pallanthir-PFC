@@ -1,6 +1,6 @@
 package br.com.pfc.biblioteca.entity.jpa;
 
-import br.com.pfc.biblioteca.dto.DadosLivro;
+import br.com.pfc.biblioteca.dto.livro.DadosLivro;
 import br.com.pfc.biblioteca.enums.Materia;
 import jakarta.persistence.*;
 import org.hibernate.annotations.ColumnDefault;

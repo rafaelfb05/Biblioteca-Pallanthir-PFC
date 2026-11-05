@@ -1,6 +1,6 @@
 package br.com.pfc.biblioteca.service;
 
-import br.com.pfc.biblioteca.dto.ReservaDTO;
+import br.com.pfc.biblioteca.dto.reserva.ReservaDTO;
 import br.com.pfc.biblioteca.enums.StatusReserva;
 import br.com.pfc.biblioteca.infra.exception.ConflitoException;
 import br.com.pfc.biblioteca.infra.exception.RecursoNaoEncontradoException;

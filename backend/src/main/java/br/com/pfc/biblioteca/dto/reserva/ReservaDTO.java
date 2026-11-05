@@ -1,4 +1,4 @@
-package br.com.pfc.biblioteca.dto;
+package br.com.pfc.biblioteca.dto.reserva;
 
 import br.com.pfc.biblioteca.enums.StatusReserva;
 import br.com.pfc.biblioteca.entity.jpa.Reserva;

@@ -1,9 +1,9 @@
 package br.com.pfc.biblioteca.controller;
 
-import br.com.pfc.biblioteca.dto.AtualizarLivroRequest;
-import br.com.pfc.biblioteca.dto.CadastroLivroRequest;
-import br.com.pfc.biblioteca.dto.LivroDTO;
-import br.com.pfc.biblioteca.dto.MateriaDTO;
+import br.com.pfc.biblioteca.dto.livro.AtualizarLivroRequest;
+import br.com.pfc.biblioteca.dto.livro.CadastroLivroRequest;
+import br.com.pfc.biblioteca.dto.livro.LivroDTO;
+import br.com.pfc.biblioteca.dto.livro.MateriaDTO;
 import br.com.pfc.biblioteca.enums.Materia;
 import br.com.pfc.biblioteca.entity.jpa.Livro;
 import br.com.pfc.biblioteca.service.LivroService;

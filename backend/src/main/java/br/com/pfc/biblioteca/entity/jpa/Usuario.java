@@ -1,6 +1,6 @@
 package br.com.pfc.biblioteca.entity.jpa;
 
-import br.com.pfc.biblioteca.dto.UsuarioRequest;
+import br.com.pfc.biblioteca.dto.usuario.UsuarioRequest;
 import br.com.pfc.biblioteca.enums.TipoUsuario;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;

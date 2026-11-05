@@ -1,4 +1,4 @@
-package br.com.pfc.biblioteca.dto;
+package br.com.pfc.biblioteca.dto.livro;
 
 import br.com.pfc.biblioteca.enums.Materia;
 import br.com.pfc.biblioteca.entity.jpa.Livro;

@@ -1,4 +1,4 @@
-package br.com.pfc.biblioteca.dto;
+package br.com.pfc.biblioteca.dto.usuario;
 
 import br.com.pfc.biblioteca.enums.TipoUsuario;
 import br.com.pfc.biblioteca.entity.jpa.Usuario;

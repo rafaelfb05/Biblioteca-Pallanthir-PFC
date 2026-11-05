@@ -1,9 +1,9 @@
 package br.com.pfc.biblioteca.service;
 
-import br.com.pfc.biblioteca.dto.AtualizarLivroRequest;
-import br.com.pfc.biblioteca.dto.DadosLivro;
-import br.com.pfc.biblioteca.dto.LivroDTO;
-import br.com.pfc.biblioteca.dto.MateriaDTO;
+import br.com.pfc.biblioteca.dto.livro.AtualizarLivroRequest;
+import br.com.pfc.biblioteca.dto.livro.DadosLivro;
+import br.com.pfc.biblioteca.dto.livro.LivroDTO;
+import br.com.pfc.biblioteca.dto.livro.MateriaDTO;
 import br.com.pfc.biblioteca.enums.Materia;
 import br.com.pfc.biblioteca.enums.StatusReserva;
 import br.com.pfc.biblioteca.infra.exception.ConflitoException;
