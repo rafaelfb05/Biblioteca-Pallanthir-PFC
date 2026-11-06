@@ -14,7 +14,7 @@ public record LivroDTO(Long id,
                        Materia materia,
                        double preco,
                        Integer estoqueReserva,
-                       Integer reservaCompra) {
+                       Integer estoqueCompra) {
 
     public LivroDTO(Livro livro) {
         this(livro.getId(), livro.getTitulo(),

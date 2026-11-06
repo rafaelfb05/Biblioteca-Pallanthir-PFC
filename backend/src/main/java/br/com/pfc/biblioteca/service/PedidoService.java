@@ -13,6 +13,7 @@ import br.com.pfc.biblioteca.repository.UsuarioRepository;
 import com.mercadopago.resources.payment.Payment;
 import com.mercadopago.resources.preference.Preference;
 
+import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -24,7 +25,6 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 @Service
@@ -91,7 +91,7 @@ public class PedidoService {
 
             MercadoPagoService.OrderCriada order = mercadoPagoService.criarOrder(pedido, MINUTOS_VALIDADE);
             pedido.setMpOrderId(order.id());
-            pedido.setLinkPagamento(order.checkoutUrl);
+            pedido.setLinkPagamento(order.checkoutUrl());
             repository.save(pedido);
             itemCarrinhoRepository.saveAll(itensCarrinho);
 
