@@ -49,7 +49,7 @@ public class CarrinhoService {
 
         int estoque = livro.getEstoqueCompra() == null ? 0 : livro.getEstoqueCompra();
         if(request.quantidade() > estoque){
-            throw new ConflitoException("O estoqe de " + livro.getTitulo() + " está em falta");
+            throw new ConflitoException("O estoque de " + livro.getTitulo() + " está em falta");
         }
 
         ItemCarrinho item = repository.findByUsuarioIdAndLivroId(usuario.getId(), livro.getId())

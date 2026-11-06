@@ -22,7 +22,7 @@ public interface AvaliacaoRepository extends JpaRepository<Avaliacao, Long> {
     Double calcularMedia(long livroId);
 
     @Query("""
-        SELECT new br.com.pfc.biblioteca.dto.RankingLivroDTO(
+        SELECT new br.com.pfc.biblioteca.dto.livro.RankingLivroDTO(
             l.id, l.titulo, l.capaUrl, AVG(a.nota), COUNT(a))
         FROM Avaliacao a JOIN a.livro l
         WHERE a.ativo = true AND l.ativo = true
