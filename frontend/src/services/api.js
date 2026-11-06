@@ -84,10 +84,16 @@ export const livrosApi = {
     request(`/livros/titulo/${encodeURIComponent(titulo)}`),
   filtrarPorMateria: (materia) =>
     request(`/livros/${encodeURIComponent(materia)}`),
-  cadastrar: (titulo, materia, preco, estoque) =>
+  cadastrar: (titulo, materia, preco, estoqueReserva, estoqueCompra) =>
     request("/livros/cadastro", {
       method: "POST",
-      body: JSON.stringify({ titulo, materia, preco, estoque }),
+      body: JSON.stringify({
+        titulo,
+        materia,
+        preco,
+        estoqueReserva,
+        estoqueCompra,
+      }),
     }),
   atualizar: (id, dados) =>
     request(`/livros/atualizar/${id}`, {
@@ -164,6 +170,22 @@ export const avaliacoesApi = {
   remover: (avaliacaoId) =>
     request(`/avaliacoes/livros/${avaliacaoId}`, { method: "DELETE" }),
   ranking: () => request("/avaliacoes/ranking"),
+};
+
+export const carrinhoApi = {
+  obter: () => request("/carrinho"),
+  definirQuantidade: (livroId, quantidade) =>
+    request("/carrinho/itens", {
+      method: "POST",
+      body: JSON.stringify({ livroId, quantidade }),
+    }),
+  remover: (livroId) =>
+    request(`/carrinho/itens/${livroId}`, { method: "DELETE" }),
+};
+
+export const pedidosApi = {
+  finalizarCompra: () => request("/pedidos/checkout", { method: "POST" }),
+  listar: () => request("/pedidos"),
 };
 
 export const logsApi = {

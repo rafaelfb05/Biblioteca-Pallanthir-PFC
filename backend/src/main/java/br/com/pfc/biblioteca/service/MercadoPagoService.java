@@ -84,7 +84,12 @@ public class MercadoPagoService {
         }
 
         JsonNode json = lerJson(resposta.body());
-        return new OrderCriada(json.path("id").asText(), json.path("checkout_url").asText());
+        String checkoutUrl = json.path("checkout_url").asText();
+        if (checkoutUrl.isBlank()) {
+            log.error("Mercado Pago não retornou checkout_url para o pedido {}", pedido.getId());
+            throw new RuntimeException("Falha ao criar o pagamento");
+        }
+        return new OrderCriada(json.path("id").asText(), checkoutUrl);
     }
 
     public OrderMP buscarOrder(String orderId) {
