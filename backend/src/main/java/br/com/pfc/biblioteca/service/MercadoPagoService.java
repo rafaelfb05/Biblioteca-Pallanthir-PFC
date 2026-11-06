@@ -59,7 +59,6 @@ public class MercadoPagoService {
             item.put("title", ip.getLivro().getTitulo());
             item.put("unit_price", ip.getPrecoUnitario().toPlainString());
             item.put("quantity", ip.getQuantidade());
-            item.put("unit_measure", "unit");
             item.put("external_code", String.valueOf(ip.getLivro().getId()));
         }
 
