@@ -2,24 +2,28 @@
 
 Um sistema de biblioteca criado para ajudar estudantes de diversas áreas.
 
-Os estudantes podem navegar pelo catálogo organizado por matérias, conferir os livros mais bem avaliados, salvar os preferidos na aba de favoritos e reservar livros para retirada. Os funcionários cuidam do acervo, das entregas e devoluções e acompanham tudo pelos logs de auditoria.
+Os estudantes podem navegar pelo catálogo organizado por matérias, avaliar os livros e conferir os mais bem avaliados, salvar os preferidos na aba de favoritos, reservar livros para retirada e comprar exemplares pagando pelo Mercado Pago. Os funcionários cuidam do acervo, das entregas e devoluções e acompanham tudo pela dashboard e pelos logs de auditoria.
 
-O sistema não oferece os livros digitalmente, apenas reservas para buscar em uma biblioteca física.
+O sistema não oferece os livros digitalmente: as reservas e as compras são de exemplares físicos da biblioteca.
 
 ---
 
 ## Funcionalidades
 
 ### Estudante
-- Catálogo de livros com busca por título, filtro por matéria e página dos mais bem avaliados.
-- Página de detalhes do livro com capa ampliável, preço e estoque.
+- Catálogo de livros com busca por título, filtro por matéria e ranking dos 10 mais bem avaliados.
+- Página de detalhes do livro com capa ampliável, preço, estoque para reserva e estoque à venda.
+- Avaliação dos livros com nota de 1 a 5 e comentário opcional.
 - Favoritos.
 - Reserva de livros, cancelamento e histórico em "Minhas reservas".
+- Carrinho de compras e pagamento pelo **Mercado Pago (Checkout Pro)**.
+- Página "Meus pedidos", com o status de cada compra.
 
 ### Funcionário
 - Cadastro de livros a partir do título, com dados e capa preenchidos pela Google Books API.
-- Edição e exclusão de livros.
+- Edição e exclusão de livros, com estoques separados para reserva e para venda.
 - Gestão de usuários e reservas, com registro de entrega e devolução.
+- Dashboard com os números do acervo, das reservas e das matérias mais reservadas e mais compradas.
 - Consulta dos logs de auditoria, com filtro por usuário e por texto.
 
 ### Conta e segurança
@@ -53,13 +57,14 @@ O sistema não oferece os livros digitalmente, apenas reservas para buscar em um
 
 ### Banco de dados
 
-- **PostgreSQL** — Banco de dados principal do sistema, hospedado na Supabase. É responsável pela persistência dos usuários, livros, favoritos e reservas.
-- **MongoDB** — Usado **exclusivamente para os logs de auditoria**, sem nenhum dado de negócio. Armazena registros como logins, reservas, alterações de livros e tentativas de acesso negado.
+- **PostgreSQL** — Banco de dados principal do sistema, hospedado na Supabase. É responsável pela persistência dos usuários, livros, favoritos, reservas, avaliações, carrinhos e pedidos.
+- **MongoDB** — Usado **exclusivamente para os logs de auditoria**, sem nenhum dado de negócio. Armazena registros como logins, reservas, pedidos, pagamentos, alterações de livros e tentativas de acesso negado.
 
 ### Integrações externas
 
 - **Google Books API** — API externa utilizada para obter informações dos livros adicionados ao sistema.
 - **Brevo** — Serviço de envio de e-mails transacionais, utilizado para enviar os códigos de verificação em duas etapas e de recuperação de senha.
+- **Mercado Pago** — Processa os pagamentos das compras pela API de Orders (Checkout Pro) e avisa o sistema por webhook quando um pagamento muda de status.
 
 ### Hospedagem
 
@@ -97,6 +102,7 @@ O script `frontend/scripts/copiar-docs.js` roda automaticamente antes do `npm st
 - **MongoDB** para os logs de auditoria (por exemplo, no **MongoDB Atlas**)
 - Conta na **Brevo**
 - Chave da **Google Books API**
+- Conta de desenvolvedor no **Mercado Pago**
 
 ---
 
@@ -115,8 +121,10 @@ O script `frontend/scripts/copiar-docs.js` roda automaticamente antes do `npm st
 | `CODIGO_FUNCIONARIO` | Sim | Código exigido para criar uma conta do tipo Funcionário |
 | `BREVO_API_KEY` | Sim | Chave da API da Brevo, usada para enviar os e-mails |
 | `EMAIL_REMETENTE` | Sim | E-mail remetente verificado na Brevo |
-| `FRONTEND_URL` | Não | URL do front-end, usada no link "Copiar código" dos e-mails. Padrão: `https://pallanthir.vercel.app` |
+| `FRONTEND_URL` | Não | URL do front-end, usada no link "Copiar código" dos e-mails e nos endereços de retorno do pagamento. Padrão: `https://pallanthir.vercel.app` |
 | `BOOK_API` | Sim | Chave da Google Books API, usada pelo `LivroService` |
+| `MP_ACCESS_TOKEN` | Sim | Access Token da aplicação no Mercado Pago, usado para criar e consultar os pedidos |
+| `MP_WEBHOOK_SECRET` | Sim | Assinatura secreta do webhook do Mercado Pago, usada para validar as notificações |
 | `PORT` | Não | Porta do servidor. Padrão `8080`. A Render define automaticamente |
 | `CORS_ALLOWED_ORIGINS` | Não | Origens liberadas no CORS, separadas por vírgula. Padrão: `http://localhost:3000,https://pallanthir.vercel.app,https://*.vercel.app` |
 
@@ -188,11 +196,25 @@ Ambos são definidos por você:
 3. Em **APIs e serviços → Credenciais**, crie uma **Chave de API**.
 4. Essa chave é o valor de `BOOK_API`.
 
-### 6. Render (back-end)
+### 6. Mercado Pago (pagamentos)
+
+1. Acesse [mercadopago.com.br/developers](https://www.mercadopago.com.br/developers), entre com a conta da biblioteca e abra **Suas integrações**.
+2. Clique em **Criar aplicação**, escolha **Pagamentos online** e o produto **Checkout Pro**.
+3. Na aplicação, selecione o ambiente (**Teste** ou **Produção**) e abra **Credenciais**. Copie o **Access Token** (não a Public Key). Ele é o `MP_ACCESS_TOKEN`.
+4. No mesmo ambiente, abra **Configuração de webhooks** e preencha:
+   - **URL:** `https://<sua-api>/pagamentos/webhook` (a URL da Render)
+   - **Eventos:** marque apenas **Order (Mercado Pago)**
+5. Salve e copie a **Assinatura secreta**. Ela é o `MP_WEBHOOK_SECRET`.
+
+As credenciais de teste e as de produção são diferentes, assim como o webhook de cada ambiente. Troque as duas variáveis juntas ao mudar de ambiente.
+
+Para testar sem cobrança real, use as credenciais de **Teste** e crie uma conta compradora em **Suas integrações → Contas de teste**. Veja a seção [Pagamentos](#pagamentos).
+
+### 7. Render (back-end)
 
 Chaves são geradas no momento do deploy; veja a seção de deploy abaixo.
 
-### 7. Vercel (front-end)
+### 8. Vercel (front-end)
 
 Idem — a única variável necessária é `REACT_APP_API_URL`.
 
@@ -224,6 +246,8 @@ $env:BREVO_API_KEY = "sua-chave-brevo"
 $env:EMAIL_REMETENTE = "seu-email-verificado@exemplo.com"
 $env:FRONTEND_URL = "http://localhost:3000"
 $env:BOOK_API = "sua-chave-google-books"
+$env:MP_ACCESS_TOKEN = "seu-access-token-do-mercado-pago"
+$env:MP_WEBHOOK_SECRET = "sua-assinatura-secreta-do-webhook"
 
 cd backend
 .\mvnw.cmd spring-boot:run
@@ -242,6 +266,8 @@ export BREVO_API_KEY="sua-chave-brevo"
 export EMAIL_REMETENTE="seu-email-verificado@exemplo.com"
 export FRONTEND_URL="http://localhost:3000"
 export BOOK_API="sua-chave-google-books"
+export MP_ACCESS_TOKEN="seu-access-token-do-mercado-pago"
+export MP_WEBHOOK_SECRET="sua-assinatura-secreta-do-webhook"
 
 cd backend
 chmod +x mvnw
@@ -283,8 +309,12 @@ docker run -p 8080:8080 \
   -e BREVO_API_KEY="sua-chave-brevo" \
   -e EMAIL_REMETENTE="seu-email-verificado@exemplo.com" \
   -e BOOK_API="sua-chave-google-books" \
+  -e MP_ACCESS_TOKEN="seu-access-token-do-mercado-pago" \
+  -e MP_WEBHOOK_SECRET="sua-assinatura-secreta-do-webhook" \
   pallanthir-backend
 ```
+
+Rodando localmente, o Mercado Pago não consegue chamar o webhook em `localhost`. O status dos pedidos ainda é atualizado, porque o back-end consulta o Mercado Pago sempre que a página "Meus pedidos" é aberta.
 
 ---
 
@@ -304,6 +334,32 @@ Authorization: Bearer <token>
 O front-end renova o token automaticamente pela rota `POST /usuarios/renovar-token` enquanto o usuário estiver ativo.
 
 Para testar pelo Swagger, faça as duas etapas acima, copie o token e informe-o nas requisições protegidas.
+
+---
+
+## Pagamentos
+
+O fluxo de compra funciona assim:
+
+1. O estudante adiciona livros ao carrinho (`POST /carrinho/itens`).
+2. Ao clicar em **Pagar com Mercado Pago**, o back-end cria o pedido (`POST /pedidos/checkout`), separa os exemplares do estoque de venda por **30 minutos** e cria uma order no Mercado Pago, que devolve o link de pagamento.
+3. O estudante paga na página do Mercado Pago e volta ao site em `/compra/sucesso`, `/compra/pendente` ou `/compra/falha`.
+4. O Mercado Pago chama o webhook (`POST /pagamentos/webhook`). O back-end valida a assinatura, consulta a order na API do Mercado Pago e marca o pedido como **Aprovado** quando o pagamento é processado.
+5. Ao abrir "Meus pedidos", o back-end também consulta o Mercado Pago para cada pedido ainda pendente, garantindo o status correto mesmo sem o webhook.
+
+Regras importantes:
+- Os itens só saem do carrinho quando o pedido é aprovado ou expira.
+- Enquanto houver um pedido aguardando pagamento, o carrinho fica bloqueado e não é possível criar outro pedido.
+- Pedidos não pagos expiram após 30 minutos; os exemplares voltam ao estoque de venda.
+
+### Testando com as contas de teste
+
+1. Use as credenciais de **Teste** em `MP_ACCESS_TOKEN` e `MP_WEBHOOK_SECRET`.
+2. Em **Suas integrações → Contas de teste**, use ou crie uma conta **Compradora**.
+3. Abra uma janela anônima, entre em [mercadopago.com.br](https://www.mercadopago.com.br) com a conta compradora de teste e, na mesma janela, faça a compra pelo site.
+4. Pague com um dos cartões de teste exibidos no painel, usando o titular **`APRO`** para simular a aprovação.
+
+Se aparecer "Uma das partes com as quais você está tentando efetuar o pagamento é de teste", o pagamento está misturando contas de teste e reais: confira se o `MP_ACCESS_TOKEN` é de teste e se o pagamento foi feito logado com a conta compradora de teste.
 
 ---
 
@@ -330,10 +386,13 @@ Para testar pelo Swagger, faça as duas etapas acima, copie o token e informe-o 
    - `EMAIL_REMETENTE`
    - `FRONTEND_URL` com a URL do front na Vercel (opcional, se for diferente do padrão)
    - `BOOK_API`
+   - `MP_ACCESS_TOKEN`
+   - `MP_WEBHOOK_SECRET`
    - `CORS_ALLOWED_ORIGINS` com a URL do front na Vercel (opcional, se for diferente do padrão)
 
    Não cadastre `PORT` — a Render injeta essa variável sozinha.
 5. Clique em **Create Web Service**. Ao final, anote a URL gerada, no formato `https://seu-servico.onrender.com`.
+6. No painel do Mercado Pago, configure o webhook com essa URL seguida de `/pagamentos/webhook`.
 
 No plano gratuito o serviço hiberna após alguns minutos sem uso, então a primeira requisição depois de um período ocioso pode demorar cerca de um minuto.
 
@@ -355,6 +414,8 @@ O `vercel.json` já contém o rewrite que envia todas as rotas para o `index.htm
 
 Não há passo extra de deploy: o PostgreSQL já está hospedado na Supabase desde a criação do projeto, e o MongoDB dos logs também. Basta garantir que as credenciais cadastradas na Render estejam corretas e que o MongoDB aceite conexões externas (**Network Access**).
 
+Ao atualizar um banco da v2.0 para a v3.0, rode a migração dos estoques descrita nas [Release Notes v3.0](RELEASE_NOTES_V3.0.md#migração-do-banco-de-dados).
+
 ---
 
 ## Documentação
@@ -364,6 +425,7 @@ Não há passo extra de deploy: o PostgreSQL já está hospedado na Supabase des
 | [Requisitos](REQUISITOS.md) | Requisitos funcionais, não funcionais e regras de negócio |
 | [Release Notes v1.0](RELEASE_NOTES_v1.0.md) | Primeira versão do sistema |
 | [Release Notes v2.0](RELEASE_NOTES_V2.0.md) | Segurança, 2FA, logs e LGPD |
+| [Release Notes v3.0](RELEASE_NOTES_V3.0.md) | Avaliações, carrinho, pagamentos com Mercado Pago e dashboard |
 | [Política de Segurança](SECURITY.md) | Mecanismos de segurança e como relatar vulnerabilidades |
 | [Termos de Uso](TERMOS_DE_USO.md) | Regras de uso do sistema |
 | [Política de Privacidade](POLITICA_DE_PRIVACIDADE.md) | Tratamento de dados pessoais conforme a LGPD |
@@ -377,6 +439,8 @@ Não há passo extra de deploy: o PostgreSQL já está hospedado na Supabase des
 - [ ] Conta na Brevo com remetente verificado e chave de API gerada
 - [ ] `JWT_SECRET` e `CODIGO_FUNCIONARIO` definidos
 - [ ] Chave da Google Books API gerada
+- [ ] Aplicação criada no Mercado Pago, Access Token copiado e webhook configurado com o evento **Order (Mercado Pago)**
 - [ ] Web Service na Render com todas as variáveis obrigatórias cadastradas e build concluído
+- [ ] Migração dos estoques executada, se o banco veio da v2.0
 - [ ] `REACT_APP_API_URL` na Vercel apontando para a URL da Render
 - [ ] URL da Vercel liberada em `CORS_ALLOWED_ORIGINS` e em `FRONTEND_URL`, se for diferente do padrão

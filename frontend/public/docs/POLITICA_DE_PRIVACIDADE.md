@@ -1,6 +1,6 @@
 # Política de Privacidade — Biblioteca Pallanthir
 
-**Última atualização:** 26/09/2026
+**Última atualização:** 07/11/2026
 
 Esta Política de Privacidade explica quais dados pessoais a **Biblioteca Pallanthir** coleta, para que eles são usados, com quem são compartilhados, por quanto tempo são mantidos e quais são os seus direitos, em conformidade com a **Lei Geral de Proteção de Dados (LGPD — Lei nº 13.709/2018)**.
 
@@ -35,6 +35,10 @@ O controlador dos dados é a **equipe do projeto Biblioteca Pallanthir**, desenv
 |---|---|
 | Livros favoritados | Exibir a sua lista de favoritos. |
 | Reservas (livro, data e status) | Controlar as reservas e o estoque. |
+| Avaliações (livro, nota, comentário e data) | Exibir a avaliação na página do livro e calcular a média e o ranking. **As avaliações são públicas e exibem o seu nome** (ver seção 2.4). |
+| Carrinho (livros e quantidades) | Guardar os livros que você pretende comprar. |
+| Pedidos (livros, quantidades, preços, total, datas e status) | Controlar as compras, o estoque à venda e a retirada dos livros. |
+| Identificador do pedido no Mercado Pago e link de pagamento | Permitir retomar o pagamento e confirmar o status junto ao Mercado Pago. |
 | Código de verificação em duas etapas e sua validade | Confirmar o login. É apagado após o uso e expira em 10 minutos. |
 | Código de recuperação de senha e sua validade | Permitir a redefinição da senha. É apagado após o uso e expira em 15 minutos. |
 | Tentativas de login com senha incorreta e horário de bloqueio | Proteger a conta contra tentativas repetidas de acesso. |
@@ -42,11 +46,23 @@ O controlador dos dados é a **equipe do projeto Biblioteca Pallanthir**, desenv
 
 ### 2.3 Logs de auditoria
 
-O sistema registra ações relevantes, como logins (com sucesso ou falha), verificação em duas etapas, cadastros, atualizações e exclusões de conta, favoritos, reservas, cancelamentos, entregas, devoluções, alterações no acervo e tentativas de acesso negado.
+O sistema registra ações relevantes, como logins (com sucesso ou falha), verificação em duas etapas, cadastros, atualizações e exclusões de conta, favoritos, reservas, cancelamentos, entregas, devoluções, avaliações, criação de pedidos, pagamentos aprovados, pedidos expirados, alterações no acervo e tentativas de acesso negado.
 
 Cada registro contém: **identificador do usuário (quando existir), e-mail utilizado, tipo da ação, descrição da ação e data/hora**. Os logs só podem ser consultados por contas do tipo **Funcionário**.
 
-### 2.4 Dados armazenados no seu navegador
+A **dashboard** dos funcionários mostra apenas números gerais (quantidade de livros, de reservas por status e de matérias mais reservadas e compradas), sem identificar nenhum usuário.
+
+### 2.4 Avaliações públicas
+
+Ao avaliar um livro, a nota, o comentário, a data e o **nome cadastrado na sua conta** passam a ser exibidos na página do livro para qualquer pessoa, inclusive visitantes sem conta. Não escreva dados pessoais nos comentários. Você pode remover a sua avaliação a qualquer momento, e alterar o seu nome em **Minha conta** também altera o nome exibido nas avaliações.
+
+### 2.5 Pagamentos
+
+O pagamento das compras é feito **diretamente na página do Mercado Pago**. Os dados que você informa ali, como número do cartão, código de segurança, CPF e e-mail do pagador, são tratados pelo **Mercado Pago, conforme a política de privacidade dele**, e **não são recebidos nem armazenados** pela Biblioteca Pallanthir.
+
+Do pagamento, o sistema guarda apenas o identificador do pedido no Mercado Pago, o link de pagamento e o status (aguardando pagamento, aprovado ou expirado).
+
+### 2.6 Dados armazenados no seu navegador
 
 O sistema **não utiliza cookies**. Ele guarda no `localStorage` do seu navegador:
 
@@ -55,9 +71,12 @@ O sistema **não utiliza cookies**. Ele guarda no `localStorage` do seu navegado
 
 Esses dados são apagados ao sair da conta, ao excluir a conta ou quando a sessão expira.
 
-### 2.5 Dados que não coletamos
+O carrinho não fica no navegador: ele é guardado no servidor, vinculado à sua conta.
 
-- Não coletamos CPF, telefone, endereço ou dados de pagamento.
+### 2.7 Dados que não coletamos
+
+- Não coletamos telefone nem endereço.
+- Não recebemos nem armazenamos dados de cartão, dados bancários ou o CPF informado no pagamento; esses dados ficam com o Mercado Pago.
 - Não utilizamos ferramentas de rastreamento, anúncios ou análise de comportamento de terceiros.
 
 ---
@@ -67,6 +86,9 @@ Esses dados são apagados ao sair da conta, ao excluir a conta ou quando a sess�
 | Finalidade | Base legal (LGPD, art. 7º) |
 |---|---|
 | Criar e manter a sua conta, permitir login, favoritos e reservas | Execução de contrato ou de procedimentos relacionados, a pedido do titular (inciso V) |
+| Publicar as suas avaliações, a seu pedido | Execução de contrato ou de procedimentos relacionados, a pedido do titular (inciso V) |
+| Manter o carrinho, processar compras e confirmar pagamentos com o Mercado Pago | Execução de contrato (inciso V) |
+| Guardar o histórico de pedidos para comprovar as compras e atender a pedidos de arrependimento ou reembolso | Execução de contrato (inciso V) e exercício regular de direitos (inciso VI) |
 | Enviar códigos de verificação e de recuperação de senha por e-mail | Execução de contrato (inciso V) |
 | Bloqueio por tentativas, verificação em duas etapas, encerramento por inatividade e logs de auditoria | Legítimo interesse, para garantir a segurança do sistema e das contas (inciso IX) |
 | Atender a solicitações de autoridades | Cumprimento de obrigação legal ou regulatória (inciso II) |
@@ -81,12 +103,15 @@ Para funcionar, o sistema utiliza serviços de terceiros que atuam como **operad
 
 | Serviço | Uso | Dados envolvidos |
 |---|---|---|
-| **Supabase** (PostgreSQL) | Banco de dados principal | Conta, favoritos, reservas, códigos temporários |
+| **Supabase** (PostgreSQL) | Banco de dados principal | Conta, favoritos, reservas, avaliações, carrinho, pedidos, códigos temporários |
 | **MongoDB Atlas** | Armazenamento dos logs de auditoria | Registros de log (seção 2.3) |
 | **Render** | Hospedagem do servidor (back-end) | Todos os dados em trânsito pelo servidor |
 | **Vercel** | Hospedagem do site (front-end) | Dados técnicos de acesso ao site (ex.: endereço IP) |
 | **Brevo** | Envio dos e-mails com códigos | Nome do sistema, seu e-mail e o conteúdo da mensagem |
 | **Google Books API** | Obtenção das informações dos livros | **Nenhum dado pessoal** é enviado |
+| **Mercado Pago** | Processamento dos pagamentos | O sistema envia o número do pedido, os títulos, as quantidades e os preços dos livros. **Seu nome e seu e-mail não são enviados.** Os dados de pagamento você informa diretamente ao Mercado Pago (seção 2.5). |
+
+O Mercado Pago trata os dados de pagamento como controlador independente, de acordo com os próprios termos e a própria política de privacidade.
 
 Alguns desses serviços podem armazenar ou processar dados fora do Brasil. Nesses casos, a transferência ocorre para a execução do serviço solicitado por você (LGPD, art. 33, inciso IX) e com base nas garantias oferecidas por esses fornecedores.
 
@@ -104,6 +129,8 @@ Os dados também podem ser compartilhados com autoridades públicas quando houve
 - Controle de permissões por tipo de conta: estudantes só acessam os próprios favoritos, reservas e dados; funções administrativas são restritas a funcionários.
 - Registro de tentativas de acesso não autorizado nos logs de auditoria.
 - Comunicação com o servidor feita por HTTPS.
+- Pagamentos feitos na página do Mercado Pago, sem que os dados do cartão passem pelo sistema.
+- Notificações de pagamento aceitas apenas com assinatura válida do Mercado Pago, e status confirmado diretamente na API do Mercado Pago.
 
 Nenhum sistema é totalmente imune a incidentes. Caso ocorra um incidente de segurança que possa gerar risco relevante, os titulares afetados e a Autoridade Nacional de Proteção de Dados (ANPD) serão comunicados, conforme o art. 48 da LGPD.
 
@@ -117,6 +144,9 @@ Nenhum sistema é totalmente imune a incidentes. Caso ocorra um incidente de seg
 | Código de verificação em duas etapas | Até ser usado ou expirar (10 minutos). |
 | Código de recuperação de senha | Até ser usado ou expirar (15 minutos). |
 | Reservas | Mantidas para controle do acervo, vinculadas à conta. Após a exclusão da conta, ficam associadas apenas ao registro anonimizado. |
+| Avaliações | Enquanto estiverem publicadas. As avaliações removidas deixam de ser exibidas. Após a exclusão da conta, as avaliações publicadas continuam visíveis com o nome "Usuário removido". |
+| Carrinho | Enquanto os itens estiverem no carrinho. Os itens saem quando o pedido é aprovado ou expira, ou quando você os remove. |
+| Pedidos | Mantidos para comprovação das compras e atendimento a pedidos de arrependimento e reembolso. Após a exclusão da conta, ficam associados apenas ao registro anonimizado. |
 | Logs de auditoria | Mantidos pelo tempo necessário para fins de segurança e rastreabilidade, enquanto o projeto estiver em funcionamento. |
 
 ---
@@ -135,6 +165,8 @@ Ao excluir:
 - seus favoritos e códigos pendentes são apagados;
 - a conta é desativada.
 
+Os pedidos continuam registrados, associados apenas à conta anonimizada. As avaliações que estiverem publicadas continuam visíveis, mas passam a exibir o nome "Usuário removido". Se não quiser que elas permaneçam, remova-as antes de excluir a conta.
+
 **Importante:** os logs de auditoria registrados **antes** da exclusão continuam armazenando o e-mail utilizado em cada ação, pelo período indicado na seção 6, para fins de segurança. Se desejar a remoção também desses registros, solicite pelo e-mail de contato.
 
 ---
@@ -145,7 +177,7 @@ Conforme o art. 18 da LGPD, você pode solicitar a qualquer momento:
 
 - confirmação de que tratamos seus dados;
 - acesso aos seus dados;
-- correção de dados incompletos, inexatos ou desatualizados (nome e e-mail podem ser alterados diretamente em **Minha conta**);
+- correção de dados incompletos, inexatos ou desatualizados (nome e e-mail podem ser alterados diretamente em **Minha conta**, e as avaliações podem ser refeitas ou removidas na página de cada livro);
 - anonimização, bloqueio ou eliminação de dados desnecessários ou tratados em desconformidade com a LGPD;
 - portabilidade dos dados;
 - eliminação dos dados tratados com base no seu consentimento;
