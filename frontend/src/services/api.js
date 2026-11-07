@@ -188,6 +188,10 @@ export const pedidosApi = {
   listar: () => request("/pedidos"),
 };
 
+export const dashboardApi = {
+  obter: () => request("/dashboard"),
+};
+
 export const logsApi = {
   listar: () => request("/logs"),
   listarPorUsuario: (usuarioId) => request(`/logs/usuarios/${usuarioId}`),

@@ -4,6 +4,7 @@ import ModalDocumento from "./Componentes/ModalDocumento";
 import {
   avaliacoesApi,
   carrinhoApi,
+  dashboardApi,
   definirAoExpirarSessao,
   definirToken,
   lerDadosDoToken,
@@ -121,7 +122,61 @@ const PAGINAS_PRIVADAS = [
   "conta",
   "gestao",
   "logs",
+  "dashboard",
 ];
+
+const formatarNumero = (valor) => Number(valor || 0).toLocaleString("pt-BR");
+
+const formatarPorcentagem = (parte, total) =>
+  total > 0 ? Math.round((parte / total) * 100) + "%" : "0%";
+
+function GraficoMaterias({ titulo, descricao, itens, unidade }) {
+  const maior = itens.reduce((max, item) => Math.max(max, item.quantidade), 0);
+
+  return (
+    <div className="dashboard-card">
+      <h3>{titulo}</h3>
+      <p className="dashboard-card-sub">{descricao}</p>
+      {itens.length === 0 ? (
+        <p className="dashboard-vazio">Ainda não há dados suficientes.</p>
+      ) : (
+        <ol className="dashboard-barras">
+          {itens.map((item) => (
+            <li
+              key={item.nome}
+              title={
+                item.rotulo +
+                ": " +
+                formatarNumero(item.quantidade) +
+                " " +
+                unidade
+              }
+            >
+              <span className="dashboard-barra-rotulo">
+                <span aria-hidden="true">{ICONES_MATERIA[item.nome] || "📚"}</span>
+                {item.rotulo}
+              </span>
+              <span className="dashboard-barra-trilho" aria-hidden="true">
+                <span
+                  className="dashboard-barra"
+                  style={{
+                    width:
+                      maior > 0
+                        ? Math.max((item.quantidade / maior) * 100, 2) + "%"
+                        : "0%",
+                  }}
+                />
+              </span>
+              <span className="dashboard-barra-valor">
+                {formatarNumero(item.quantidade)}
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
+  );
+}
 
 const mensagemDeErro = (erro, padrao) =>
   erro && erro.status && erro.message ? erro.message : padrao;
@@ -511,6 +566,7 @@ function App() {
   const [usuarioGestao, setUsuarioGestao] = useState(null);
   const [reservasGestao, setReservasGestao] = useState([]);
   const [logs, setLogs] = useState([]);
+  const [dashboard, setDashboard] = useState(null);
   const [filtroLogs, setFiltroLogs] = useState(FILTRO_LOGS_VAZIO);
   const [carregandoPainel, setCarregandoPainel] = useState(false);
 
@@ -672,6 +728,7 @@ function App() {
     setUsuarioGestao(null);
     setReservasGestao([]);
     setLogs([]);
+    setDashboard(null);
     setPagina((atual) => (PAGINAS_PRIVADAS.includes(atual) ? "inicio" : atual));
     setAviso(mensagem);
   }, []);
@@ -1123,6 +1180,24 @@ function App() {
     abrirPagina("logs");
     setFiltroLogs(FILTRO_LOGS_VAZIO);
     await Promise.all([carregarLogs(""), carregarUsuariosGestao()]);
+  };
+
+  const carregarDashboard = async () => {
+    try {
+      setCarregandoPainel(true);
+      setErro(null);
+      setDashboard(await dashboardApi.obter());
+    } catch (e) {
+      setErro(mensagemDeErro(e, "Não foi possível carregar a dashboard."));
+      console.error(e);
+    } finally {
+      setCarregandoPainel(false);
+    }
+  };
+
+  const irParaDashboard = async () => {
+    abrirPagina("dashboard");
+    await carregarDashboard();
   };
 
   const atualizarConta = async (evento) => {
@@ -1879,18 +1954,6 @@ function App() {
         </button>
         <button
           type="button"
-          className="nav-link"
-          onClick={() => {
-            voltarParaInicio();
-            document
-              .getElementById("livros")
-              ?.scrollIntoView({ behavior: "smooth" });
-          }}
-        >
-          Livros
-        </button>
-        <button
-          type="button"
           className={"nav-link" + (pagina === "materias" ? " active" : "")}
           onClick={irParaMaterias}
         >
@@ -1941,6 +2004,15 @@ function App() {
             onClick={irParaPedidos}
           >
             Pedidos
+          </button>
+        )}
+        {ehFuncionario && (
+          <button
+            type="button"
+            className={"nav-link" + (pagina === "dashboard" ? " active" : "")}
+            onClick={irParaDashboard}
+          >
+            Dashboard
           </button>
         )}
         {ehFuncionario && (
@@ -2745,6 +2817,124 @@ function App() {
                 )}
               </div>
             </div>
+          )}
+        </section>
+
+        {modalCadastroLivro}
+        {modalAutenticacao}
+      </div>
+    );
+  }
+
+  if (pagina === "dashboard") {
+    const totalReservas = dashboard
+      ? dashboard.reservas.reservadas +
+        dashboard.reservas.entregues +
+        dashboard.reservas.devolvidas +
+        dashboard.reservas.canceladas
+      : 0;
+
+    return (
+      <div className="app">
+        {cabecalho}
+
+        <section className="section pagina-dashboard">
+          <div className="section-header">
+            <div>
+              <span className="section-label">PAINEL</span>
+              <h2>Dashboard</h2>
+            </div>
+            <button type="button" className="link-button" onClick={irParaInicio}>
+              Voltar ao acervo →
+            </button>
+          </div>
+
+          <div className="dashboard-topo">
+            <p className="materias-sub">
+              Resumo do acervo, das reservas e das vendas da biblioteca.
+            </p>
+            {ehFuncionario && (
+              <button
+                type="button"
+                className="favoritar-button"
+                onClick={carregarDashboard}
+                disabled={carregandoPainel}
+              >
+                {carregandoPainel ? "Carregando..." : "Atualizar"}
+              </button>
+            )}
+          </div>
+
+          {erro && <p className="erro">{erro}</p>}
+
+          {!ehFuncionario && <p>Área restrita a funcionários.</p>}
+          {ehFuncionario && !dashboard && carregandoPainel && (
+            <p>Carregando dashboard...</p>
+          )}
+
+          {ehFuncionario && dashboard && (
+            <>
+              <h3 className="dashboard-titulo">Acervo</h3>
+              <div className="dashboard-numeros">
+                <div className="dashboard-numero">
+                  <small>Títulos ativos</small>
+                  <strong>{formatarNumero(dashboard.estoque.titulosAtivos)}</strong>
+                </div>
+                <div className="dashboard-numero">
+                  <small>Exemplares para reserva</small>
+                  <strong>
+                    {formatarNumero(dashboard.estoque.exemplaresParaReserva)}
+                  </strong>
+                </div>
+                <div className="dashboard-numero">
+                  <small>Exemplares à venda</small>
+                  <strong>
+                    {formatarNumero(dashboard.estoque.exemplaresParaCompra)}
+                  </strong>
+                </div>
+                <div className="dashboard-numero">
+                  <small>Títulos esgotados para reserva</small>
+                  <strong>
+                    {formatarNumero(dashboard.estoque.esgotadosParaReserva)}
+                  </strong>
+                </div>
+              </div>
+
+              <h3 className="dashboard-titulo">Reservas</h3>
+              <div className="dashboard-numeros">
+                {[
+                  ["RESERVADO", dashboard.reservas.reservadas],
+                  ["ENTREGUE", dashboard.reservas.entregues],
+                  ["DEVOLVIDO", dashboard.reservas.devolvidas],
+                  ["CANCELADO", dashboard.reservas.canceladas],
+                ].map(([status, quantidade]) => (
+                  <div className="dashboard-numero" key={status}>
+                    <span className={"reserva-status " + status.toLowerCase()}>
+                      {ROTULO_STATUS_RESERVA[status]}
+                    </span>
+                    <strong>{formatarNumero(quantidade)}</strong>
+                    <small>
+                      {formatarPorcentagem(quantidade, totalReservas)} do total
+                    </small>
+                  </div>
+                ))}
+              </div>
+
+              <div className="dashboard-graficos">
+                <GraficoMaterias
+                  titulo="Matérias mais reservadas"
+                  descricao="As 5 matérias com mais reservas."
+                  itens={dashboard.materiasMaisReservadas || []}
+                  unidade="reservas"
+                />
+                <GraficoMaterias
+                  titulo="Matérias mais compradas"
+                  descricao="Exemplares vendidos em pedidos aprovados."
+                  itens={dashboard.materiasMaisCompradas || []}
+                  unidade="exemplares"
+                />
+              </div>
+            </>
           )}
         </section>
 

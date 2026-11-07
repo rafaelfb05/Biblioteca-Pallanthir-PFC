@@ -1904,3 +1904,160 @@
   font-size: 13px;
   line-height: 1.5;
 }
+
+.dashboard-topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 10px;
+}
+
+.dashboard-topo .materias-sub {
+  margin-bottom: 0;
+}
+
+.dashboard-titulo {
+  margin: 30px 0 14px;
+  color: #ffffff;
+  font-size: 18px;
+}
+
+.dashboard-numeros {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.dashboard-numero {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 18px 20px;
+  border: 1px solid #26262d;
+  border-radius: 12px;
+  background: #131317;
+}
+
+.dashboard-numero small {
+  color: #8a8a93;
+  font-size: 13px;
+}
+
+.dashboard-numero strong {
+  color: #ffffff;
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.dashboard-graficos {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 30px;
+}
+
+.dashboard-card {
+  padding: 20px 22px;
+  border: 1px solid #26262d;
+  border-radius: 12px;
+  background: #131317;
+}
+
+.dashboard-card h3 {
+  margin: 0;
+  color: #ffffff;
+  font-size: 17px;
+}
+
+.dashboard-card-sub {
+  margin: 4px 0 18px;
+  color: #8a8a93;
+  font-size: 13px;
+}
+
+.dashboard-vazio {
+  color: #8a8a93;
+  font-size: 14px;
+}
+
+.dashboard-barras {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dashboard-barras li {
+  display: grid;
+  grid-template-columns: minmax(110px, 160px) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.dashboard-barra-rotulo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+  color: #cfcfd6;
+  font-size: 14px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.dashboard-barra-trilho {
+  display: block;
+  height: 10px;
+  border-radius: 0 4px 4px 0;
+  background: #1d1d23;
+}
+
+.dashboard-barra {
+  display: block;
+  height: 100%;
+  border-radius: 0 4px 4px 0;
+  background: #e51d2a;
+  transition: width 0.3s;
+}
+
+.dashboard-barras li:hover .dashboard-barra {
+  background: #ff3d48;
+}
+
+.dashboard-barra-valor {
+  min-width: 28px;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: right;
+}
+
+@media (max-width: 1000px) {
+  .dashboard-numeros {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-graficos {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .dashboard-topo {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .dashboard-numero strong {
+    font-size: 24px;
+  }
+
+  .dashboard-barras li {
+    grid-template-columns: minmax(90px, 120px) minmax(0, 1fr) auto;
+  }
+}
