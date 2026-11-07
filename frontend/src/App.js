@@ -3,11 +3,13 @@ import "./App.css";
 import ModalDocumento from "./Componentes/ModalDocumento";
 import {
   avaliacoesApi,
+  carrinhoApi,
   definirAoExpirarSessao,
   definirToken,
   lerDadosDoToken,
   livrosApi,
   logsApi,
+  pedidosApi,
   reservasApi,
   tokenExpirado,
   usuariosApi,
@@ -25,7 +27,13 @@ const ICONES_MATERIA = {
   BIOLOGIA: "🧬",
 };
 
-const FORM_LIVRO_VAZIO = { titulo: "", materia: "", preco: "", estoque: "1" };
+const FORM_LIVRO_VAZIO = {
+  titulo: "",
+  materia: "",
+  preco: "",
+  estoqueReserva: "1",
+  estoqueCompra: "0",
+};
 const FORM_USUARIO_VAZIO = {
   nome: "",
   email: "",
@@ -105,7 +113,15 @@ const TITULOS_AUTENTICACAO = {
   redefinir: "Redefinir senha",
 };
 
-const PAGINAS_PRIVADAS = ["favoritos", "reservas", "conta", "gestao", "logs"];
+const PAGINAS_PRIVADAS = [
+  "favoritos",
+  "reservas",
+  "carrinho",
+  "pedidos",
+  "conta",
+  "gestao",
+  "logs",
+];
 
 const mensagemDeErro = (erro, padrao) =>
   erro && erro.status && erro.message ? erro.message : padrao;
@@ -135,6 +151,45 @@ const ROTULO_STATUS_RESERVA = {
   DEVOLVIDO: "Devolvido",
   CANCELADO: "Cancelado",
 };
+
+const CARRINHO_VAZIO = { itens: [], total: 0 };
+const INTERVALO_ATUALIZACAO_PEDIDOS = 5 * 1000;
+const MAXIMO_ATUALIZACOES_PEDIDOS = 24;
+
+const ROTULO_STATUS_PEDIDO = {
+  AGUARDANDO_PAGAMENTO: "Aguardando pagamento",
+  APROVADO: "Aprovado",
+  EXPIRADO: "Expirado",
+};
+
+const RETORNOS_DE_PAGAMENTO = {
+  "/compra/sucesso": {
+    tipo: "sucesso",
+    aguardarConfirmacao: true,
+    mensagem:
+      "Recebemos o retorno do Mercado Pago. A confirmação do pagamento pode levar alguns instantes.",
+  },
+  "/compra/pendente": {
+    tipo: "pendente",
+    aguardarConfirmacao: true,
+    mensagem:
+      "Seu pagamento está pendente. O pedido será atualizado assim que o Mercado Pago confirmar.",
+  },
+  "/compra/falha": {
+    tipo: "falha",
+    aguardarConfirmacao: false,
+    mensagem:
+      "O pagamento não foi concluído. Você pode tentar novamente enquanto o pedido estiver aguardando pagamento.",
+  },
+};
+
+const lerRetornoDePagamento = () =>
+  RETORNOS_DE_PAGAMENTO[window.location.pathname.replace(/\/$/, "")] || null;
+
+const estoqueDeCompra = (livro) => Number(livro.estoqueCompra || 0);
+
+const podeSerComprado = (livro) =>
+  estoqueDeCompra(livro) > 0 && Number(livro.preco || 0) > 0;
 
 const formatarNota = (valor) => Number(valor || 0).toFixed(1);
 
@@ -412,7 +467,9 @@ function App() {
   const [erro, setErro] = useState(null);
   const [aviso, setAviso] = useState(null);
 
-  const [pagina, setPagina] = useState("inicio");
+  const [pagina, setPagina] = useState(() =>
+    lerRetornoDePagamento() ? "pedidos" : "inicio"
+  );
   const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState({ tipo: "todos" });
   const [resultado, setResultado] = useState([]);
@@ -422,6 +479,15 @@ function App() {
   const [favoritoEmEdicao, setFavoritoEmEdicao] = useState(null);
   const [reservas, setReservas] = useState([]);
   const [reservaEmEdicao, setReservaEmEdicao] = useState(null);
+  const [carrinho, setCarrinho] = useState(CARRINHO_VAZIO);
+  const [itemCarrinhoEmEdicao, setItemCarrinhoEmEdicao] = useState(null);
+  const [finalizandoCompra, setFinalizandoCompra] = useState(false);
+  const [pedidos, setPedidos] = useState([]);
+  const [carregandoPedidos, setCarregandoPedidos] = useState(true);
+  const [erroPedidos, setErroPedidos] = useState(null);
+  const [retornoPagamento, setRetornoPagamento] = useState(
+    lerRetornoDePagamento
+  );
 
   const [livroAbertoId, setLivroAbertoId] = useState(null);
   const [capaAmpliada, setCapaAmpliada] = useState(null);
@@ -516,6 +582,29 @@ function App() {
     }
   }, []);
 
+  const carregarCarrinho = useCallback(async () => {
+    try {
+      setCarrinho((await carrinhoApi.obter()) || CARRINHO_VAZIO);
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
+
+  const carregarPedidos = useCallback(async () => {
+    try {
+      setCarregandoPedidos(true);
+      setPedidos((await pedidosApi.listar()) || []);
+      setErroPedidos(null);
+    } catch (e) {
+      setErroPedidos(
+        mensagemDeErro(e, "Não foi possível carregar os seus pedidos.")
+      );
+      console.error(e);
+    } finally {
+      setCarregandoPedidos(false);
+    }
+  }, []);
+
   const carregarAvaliacoes = useCallback(async (livroId) => {
     try {
       setCarregandoAvaliacoes(true);
@@ -554,9 +643,11 @@ function App() {
       await Promise.all([
         carregarFavoritos(sessao.id),
         carregarReservas(sessao.id),
+        carregarCarrinho(),
+        carregarPedidos(),
       ]);
     },
-    [carregarFavoritos, carregarReservas]
+    [carregarFavoritos, carregarReservas, carregarCarrinho, carregarPedidos]
   );
 
   const ultimaAtividade = useRef(0);
@@ -573,6 +664,10 @@ function App() {
     setUsuario(null);
     setFavoritos([]);
     setReservas([]);
+    setCarrinho(CARRINHO_VAZIO);
+    setPedidos([]);
+    setErroPedidos(null);
+    setRetornoPagamento(null);
     setUsuariosGestao([]);
     setUsuarioGestao(null);
     setReservasGestao([]);
@@ -641,6 +736,38 @@ function App() {
     setResumoAvaliacoes(RESUMO_AVALIACOES_VAZIO);
     carregarAvaliacoes(livroAbertoId);
   }, [pagina, livroAbertoId, carregarAvaliacoes]);
+
+  useEffect(() => {
+    if (lerRetornoDePagamento()) {
+      window.history.replaceState(null, "", "/");
+    }
+  }, []);
+
+  const temPedidoAguardando = pedidos.some(
+    (pedido) => pedido.status === "AGUARDANDO_PAGAMENTO"
+  );
+  const aguardarConfirmacao = Boolean(
+    pagina === "pedidos" &&
+      ehEstudante &&
+      temPedidoAguardando &&
+      retornoPagamento &&
+      retornoPagamento.aguardarConfirmacao
+  );
+
+  useEffect(() => {
+    if (!aguardarConfirmacao) {
+      return undefined;
+    }
+    let atualizacoes = 0;
+    const intervalo = setInterval(() => {
+      atualizacoes += 1;
+      if (atualizacoes >= MAXIMO_ATUALIZACOES_PEDIDOS) {
+        clearInterval(intervalo);
+      }
+      carregarPedidos();
+    }, INTERVALO_ATUALIZACAO_PEDIDOS);
+    return () => clearInterval(intervalo);
+  }, [aguardarConfirmacao, carregarPedidos]);
 
   const minhaAvaliacao = useMemo(
     () =>
@@ -1124,6 +1251,120 @@ function App() {
     }
   };
 
+  const irParaCarrinho = async () => {
+    abrirPagina("carrinho");
+    if (ehEstudante) {
+      await carregarCarrinho();
+    }
+  };
+
+  const irParaPedidos = async () => {
+    abrirPagina("pedidos");
+    setRetornoPagamento(null);
+    if (ehEstudante) {
+      await carregarPedidos();
+    }
+  };
+
+  const adicionarAoCarrinho = async (livro) => {
+    if (!usuarioId) {
+      abrirAutenticacao("login");
+      return;
+    }
+    if (itemCarrinhoEmEdicao === livro.id) {
+      return;
+    }
+
+    const itemExistente = carrinho.itens.find(
+      (item) => item.livroId === livro.id
+    );
+
+    try {
+      setItemCarrinhoEmEdicao(livro.id);
+      setErro(null);
+      setCarrinho(
+        await carrinhoApi.definirQuantidade(
+          livro.id,
+          (itemExistente ? itemExistente.quantidade : 0) + 1
+        )
+      );
+      setAviso('"' + livro.titulo + '" foi adicionado ao carrinho.');
+    } catch (e) {
+      setErro(mensagemDeErro(e, "Não foi possível adicionar ao carrinho."));
+      console.error(e);
+    } finally {
+      setItemCarrinhoEmEdicao(null);
+    }
+  };
+
+  const alterarQuantidadeNoCarrinho = async (item, quantidade) => {
+    try {
+      setItemCarrinhoEmEdicao(item.livroId);
+      setErro(null);
+      setCarrinho(
+        await carrinhoApi.definirQuantidade(item.livroId, quantidade)
+      );
+    } catch (e) {
+      setErro(mensagemDeErro(e, "Não foi possível alterar a quantidade."));
+      console.error(e);
+    } finally {
+      setItemCarrinhoEmEdicao(null);
+    }
+  };
+
+  const removerDoCarrinho = async (item) => {
+    try {
+      setItemCarrinhoEmEdicao(item.livroId);
+      setErro(null);
+      setCarrinho(await carrinhoApi.remover(item.livroId));
+    } catch (e) {
+      setErro(mensagemDeErro(e, "Não foi possível remover o item."));
+      console.error(e);
+    } finally {
+      setItemCarrinhoEmEdicao(null);
+    }
+  };
+
+  const irParaMercadoPago = async (link) => {
+    try {
+      const resposta = await usuariosApi.renovarToken();
+      const sessao = {
+        ...usuario,
+        nome: resposta.usuario.nome,
+        token: resposta.token,
+      };
+      const agora = Date.now();
+      ultimaAtividade.current = agora;
+      salvarUltimaAtividade(agora);
+      salvarSessao(sessao);
+      definirToken(sessao.token);
+      setUsuario(sessao);
+    } catch (e) {
+      console.error(e);
+    }
+    window.location.assign(link);
+  };
+
+  const finalizarCompra = async () => {
+    if (finalizandoCompra) {
+      return;
+    }
+
+    try {
+      setFinalizandoCompra(true);
+      setErro(null);
+      const pedido = await pedidosApi.finalizarCompra();
+      setCarrinho(CARRINHO_VAZIO);
+      await irParaMercadoPago(pedido.linkPagamento);
+    } catch (e) {
+      console.error(e);
+      await Promise.all([carregarLivros(), carregarCarrinho()]);
+      setErro(mensagemDeErro(e, "Não foi possível finalizar a compra."));
+    } finally {
+      setFinalizandoCompra(false);
+    }
+  };
+
   const alternarFavorito = async (livro) => {
     if (!usuarioId) {
       setErro("Entre na sua conta para favoritar livros.");
@@ -1169,7 +1410,7 @@ function App() {
       abrirAutenticacao("login");
       return;
     }
-    if (Number(livro.estoque || 0) <= 0) {
+    if (Number(livro.estoqueReserva || 0) <= 0) {
       setErro("Este livro está sem estoque no momento.");
       return;
     }
@@ -1297,7 +1538,8 @@ function App() {
         formLivro.titulo.trim(),
         formLivro.materia,
         Number(String(formLivro.preco).replace(",", ".")) || 0,
-        Number(formLivro.estoque) || 0
+        Number(formLivro.estoqueReserva) || 0,
+        Number(formLivro.estoqueCompra) || 0
       );
       setFormLivro(FORM_LIVRO_VAZIO);
       setMostrarCadastroLivro(false);
@@ -1329,7 +1571,8 @@ function App() {
         numeroPagina: Number(formEdicao.numeroPagina) || 0,
         materia: nomeDaMateria(formEdicao.materia) || null,
         preco: Number(String(formEdicao.preco).replace(",", ".")) || 0,
-        estoque: Number(formEdicao.estoque) || 0,
+        estoqueReserva: Number(formEdicao.estoqueReserva) || 0,
+        estoqueCompra: Number(formEdicao.estoqueCompra) || 0,
       });
       setAviso('"' + atualizado.titulo + '" foi atualizado.');
       setFormEdicao({ ...atualizado });
@@ -1488,6 +1731,11 @@ function App() {
     [reservas]
   );
 
+  const quantidadeNoCarrinho = carrinho.itens.reduce(
+    (total, item) => total + item.quantidade,
+    0
+  );
+
   const mensagemListaVazia =
     filtro.tipo === "todos"
       ? "Nenhum livro cadastrado ainda."
@@ -1555,10 +1803,10 @@ function App() {
           <strong>{formatarPreco(livro.preco)}</strong>
           <span
             className={
-              "estoque" + (Number(livro.estoque || 0) <= 0 ? " esgotado" : "")
+              "estoque" + (Number(livro.estoqueReserva || 0) <= 0 ? " esgotado" : "")
             }
           >
-            {formatarEstoque(livro.estoque)}
+            {formatarEstoque(livro.estoqueReserva)}
           </span>
         </div>
         {!ehFuncionario && (
@@ -1570,10 +1818,27 @@ function App() {
               reservarLivro(livro);
             }}
             disabled={
-              reservaEmEdicao === livro.id || Number(livro.estoque || 0) <= 0
+              reservaEmEdicao === livro.id || Number(livro.estoqueReserva || 0) <= 0
             }
           >
-            {Number(livro.estoque || 0) <= 0 ? "Indisponível" : "Reservar"}
+            {Number(livro.estoqueReserva || 0) <= 0 ? "Indisponível" : "Reservar"}
+          </button>
+        )}
+        {!ehFuncionario && (
+          <button
+            type="button"
+            className="reservar-button"
+            onClick={(e) => {
+              e.stopPropagation();
+              adicionarAoCarrinho(livro);
+            }}
+            disabled={
+              itemCarrinhoEmEdicao === livro.id || !podeSerComprado(livro)
+            }
+          >
+            {podeSerComprado(livro)
+              ? "Adicionar ao carrinho"
+              : "Indisponível para compra"}
           </button>
         )}
       </div>
@@ -1643,6 +1908,25 @@ function App() {
             {reservasAtivas.length > 0 && "(" + reservasAtivas.length + ")"}
           </button>
         )}
+        {!ehFuncionario && (
+          <button
+            type="button"
+            className={"nav-link" + (pagina === "carrinho" ? " active" : "")}
+            onClick={irParaCarrinho}
+          >
+            Carrinho{" "}
+            {quantidadeNoCarrinho > 0 && "(" + quantidadeNoCarrinho + ")"}
+          </button>
+        )}
+        {!ehFuncionario && (
+          <button
+            type="button"
+            className={"nav-link" + (pagina === "pedidos" ? " active" : "")}
+            onClick={irParaPedidos}
+          >
+            Pedidos
+          </button>
+        )}
         {ehFuncionario && (
           <button
             type="button"
@@ -1670,6 +1954,19 @@ function App() {
             onClick={abrirCadastroLivro}
           >
             + Cadastrar livro
+          </button>
+        )}
+        {!ehFuncionario && (
+          <button
+            type="button"
+            className="carrinho-atalho"
+            onClick={irParaCarrinho}
+            aria-label={
+              "Carrinho" +
+              (quantidadeNoCarrinho > 0 ? " (" + quantidadeNoCarrinho + ")" : "")
+            }
+          >
+            🛒 {quantidadeNoCarrinho > 0 && quantidadeNoCarrinho}
           </button>
         )}
         {usuario ? (
@@ -1755,15 +2052,28 @@ function App() {
             />
           </label>
           <label>
-            Estoque
+            Estoque para reserva
             <input
               type="number"
               min="0"
               step="1"
-              placeholder="Quantidade em estoque"
-              value={formLivro.estoque}
+              placeholder="Quantidade disponível para reserva"
+              value={formLivro.estoqueReserva}
               onChange={(e) =>
-                setFormLivro({ ...formLivro, estoque: e.target.value })
+                setFormLivro({ ...formLivro, estoqueReserva: e.target.value })
+              }
+            />
+          </label>
+          <label>
+            Estoque para compra
+            <input
+              type="number"
+              min="0"
+              step="1"
+              placeholder="Quantidade disponível para venda"
+              value={formLivro.estoqueCompra}
+              onChange={(e) =>
+                setFormLivro({ ...formLivro, estoqueCompra: e.target.value })
               }
             />
           </label>
@@ -2737,6 +3047,276 @@ function App() {
     );
   }
 
+  if (pagina === "carrinho") {
+    return (
+      <div className="app">
+        {cabecalho}
+
+        <section className="section pagina-reservas">
+          <div className="section-header">
+            <div>
+              <span className="section-label">SUA COMPRA</span>
+              <h2>Meu carrinho</h2>
+            </div>
+            <div className="carrinho-links">
+              <button
+                type="button"
+                className="link-button"
+                onClick={irParaPedidos}
+              >
+                Meus pedidos
+              </button>
+              <button
+                type="button"
+                className="link-button"
+                onClick={irParaInicio}
+              >
+                Voltar ao acervo →
+              </button>
+            </div>
+          </div>
+
+          {aviso && (
+            <p className="aviso" onAnimationEnd={() => setAviso(null)}>
+              {aviso}
+            </p>
+          )}
+          {erro && <p className="erro">{erro}</p>}
+
+          {!usuario && (
+            <p>
+              <button
+                type="button"
+                className="link-button"
+                onClick={() => abrirAutenticacao("login")}
+              >
+                Entre na sua conta
+              </button>{" "}
+              para ver o seu carrinho.
+            </p>
+          )}
+          {usuario && !ehEstudante && (
+            <p>As compras estão disponíveis apenas para estudantes.</p>
+          )}
+          {ehEstudante && carrinho.itens.length === 0 && (
+            <p>Seu carrinho está vazio.</p>
+          )}
+
+          {ehEstudante && carrinho.itens.length > 0 && (
+            <>
+              <div className="reservas">
+                {carrinho.itens.map((item) => (
+                  <div className="reserva-card carrinho-item" key={item.livroId}>
+                    <div className="carrinho-capa">
+                      {item.capaUrl ? (
+                        <img
+                          src={capaNaResolucao(item.capaUrl, ZOOM_CAPA_CARTAO)}
+                          alt={"Capa de " + item.titulo}
+                          loading="lazy"
+                        />
+                      ) : (
+                        <CapaGenerica titulo={item.titulo} tamanho="cartao" />
+                      )}
+                    </div>
+                    <div className="reserva-info carrinho-info">
+                      <h3>{item.titulo}</h3>
+                      <small>{formatarPreco(item.precoUnitario)} por unidade</small>
+                    </div>
+                    <div
+                      className="carrinho-quantidade"
+                      role="group"
+                      aria-label={"Quantidade de " + item.titulo}
+                    >
+                      <button
+                        type="button"
+                        onClick={() =>
+                          alterarQuantidadeNoCarrinho(item, item.quantidade - 1)
+                        }
+                        disabled={
+                          itemCarrinhoEmEdicao === item.livroId ||
+                          item.quantidade <= 1
+                        }
+                        aria-label="Diminuir quantidade"
+                      >
+                        −
+                      </button>
+                      <span>{item.quantidade}</span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          alterarQuantidadeNoCarrinho(item, item.quantidade + 1)
+                        }
+                        disabled={itemCarrinhoEmEdicao === item.livroId}
+                        aria-label="Aumentar quantidade"
+                      >
+                        +
+                      </button>
+                    </div>
+                    <strong className="carrinho-subtotal">
+                      {formatarPreco(item.subtotal)}
+                    </strong>
+                    <div className="reserva-acoes">
+                      <button
+                        type="button"
+                        className="reservar-button cancelar"
+                        onClick={() => removerDoCarrinho(item)}
+                        disabled={itemCarrinhoEmEdicao === item.livroId}
+                      >
+                        Remover
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="carrinho-resumo">
+                <div>
+                  <small>Total</small>
+                  <strong>{formatarPreco(carrinho.total)}</strong>
+                </div>
+                <p className="materias-sub">
+                  Você será levado ao Mercado Pago para concluir o pagamento. Os
+                  itens ficam separados por 30 minutos.
+                </p>
+                <button
+                  type="button"
+                  className="reservar-button"
+                  onClick={finalizarCompra}
+                  disabled={finalizandoCompra}
+                >
+                  {finalizandoCompra
+                    ? "Redirecionando..."
+                    : "Pagar com Mercado Pago"}
+                </button>
+              </div>
+            </>
+          )}
+        </section>
+
+        {modalCadastroLivro}
+        {modalAutenticacao}
+      </div>
+    );
+  }
+
+  if (pagina === "pedidos") {
+    return (
+      <div className="app">
+        {cabecalho}
+
+        <section className="section pagina-reservas">
+          <div className="section-header">
+            <div>
+              <span className="section-label">SUAS COMPRAS</span>
+              <h2>Meus pedidos</h2>
+            </div>
+            <button type="button" className="link-button" onClick={irParaInicio}>
+              Voltar ao acervo →
+            </button>
+          </div>
+
+          {retornoPagamento && (
+            <p className={"retorno-pagamento " + retornoPagamento.tipo}>
+              {retornoPagamento.mensagem}
+            </p>
+          )}
+          {aviso && (
+            <p className="aviso" onAnimationEnd={() => setAviso(null)}>
+              {aviso}
+            </p>
+          )}
+          {erro && <p className="erro">{erro}</p>}
+          {ehEstudante && erroPedidos && <p className="erro">{erroPedidos}</p>}
+
+          {!usuario && (
+            <p>
+              <button
+                type="button"
+                className="link-button"
+                onClick={() => abrirAutenticacao("login")}
+              >
+                Entre na sua conta
+              </button>{" "}
+              {retornoPagamento
+                ? "para ver o status da compra. O fim da sessão não afeta o seu pagamento."
+                : "para ver os seus pedidos."}
+            </p>
+          )}
+          {usuario && !ehEstudante && (
+            <p>As compras estão disponíveis apenas para estudantes.</p>
+          )}
+          {ehEstudante && pedidos.length === 0 && carregandoPedidos && (
+            <p>Carregando pedidos...</p>
+          )}
+          {ehEstudante &&
+            pedidos.length === 0 &&
+            !carregandoPedidos &&
+            !erroPedidos && <p>Você ainda não fez nenhum pedido.</p>}
+
+          {ehEstudante && pedidos.length > 0 && (
+            <div className="reservas">
+              {pedidos.map((pedido) => (
+                <div className="reserva-card" key={pedido.id}>
+                  <div className="reserva-info">
+                    <span
+                      className={
+                        "reserva-status " + pedido.status.toLowerCase()
+                      }
+                    >
+                      {ROTULO_STATUS_PEDIDO[pedido.status] || pedido.status}
+                    </span>
+                    <h3>Pedido #{pedido.id}</h3>
+                    <small>Feito em {formatarData(pedido.dataCriacao)}</small>
+                    <ul className="pedido-itens">
+                      {(pedido.itens || []).map((item) => (
+                        <li key={item.livroId}>
+                          {item.quantidade}x {item.titulo} ·{" "}
+                          {formatarPreco(item.precoUnitario)}
+                        </li>
+                      ))}
+                    </ul>
+                    {pedido.status === "AGUARDANDO_PAGAMENTO" && (
+                      <small>
+                        Pague até {formatarData(pedido.dataExpiracao)}
+                      </small>
+                    )}
+                    {pedido.status === "EXPIRADO" && (
+                      <small>
+                        O prazo de pagamento terminou ou o pagamento foi
+                        cancelado.
+                      </small>
+                    )}
+                  </div>
+
+                  <div className="pedido-lateral">
+                    <strong className="carrinho-subtotal">
+                      {formatarPreco(pedido.total)}
+                    </strong>
+                    {pedido.status === "AGUARDANDO_PAGAMENTO" &&
+                      pedido.linkPagamento && (
+                        <button
+                          type="button"
+                          className="reservar-button"
+                          onClick={() =>
+                            irParaMercadoPago(pedido.linkPagamento)
+                          }
+                        >
+                          Pagar com Mercado Pago
+                        </button>
+                      )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {modalCadastroLivro}
+        {modalAutenticacao}
+      </div>
+    );
+  }
+
   if (pagina === "favoritos") {
     return (
       <div className="app">
@@ -2857,8 +3437,12 @@ function App() {
                   </strong>
                 </div>
                 <div>
-                  <small>Estoque</small>
-                  <strong>{formatarEstoque(livroAberto.estoque)}</strong>
+                  <small>Para reserva</small>
+                  <strong>{formatarEstoque(livroAberto.estoqueReserva)}</strong>
+                </div>
+                <div>
+                  <small>Para compra</small>
+                  <strong>{formatarEstoque(livroAberto.estoqueCompra)}</strong>
                 </div>
               </div>
 
@@ -2894,12 +3478,27 @@ function App() {
                     onClick={() => reservarLivro(livroAberto)}
                     disabled={
                       reservaEmEdicao === livroAberto.id ||
-                      Number(livroAberto.estoque || 0) <= 0
+                      Number(livroAberto.estoqueReserva || 0) <= 0
                     }
                   >
-                    {Number(livroAberto.estoque || 0) <= 0
+                    {Number(livroAberto.estoqueReserva || 0) <= 0
                       ? "Sem estoque"
                       : "Reservar livro"}
+                  </button>
+                )}
+                {!ehFuncionario && (
+                  <button
+                    type="button"
+                    className="reservar-button"
+                    onClick={() => adicionarAoCarrinho(livroAberto)}
+                    disabled={
+                      itemCarrinhoEmEdicao === livroAberto.id ||
+                      !podeSerComprado(livroAberto)
+                    }
+                  >
+                    {podeSerComprado(livroAberto)
+                      ? "Adicionar ao carrinho"
+                      : "Indisponível para compra"}
                   </button>
                 )}
                 {ehFuncionario && (
@@ -3113,19 +3712,42 @@ function App() {
                   />
                 </label>
                 <label>
-                  Estoque
+                  Estoque para reserva
                   <input
                     type="number"
                     min="0"
                     step="1"
                     value={
-                      formEdicao.estoque === undefined ||
-                      formEdicao.estoque === null
+                      formEdicao.estoqueReserva === undefined ||
+                      formEdicao.estoqueReserva === null
                         ? 0
-                        : formEdicao.estoque
+                        : formEdicao.estoqueReserva
                     }
                     onChange={(e) =>
-                      setFormEdicao({ ...formEdicao, estoque: e.target.value })
+                      setFormEdicao({
+                        ...formEdicao,
+                        estoqueReserva: e.target.value,
+                      })
+                    }
+                  />
+                </label>
+                <label>
+                  Estoque para compra
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={
+                      formEdicao.estoqueCompra === undefined ||
+                      formEdicao.estoqueCompra === null
+                        ? 0
+                        : formEdicao.estoqueCompra
+                    }
+                    onChange={(e) =>
+                      setFormEdicao({
+                        ...formEdicao,
+                        estoqueCompra: e.target.value,
+                      })
                     }
                   />
                 </label>
