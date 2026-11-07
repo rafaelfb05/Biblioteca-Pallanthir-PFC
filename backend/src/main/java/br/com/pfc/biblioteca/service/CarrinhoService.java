@@ -10,7 +10,9 @@ import br.com.pfc.biblioteca.infra.exception.ConflitoException;
 import br.com.pfc.biblioteca.infra.exception.RecursoNaoEncontradoException;
 import br.com.pfc.biblioteca.infra.exception.RegraDeNegocioException;
 import br.com.pfc.biblioteca.repository.ItemCarrinhoRepository;
+import br.com.pfc.biblioteca.enums.StatusPedido;
 import br.com.pfc.biblioteca.repository.LivroRepository;
+import br.com.pfc.biblioteca.repository.PedidoRepository;
 import br.com.pfc.biblioteca.repository.UsuarioRepository;
 
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -28,16 +30,19 @@ public class CarrinhoService {
     private final ItemCarrinhoRepository repository;
     private final LivroRepository livroRepository;
     private final UsuarioRepository usuarioRepository;
+    private final PedidoRepository pedidoRepository;
 
-    public CarrinhoService(ItemCarrinhoRepository repository, LivroRepository livroRepository, UsuarioRepository usuarioRepository) {
+    public CarrinhoService(ItemCarrinhoRepository repository, LivroRepository livroRepository, UsuarioRepository usuarioRepository, PedidoRepository pedidoRepository) {
         this.repository = repository;
         this.livroRepository = livroRepository;
         this.usuarioRepository = usuarioRepository;
+        this.pedidoRepository = pedidoRepository;
     }
 
     @Transactional
     public CarrinhoDTO adicionar(AdicionarCarrinhoRequest request){
         Usuario usuario = usuarioLogado();
+        validarSemPedidoAguardando(usuario);
 
         Livro livro = livroRepository.findById(request.livroId())
                 .filter(Livro::isAtivo)
@@ -65,6 +70,7 @@ public class CarrinhoService {
     @Transactional
     public CarrinhoDTO remover(Long livroId){
         Usuario usuario = usuarioLogado();
+        validarSemPedidoAguardando(usuario);
         ItemCarrinho item = repository.findByUsuarioIdAndLivroId(usuario.getId(), livroId)
                 .filter(ItemCarrinho::isAtivo)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Item não encontrado no carrinho"));
@@ -91,6 +97,12 @@ public class CarrinhoService {
         BigDecimal total = itens.stream().map(ItemCarrinhoDTO::subtotal)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         return new CarrinhoDTO(itens, total);
+    }
+
+    private void validarSemPedidoAguardando(Usuario usuario){
+        if (pedidoRepository.existsByUsuarioIdAndStatus(usuario.getId(), StatusPedido.AGUARDANDO_PAGAMENTO)) {
+            throw new ConflitoException("O carrinho não pode ser alterado enquanto há um pedido aguardando pagamento");
+        }
     }
 
     private Usuario usuarioLogado(){

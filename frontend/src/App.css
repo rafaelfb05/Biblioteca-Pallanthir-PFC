@@ -959,6 +959,14 @@
   color: #ffffff;
 }
 
+.reservar-button.cancelar:disabled,
+.reservar-button.cancelar:disabled:hover {
+  border-color: #3a3a42;
+  background: transparent;
+  color: #6c6c75;
+  cursor: not-allowed;
+}
+
 .livro-acoes .reservar-button {
   width: auto;
   margin-top: 0;

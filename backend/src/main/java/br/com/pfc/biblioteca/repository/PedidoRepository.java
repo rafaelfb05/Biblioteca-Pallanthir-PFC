@@ -17,6 +17,10 @@ public interface PedidoRepository extends JpaRepository<Pedido, Long> {
 
     List<Pedido> findByUsuarioIdOrderByDataCriacaoDesc(Long usuarioId);
 
+    List<Pedido> findByUsuarioIdAndStatus(Long usuarioId, StatusPedido status);
+
+    boolean existsByUsuarioIdAndStatus(Long usuarioId, StatusPedido status);
+
     List<Pedido> findByStatusAndDataExpiracaoBefore(StatusPedido status, LocalDateTime limite);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
