@@ -22,6 +22,8 @@ import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
 import java.util.HexFormat;
+import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 
 @Service
@@ -129,13 +131,18 @@ public class MercadoPagoService {
         if (ts == null || v1 == null) return false;
 
         try {
-            String manifesto = "id:" + dataId + ";request-id:" + requestId + ";ts:" + ts + ";";
             Mac mac = Mac.getInstance("HmacSHA256");
             mac.init(new SecretKeySpec(webhookSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
-            String esperado = HexFormat.of().formatHex(
-                    mac.doFinal(manifesto.getBytes(StandardCharsets.UTF_8)));
-            return MessageDigest.isEqual(
-                    esperado.getBytes(StandardCharsets.UTF_8), v1.getBytes(StandardCharsets.UTF_8));
+            for (String id : List.of(dataId.toLowerCase(Locale.ROOT), dataId)) {
+                String manifesto = "id:" + id + ";request-id:" + requestId + ";ts:" + ts + ";";
+                String esperado = HexFormat.of().formatHex(
+                        mac.doFinal(manifesto.getBytes(StandardCharsets.UTF_8)));
+                if (MessageDigest.isEqual(
+                        esperado.getBytes(StandardCharsets.UTF_8), v1.getBytes(StandardCharsets.UTF_8))) {
+                    return true;
+                }
+            }
+            return false;
         } catch (GeneralSecurityException e) {
             return false;
         }

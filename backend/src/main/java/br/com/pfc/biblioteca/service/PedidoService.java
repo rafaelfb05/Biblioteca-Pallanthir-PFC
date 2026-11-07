@@ -25,6 +25,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -57,6 +58,9 @@ public class PedidoService {
         if(itensCarrinho.isEmpty()){
             throw new RegraDeNegocioException("O carrinho está vazio");
         }
+        if (repository.existsByUsuarioIdAndStatus(usuario.getId(), StatusPedido.AGUARDANDO_PAGAMENTO)) {
+            throw new ConflitoException("Você já tem um pedido aguardando pagamento");
+        }
 
         itensCarrinho.sort(Comparator.comparing(ic -> ic.getLivro().getId()));
         Pedido pedido = new Pedido(usuario);
@@ -82,7 +86,6 @@ public class PedidoService {
 
             pedido.adicionarItem(new ItemPedido(pedido, livro, ic.getQuantidade(), preco));
             total = total.add(preco.multiply(BigDecimal.valueOf(ic.getQuantidade())));
-            ic.setAtivo(false);
         }
 
             pedido.setTotal(total);
@@ -93,21 +96,23 @@ public class PedidoService {
             pedido.setMpOrderId(order.id());
             pedido.setLinkPagamento(order.checkoutUrl());
             repository.save(pedido);
-            itemCarrinhoRepository.saveAll(itensCarrinho);
 
             logService.registrarLog(usuario.getId(), usuario.getEmail(), "PEDIDO_CRIADO",
                     "Pedido: " + pedido.getId() + ", total: " + total);
             return new PedidoDTO(pedido);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<PedidoDTO> meusPedidos(){
-        return repository.findByUsuarioIdOrderByDataCriacaoDesc(usuarioLogado().getId())
+        Long usuarioId = usuarioLogado().getId();
+        repository.findByUsuarioIdAndStatus(usuarioId, StatusPedido.AGUARDANDO_PAGAMENTO)
+                .forEach(this::sincronizarComMercadoPago);
+        return repository.findByUsuarioIdOrderByDataCriacaoDesc(usuarioId)
                 .stream().map(PedidoDTO::new)
                 .collect(Collectors.toList());
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public PedidoDTO obterPedido(Long id){
         Usuario usuario = usuarioLogado();
         Pedido pedido = repository.findById(id)
@@ -116,7 +121,20 @@ public class PedidoService {
         if(!pedido.getUsuario().getId().equals(usuario.getId())){
             throw new RegraDeNegocioException("Você só pode ver os seus próprios pedidos");
         }
+        if (pedido.getStatus() == StatusPedido.AGUARDANDO_PAGAMENTO) {
+            sincronizarComMercadoPago(pedido);
+        }
         return new PedidoDTO(pedido);
+    }
+
+    private void sincronizarComMercadoPago(Pedido pedido) {
+        if (pedido.getMpOrderId() == null || pedido.getMpOrderId().isBlank()) return;
+        try {
+            processarNotificacao(pedido.getMpOrderId());
+        } catch (RuntimeException e) {
+            log.warn("Não foi possível consultar a order {} do pedido {}: {}",
+                    pedido.getMpOrderId(), pedido.getId(), e.getMessage());
+        }
     }
 
     @Transactional
@@ -141,6 +159,7 @@ public class PedidoService {
         if (pago) {
             pedido.setStatus(StatusPedido.APROVADO);
             repository.save(pedido);
+            removerDoCarrinho(pedido);
             logService.registrarLog(pedido.getUsuario().getId(), pedido.getUsuario().getEmail(),
                     "PAGAMENTO_APROVADO", "Pedido " + pedido.getId() + ", order " + orderId);
         } else if ("canceled".equals(order.status())) {
@@ -171,8 +190,21 @@ public class PedidoService {
         }
         pedido.setStatus(StatusPedido.EXPIRADO);
         repository.save(pedido);
+        removerDoCarrinho(pedido);
         logService.registrarLog(pedido.getUsuario().getId(), pedido.getUsuario().getEmail(),
                 "PEDIDO_EXPIRADO", "Pedido " + pedido.getId());
+    }
+
+    private void removerDoCarrinho(Pedido pedido) {
+        Set<Long> livrosDoPedido = pedido.getItens().stream()
+                .map(item -> item.getLivro().getId())
+                .collect(Collectors.toSet());
+        List<ItemCarrinho> itens = itemCarrinhoRepository
+                .findByUsuarioIdAndAtivoTrue(pedido.getUsuario().getId()).stream()
+                .filter(item -> livrosDoPedido.contains(item.getLivro().getId()))
+                .collect(Collectors.toList());
+        itens.forEach(item -> item.setAtivo(false));
+        itemCarrinhoRepository.saveAll(itens);
     }
 
     private Usuario usuarioLogado(){

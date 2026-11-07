@@ -743,9 +743,18 @@ function App() {
     }
   }, []);
 
-  const temPedidoAguardando = pedidos.some(
-    (pedido) => pedido.status === "AGUARDANDO_PAGAMENTO"
-  );
+  const pedidoAguardando =
+    pedidos.find((pedido) => pedido.status === "AGUARDANDO_PAGAMENTO") ||
+    null;
+  const temPedidoAguardando = Boolean(pedidoAguardando);
+  const tinhaPedidoAguardando = useRef(false);
+
+  useEffect(() => {
+    if (tinhaPedidoAguardando.current && !temPedidoAguardando && ehEstudante) {
+      carregarCarrinho();
+    }
+    tinhaPedidoAguardando.current = temPedidoAguardando;
+  }, [temPedidoAguardando, ehEstudante, carregarCarrinho]);
   const aguardarConfirmacao = Boolean(
     pagina === "pedidos" &&
       ehEstudante &&
@@ -1254,7 +1263,7 @@ function App() {
   const irParaCarrinho = async () => {
     abrirPagina("carrinho");
     if (ehEstudante) {
-      await carregarCarrinho();
+      await Promise.all([carregarCarrinho(), carregarPedidos()]);
     }
   };
 
@@ -1353,12 +1362,19 @@ function App() {
     try {
       setFinalizandoCompra(true);
       setErro(null);
+      if (pedidoAguardando && pedidoAguardando.linkPagamento) {
+        await irParaMercadoPago(pedidoAguardando.linkPagamento);
+        return;
+      }
       const pedido = await pedidosApi.finalizarCompra();
-      setCarrinho(CARRINHO_VAZIO);
       await irParaMercadoPago(pedido.linkPagamento);
     } catch (e) {
       console.error(e);
-      await Promise.all([carregarLivros(), carregarCarrinho()]);
+      await Promise.all([
+        carregarLivros(),
+        carregarCarrinho(),
+        carregarPedidos(),
+      ]);
       setErro(mensagemDeErro(e, "Não foi possível finalizar a compra."));
     } finally {
       setFinalizandoCompra(false);
@@ -3102,6 +3118,14 @@ function App() {
             <p>Seu carrinho está vazio.</p>
           )}
 
+          {ehEstudante && carrinho.itens.length > 0 && pedidoAguardando && (
+            <p className="retorno-pagamento pendente">
+              O pedido #{pedidoAguardando.id} está aguardando pagamento até{" "}
+              {formatarData(pedidoAguardando.dataExpiracao)}. Os itens saem do
+              carrinho quando o pagamento for aprovado ou o prazo terminar.
+            </p>
+          )}
+
           {ehEstudante && carrinho.itens.length > 0 && (
             <>
               <div className="reservas">
@@ -3133,6 +3157,7 @@ function App() {
                           alterarQuantidadeNoCarrinho(item, item.quantidade - 1)
                         }
                         disabled={
+                          temPedidoAguardando ||
                           itemCarrinhoEmEdicao === item.livroId ||
                           item.quantidade <= 1
                         }
@@ -3146,7 +3171,10 @@ function App() {
                         onClick={() =>
                           alterarQuantidadeNoCarrinho(item, item.quantidade + 1)
                         }
-                        disabled={itemCarrinhoEmEdicao === item.livroId}
+                        disabled={
+                          temPedidoAguardando ||
+                          itemCarrinhoEmEdicao === item.livroId
+                        }
                         aria-label="Aumentar quantidade"
                       >
                         +
@@ -3160,7 +3188,10 @@ function App() {
                         type="button"
                         className="reservar-button cancelar"
                         onClick={() => removerDoCarrinho(item)}
-                        disabled={itemCarrinhoEmEdicao === item.livroId}
+                        disabled={
+                          temPedidoAguardando ||
+                          itemCarrinhoEmEdicao === item.livroId
+                        }
                       >
                         Remover
                       </button>
@@ -3175,8 +3206,9 @@ function App() {
                   <strong>{formatarPreco(carrinho.total)}</strong>
                 </div>
                 <p className="materias-sub">
-                  Você será levado ao Mercado Pago para concluir o pagamento. Os
-                  itens ficam separados por 30 minutos.
+                  {pedidoAguardando
+                    ? "Continue o pagamento do pedido em andamento no Mercado Pago."
+                    : "Você será levado ao Mercado Pago para concluir o pagamento. Os itens ficam separados por 30 minutos."}
                 </p>
                 <button
                   type="button"
