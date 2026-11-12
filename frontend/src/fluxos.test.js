@@ -49,7 +49,7 @@ let chamadas;
 const simularApi = (rotasExtras = {}) => {
   chamadas = [];
   const rotas = {
-    "GET /livros": () => [200, [livro(ID_LIVRO, "Clean Code"), livro(ID_LIVRO_SEM_VENDA, "Sem Venda", { estoqueCompra: 0 })]],
+    "GET /livros": () => [200, [livro(ID_LIVRO, "Clean Code", { isbn10: "8595084742", isbn13: "9788595084742" }), livro(ID_LIVRO_SEM_VENDA, "Sem Venda", { estoqueCompra: 0 })]],
     "GET /livros/materias": () => [200, [{ nome: "TI", rotulo: "Ti", quantidade: 2 }]],
     ["GET /usuarios/" + ID_USUARIO + "/favoritos"]: () => [200, []],
     ["GET /reservas/usuario/" + ID_USUARIO]: () => [200, []],
@@ -242,6 +242,17 @@ test("sessão antiga com id numérico é descartada", async () => {
   expect(await screen.findByRole("button", { name: "Entrar" })).toBeInTheDocument();
   expect(localStorage.getItem("pallanthir:usuario")).toBeNull();
   expect(chamadas.some((c) => c.caminho.includes("/usuarios/1/"))).toBe(false);
+});
+
+test("página do livro mostra os ISBNs e traço quando não há", async () => {
+  simularApi({ ["GET /avaliacoes/livro/" + ID_LIVRO]: () => [200, { media: 0, total: 0, avaliacoes: [] }] });
+  render(<App />);
+
+  fireEvent.click(await screen.findByRole("heading", { name: "Clean Code" }));
+
+  expect(await screen.findByText("ISBN-10")).toBeInTheDocument();
+  expect(screen.getByText("8595084742")).toBeInTheDocument();
+  expect(screen.getByText("978-8595084742")).toBeInTheDocument();
 });
 
 test("funcionário vê a dashboard e não vê carrinho nem pedidos", async () => {

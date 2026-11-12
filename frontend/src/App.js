@@ -61,6 +61,13 @@ const CHAVE_SESSAO = "pallanthir:usuario";
 const FORMATO_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const numeroDoPedido = (id) => String(id).slice(0, 8).toUpperCase();
+
+const formatarIsbn13 = (isbn) => {
+  if (!isbn) {
+    return "—";
+  }
+  return /^97[89]\d{10}$/.test(isbn) ? isbn.slice(0, 3) + "-" + isbn.slice(3) : isbn;
+};
 const CHAVE_ULTIMA_ATIVIDADE = "pallanthir:ultimaAtividade";
 const TEMPO_LIMITE_INATIVIDADE = 15 * 60 * 1000;
 const RENOVAR_TOKEN_ANTES_DE = 5 * 60 * 1000;
@@ -1668,6 +1675,8 @@ function App() {
         preco: Number(String(formEdicao.preco).replace(",", ".")) || 0,
         estoqueReserva: Number(formEdicao.estoqueReserva) || 0,
         estoqueCompra: Number(formEdicao.estoqueCompra) || 0,
+        isbn10: formEdicao.isbn10 || "",
+        isbn13: formEdicao.isbn13 || "",
       });
       setAviso('"' + atualizado.titulo + '" foi atualizado.');
       setFormEdicao({ ...atualizado });
@@ -3670,6 +3679,14 @@ function App() {
                   <small>Para compra</small>
                   <strong>{formatarEstoque(livroAberto.estoqueCompra)}</strong>
                 </div>
+                <div>
+                  <small>ISBN-10</small>
+                  <strong>{livroAberto.isbn10 || "—"}</strong>
+                </div>
+                <div>
+                  <small>ISBN-13</small>
+                  <strong>{formatarIsbn13(livroAberto.isbn13)}</strong>
+                </div>
               </div>
 
               <div className="livro-acoes">
@@ -3974,6 +3991,30 @@ function App() {
                         ...formEdicao,
                         estoqueCompra: e.target.value,
                       })
+                    }
+                  />
+                </label>
+                <label>
+                  ISBN-10
+                  <input
+                    type="text"
+                    maxLength={13}
+                    placeholder="Ex.: 8595084742"
+                    value={formEdicao.isbn10 || ""}
+                    onChange={(e) =>
+                      setFormEdicao({ ...formEdicao, isbn10: e.target.value })
+                    }
+                  />
+                </label>
+                <label>
+                  ISBN-13
+                  <input
+                    type="text"
+                    maxLength={17}
+                    placeholder="Ex.: 978-8595084742"
+                    value={formEdicao.isbn13 || ""}
+                    onChange={(e) =>
+                      setFormEdicao({ ...formEdicao, isbn13: e.target.value })
                     }
                   />
                 </label>

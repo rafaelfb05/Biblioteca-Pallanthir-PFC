@@ -24,6 +24,10 @@ public class Livro {
     private Integer estoqueReserva = 1;
     private Integer estoqueCompra = 0;
     private Double preco = 0.0;
+    @Column(length = 10)
+    private String isbn10;
+    @Column(length = 13)
+    private String isbn13;
     @Column(nullable = false)
     @ColumnDefault("true")
     private boolean ativo = true;
@@ -45,6 +49,24 @@ public class Livro {
         } else {
             this.capaUrl = dados.imagem().capaUrl();
         }
+        this.isbn10 = dados.isbn("ISBN_10");
+        this.isbn13 = dados.isbn("ISBN_13");
+    }
+
+    public String getIsbn10() {
+        return isbn10;
+    }
+
+    public void setIsbn10(String isbn10) {
+        this.isbn10 = isbn10;
+    }
+
+    public String getIsbn13() {
+        return isbn13;
+    }
+
+    public void setIsbn13(String isbn13) {
+        this.isbn13 = isbn13;
     }
 
     public UUID getId() {

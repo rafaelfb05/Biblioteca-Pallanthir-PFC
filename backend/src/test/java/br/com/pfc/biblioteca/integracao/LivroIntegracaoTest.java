@@ -46,7 +46,9 @@ class LivroIntegracaoTest extends TesteIntegracaoBase {
                 }
                 return "{\"items\":[{\"volumeInfo\":{\"title\":" + texto(titulo) + ",\"authors\":[\"J. R. R. Tolkien\"],"
                         + "\"publishedDate\":\"1937\",\"pageCount\":310,"
-                        + "\"imageLinks\":{\"thumbnail\":\"http://books.google.com/capa.jpg\"}}}]}";
+                        + "\"imageLinks\":{\"thumbnail\":\"http://books.google.com/capa.jpg\"},"
+                        + "\"industryIdentifiers\":[{\"type\":\"ISBN_10\",\"identifier\":\"8595084742\"},"
+                        + "{\"type\":\"ISBN_13\",\"identifier\":\"9788595084742\"}]}}]}";
             }
         });
     }
@@ -96,7 +98,29 @@ class LivroIntegracaoTest extends TesteIntegracaoBase {
         assertThat(resposta.corpo().path("numeroPagina").asInt()).isEqualTo(310);
         assertThat(resposta.corpo().path("estoqueReserva").asInt()).isEqualTo(2);
         assertThat(resposta.corpo().path("estoqueCompra").asInt()).isEqualTo(3);
+        assertThat(resposta.corpo().path("isbn10").asText()).isEqualTo("8595084742");
+        assertThat(resposta.corpo().path("isbn13").asText()).isEqualTo("9788595084742");
         assertThat(catalogoContem(resposta.corpo().path("id").asText())).isTrue();
+    }
+
+    @Test
+    void edicaoDeIsbnAceitaHifenRecusaFormatoInvalidoEApagaQuandoVazio() {
+        Livro livro = criarLivro(50, 1, 0);
+        String funcionario = token(criarFuncionario());
+
+        Resposta comHifen = put("/livros/atualizar/" + livro.getId(), funcionario, Map.of("isbn10", "85-950-8474-x", "isbn13", "978-85-950-8474-2"));
+        assertThat(comHifen.status()).isEqualTo(200);
+        assertThat(comHifen.corpo().path("isbn10").asText()).isEqualTo("859508474X");
+        assertThat(comHifen.corpo().path("isbn13").asText()).isEqualTo("9788595084742");
+
+        assertThat(put("/livros/atualizar/" + livro.getId(), funcionario, Map.of("isbn13", "12345")).status()).isEqualTo(400);
+        assertThat(put("/livros/atualizar/" + livro.getId(), funcionario, Map.of("isbn10", "ABCDEFGHIJ")).status()).isEqualTo(400);
+        assertThat(recarregar(livro).getIsbn13()).isEqualTo("9788595084742");
+
+        Resposta vazio = put("/livros/atualizar/" + livro.getId(), funcionario, Map.of("isbn10", "", "isbn13", ""));
+        assertThat(vazio.status()).isEqualTo(200);
+        assertThat(recarregar(livro).getIsbn10()).isNull();
+        assertThat(recarregar(livro).getIsbn13()).isNull();
     }
 
     @Test
