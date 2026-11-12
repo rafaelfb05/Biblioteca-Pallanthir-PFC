@@ -255,6 +255,24 @@ test("página do livro mostra os ISBNs e traço quando não há", async () => {
   expect(screen.getByText("978-8595084742")).toBeInTheDocument();
 });
 
+test("funcionário busca a capa pelo ISBN na página do livro", async () => {
+  const capa = "https://covers.openlibrary.org/b/isbn/9788595084742-L.jpg";
+  simularApi({
+    ["GET /avaliacoes/livro/" + ID_LIVRO]: () => [200, { media: 0, total: 0, avaliacoes: [] }],
+    ["PUT /livros/atualizar/" + ID_LIVRO]: (corpo) => [200, livro(ID_LIVRO, "Clean Code", corpo)],
+    ["PUT /livros/atualizar/" + ID_LIVRO + "/capa"]: () => [200, livro(ID_LIVRO, "Clean Code", { capaUrl: capa })],
+  });
+  entrarComo("FUNCIONARIO");
+  render(<App />);
+
+  fireEvent.click(await screen.findByRole("heading", { name: "Clean Code" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Buscar capa pelo ISBN" }));
+
+  expect(await screen.findByText('A capa de "Clean Code" foi trocada.')).toBeInTheDocument();
+  expect(chamadasPara("PUT", "/livros/atualizar/" + ID_LIVRO)[0].corpo).toEqual({ isbn10: "8595084742", isbn13: "9788595084742" });
+  expect(chamadasPara("PUT", "/livros/atualizar/" + ID_LIVRO + "/capa")).toHaveLength(1);
+});
+
 test("funcionário vê a dashboard e não vê carrinho nem pedidos", async () => {
   simularApi({
     "GET /dashboard": () => [

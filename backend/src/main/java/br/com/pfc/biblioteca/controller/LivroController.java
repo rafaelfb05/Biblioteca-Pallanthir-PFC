@@ -40,6 +40,11 @@ public class LivroController {
         return ResponseEntity.ok(new LivroDTO(livro));
     }
 
+    @PutMapping("/atualizar/{id}/capa")
+    public ResponseEntity<LivroDTO> buscarCapaPeloIsbn(@PathVariable UUID id) {
+        return ResponseEntity.ok(new LivroDTO(service.buscarCapaPeloIsbn(id)));
+    }
+
     @DeleteMapping("/deletar/{id}")
     public ResponseEntity<Void> deletarLivro(@PathVariable UUID id,
                                              @RequestParam(defaultValue = "false") boolean confirmado) {

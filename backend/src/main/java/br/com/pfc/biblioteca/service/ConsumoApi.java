@@ -36,4 +36,25 @@ public class ConsumoApi {
         }
         return response.body();
     }
+
+    public boolean imagemExiste(String endereco) {
+        HttpClient client = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(5))
+                .followRedirects(HttpClient.Redirect.NORMAL)
+                .build();
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(endereco))
+                .timeout(Duration.ofSeconds(8))
+                .build();
+        try {
+            HttpResponse<Void> response = client.send(request, HttpResponse.BodyHandlers.discarding());
+            String tipo = response.headers().firstValue("Content-Type").orElse("");
+            return response.statusCode() == 200 && tipo.startsWith("image/");
+        } catch (IOException | IllegalArgumentException e) {
+            return false;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
+    }
 }
