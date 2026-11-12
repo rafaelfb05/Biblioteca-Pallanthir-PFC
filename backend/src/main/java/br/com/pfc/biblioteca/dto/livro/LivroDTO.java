@@ -15,13 +15,16 @@ public record LivroDTO(UUID id,
                        Materia materia,
                        double preco,
                        Integer estoqueReserva,
-                       Integer estoqueCompra) {
+                       Integer estoqueCompra,
+                       String isbn10,
+                       String isbn13) {
 
     public LivroDTO(Livro livro) {
         this(livro.getId(), livro.getTitulo(),
                 livro.getAutores(), livro.getAnoLancamento(),
                 livro.getNumeroPagina(), livro.getCapaUrl(),
                 livro.getMateria(), livro.getPreco(),
-                livro.getEstoqueReserva(), livro.getEstoqueCompra());
+                livro.getEstoqueReserva(), livro.getEstoqueCompra(),
+                livro.getIsbn10(), livro.getIsbn13());
     }
 }

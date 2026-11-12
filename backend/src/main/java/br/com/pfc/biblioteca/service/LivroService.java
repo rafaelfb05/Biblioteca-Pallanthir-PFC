@@ -77,10 +77,7 @@ public class LivroService {
 
     private List<LivroDTO> converterDados(List<Livro> livro) {
         return livro.stream()
-                .map(s -> new LivroDTO(s.getId(), s.getTitulo(), s.getAutores(),
-                        s.getAnoLancamento(), s.getNumeroPagina(),
-                        s.getCapaUrl(), s.getMateria(), s.getPreco(),
-                        s.getEstoqueReserva(), s.getEstoqueCompra()))
+                .map(LivroDTO::new)
                 .collect(Collectors.toList());
     }
 
@@ -112,9 +109,26 @@ public class LivroService {
         if (request.estoqueCompra() != null) {
             livro.setEstoqueCompra(request.estoqueCompra());
         }
+        if (request.isbn10() != null) {
+            livro.setIsbn10(normalizarIsbn(request.isbn10(), "^\\d{9}[\\dX]$", "ISBN-10 inválido: informe 10 caracteres (9 números e um número ou X no final)"));
+        }
+        if (request.isbn13() != null) {
+            livro.setIsbn13(normalizarIsbn(request.isbn13(), "^\\d{13}$", "ISBN-13 inválido: informe 13 números"));
+        }
         Livro salvo = repository.save(livro);
         logService.registrarLogUsuarioLogado("ATUALIZACAO_LIVRO", "Livro " + salvo.getId() + " (" + salvo.getTitulo() + ") atualizado");
         return salvo;
+    }
+
+    private String normalizarIsbn(String valor, String formato, String mensagem) {
+        String limpo = valor.replaceAll("[\\s-]", "").toUpperCase();
+        if (limpo.isEmpty()) {
+            return null;
+        }
+        if (!limpo.matches(formato)) {
+            throw new RegraDeNegocioException(mensagem);
+        }
+        return limpo;
     }
 
     @Transactional

@@ -11,5 +11,7 @@ public record AtualizarLivroRequest(String titulo,
                                     Materia materia,
                                     Double preco,
                                     Integer estoqueReserva,
-                                    Integer estoqueCompra) {
+                                    Integer estoqueCompra,
+                                    String isbn10,
+                                    String isbn13) {
 }
