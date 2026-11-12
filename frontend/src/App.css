@@ -840,6 +840,16 @@
   cursor: wait;
 }
 
+.modal-actions .botao-capa {
+  background: transparent;
+  border: 1px solid #e51d2a;
+  color: #e51d2a;
+}
+
+.modal-actions .botao-capa:disabled {
+  cursor: not-allowed;
+}
+
 .pagina-favoritos .books {
   grid-template-columns: repeat(3, 1fr);
 }

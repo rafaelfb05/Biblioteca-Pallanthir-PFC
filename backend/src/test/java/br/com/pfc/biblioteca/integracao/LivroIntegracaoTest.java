@@ -30,6 +30,8 @@ class LivroIntegracaoTest extends TesteIntegracaoBase {
 
     private Object consumoOriginal;
     private final List<String> buscasNaGoogleBooks = new ArrayList<>();
+    private final List<String> capasNaOpenLibrary = new ArrayList<>();
+    private final List<String> consultasNaOpenLibrary = new ArrayList<>();
 
     @BeforeEach
     void simularGoogleBooks() {
@@ -44,11 +46,20 @@ class LivroIntegracaoTest extends TesteIntegracaoBase {
                 if (titulo.startsWith("Inexistente")) {
                     return "{\"totalItems\":0}";
                 }
+                if (titulo.startsWith("Sem capa")) {
+                    return "{\"items\":[{\"volumeInfo\":{\"title\":" + texto(titulo) + ",\"pageCount\":90}}]}";
+                }
                 return "{\"items\":[{\"volumeInfo\":{\"title\":" + texto(titulo) + ",\"authors\":[\"J. R. R. Tolkien\"],"
                         + "\"publishedDate\":\"1937\",\"pageCount\":310,"
                         + "\"imageLinks\":{\"thumbnail\":\"http://books.google.com/capa.jpg\"},"
                         + "\"industryIdentifiers\":[{\"type\":\"ISBN_10\",\"identifier\":\"8595084742\"},"
                         + "{\"type\":\"ISBN_13\",\"identifier\":\"9788595084742\"}]}}]}";
+            }
+
+            @Override
+            public boolean imagemExiste(String endereco) {
+                consultasNaOpenLibrary.add(endereco);
+                return capasNaOpenLibrary.stream().anyMatch(isbn -> endereco.equals("https://covers.openlibrary.org/b/isbn/" + isbn + "-L.jpg?default=false"));
             }
         });
     }
@@ -121,6 +132,76 @@ class LivroIntegracaoTest extends TesteIntegracaoBase {
         assertThat(vazio.status()).isEqualTo(200);
         assertThat(recarregar(livro).getIsbn10()).isNull();
         assertThat(recarregar(livro).getIsbn13()).isNull();
+    }
+
+    @Test
+    void cadastroUsaACapaDaOpenLibraryQuandoElaExiste() {
+        capasNaOpenLibrary.add("9788595084742");
+
+        Resposta resposta = post("/livros/cadastro", token(criarFuncionario()), novoLivro("O Hobbit"));
+
+        assertThat(resposta.status()).isEqualTo(200);
+        assertThat(resposta.corpo().path("capaUrl").asText()).isEqualTo("https://covers.openlibrary.org/b/isbn/9788595084742-L.jpg");
+    }
+
+    @Test
+    void cadastroMantemACapaDaGoogleBooksQuandoAOpenLibraryNaoTem() {
+        Resposta resposta = post("/livros/cadastro", token(criarFuncionario()), novoLivro("O Hobbit"));
+
+        assertThat(resposta.corpo().path("capaUrl").asText()).isEqualTo("http://books.google.com/capa.jpg");
+        assertThat(consultasNaOpenLibrary).hasSize(2);
+    }
+
+    @Test
+    void cadastroSemCapaEmNenhumaFonteFicaSemCapa() {
+        Resposta resposta = post("/livros/cadastro", token(criarFuncionario()), novoLivro("Sem capa nenhuma"));
+
+        assertThat(resposta.status()).isEqualTo(200);
+        assertThat(resposta.corpo().path("capaUrl").isNull()).isTrue();
+        assertThat(consultasNaOpenLibrary).isEmpty();
+    }
+
+    @Test
+    void buscaDeCapaPeloIsbnTrocaACapaQuandoEncontra() {
+        Livro livro = criarLivro(50, 1, 0);
+        livro.setCapaUrl("http://books.google.com/antiga.jpg");
+        livro.setIsbn13("9780000000001");
+        livro.setIsbn10("8595084742");
+        livroRepository.save(livro);
+        capasNaOpenLibrary.add("8595084742");
+
+        Resposta resposta = put("/livros/atualizar/" + livro.getId() + "/capa", token(criarFuncionario()), null);
+
+        assertThat(resposta.status()).isEqualTo(200);
+        assertThat(resposta.corpo().path("capaUrl").asText()).isEqualTo("https://covers.openlibrary.org/b/isbn/8595084742-L.jpg");
+        assertThat(recarregar(livro).getCapaUrl()).isEqualTo("https://covers.openlibrary.org/b/isbn/8595084742-L.jpg");
+    }
+
+    @Test
+    void buscaDeCapaSemResultadoMantemACapaAtual() {
+        Livro livro = criarLivro(50, 1, 0);
+        livro.setCapaUrl("http://books.google.com/antiga.jpg");
+        livro.setIsbn13("9780000000001");
+        livroRepository.save(livro);
+
+        Resposta resposta = put("/livros/atualizar/" + livro.getId() + "/capa", token(criarFuncionario()), null);
+
+        assertThat(resposta.status()).isEqualTo(404);
+        assertThat(resposta.mensagem()).isEqualTo("Capa não encontrada na Open Library para esse ISBN");
+        assertThat(recarregar(livro).getCapaUrl()).isEqualTo("http://books.google.com/antiga.jpg");
+    }
+
+    @Test
+    void buscaDeCapaExigeIsbnEFuncionario() {
+        Livro livro = criarLivro(50, 1, 0);
+
+        Resposta semIsbn = put("/livros/atualizar/" + livro.getId() + "/capa", token(criarFuncionario()), null);
+        Resposta estudante = put("/livros/atualizar/" + livro.getId() + "/capa", token(criarEstudante()), null);
+
+        assertThat(semIsbn.status()).isEqualTo(400);
+        assertThat(semIsbn.mensagem()).isEqualTo("Preencha o ISBN-10 ou o ISBN-13 do livro antes de buscar a capa");
+        assertThat(estudante.status()).isEqualTo(403);
+        assertThat(consultasNaOpenLibrary).isEmpty();
     }
 
     @Test

@@ -1692,6 +1692,31 @@ function App() {
     }
   };
 
+  const buscarCapaPeloIsbn = async () => {
+    try {
+      setSalvando(true);
+      setErro(null);
+      await livrosApi.atualizar(formEdicao.id, {
+        isbn10: formEdicao.isbn10 || "",
+        isbn13: formEdicao.isbn13 || "",
+      });
+      const atualizado = await livrosApi.buscarCapa(formEdicao.id);
+      setAviso('A capa de "' + atualizado.titulo + '" foi trocada.');
+      setFormEdicao({ ...formEdicao, capaUrl: atualizado.capaUrl });
+      setResultado((atual) =>
+        atual.map((item) =>
+          item.id === atualizado.id ? { ...item, capaUrl: atualizado.capaUrl } : item
+        )
+      );
+      await carregarLivros();
+    } catch (e) {
+      setErro(mensagemDeErro(e, "Não foi possível buscar a capa pelo ISBN."));
+      console.error(e);
+    } finally {
+      setSalvando(false);
+    }
+  };
+
   const deletarLivro = async (livro) => {
     if (!window.confirm('Remover "' + livro.titulo + '" do acervo?')) {
       return;
@@ -4019,6 +4044,14 @@ function App() {
                   />
                 </label>
                 <div className="modal-actions">
+                  <button
+                    type="button"
+                    className="botao-capa"
+                    disabled={salvando || (!formEdicao.isbn10 && !formEdicao.isbn13)}
+                    onClick={buscarCapaPeloIsbn}
+                  >
+                    Buscar capa pelo ISBN
+                  </button>
                   <button type="submit" disabled={salvando}>
                     {salvando ? "Salvando..." : "Atualizar livro"}
                   </button>

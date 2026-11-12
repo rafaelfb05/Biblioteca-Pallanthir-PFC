@@ -100,6 +100,10 @@ export const livrosApi = {
       method: "PUT",
       body: JSON.stringify(dados),
     }),
+  buscarCapa: (id) =>
+    request(`/livros/atualizar/${id}/capa`, {
+      method: "PUT",
+    }),
   deletar: (id, confirmado) =>
     request(`/livros/deletar/${id}?confirmado=${confirmado ? "true" : "false"}`, {
       method: "DELETE",

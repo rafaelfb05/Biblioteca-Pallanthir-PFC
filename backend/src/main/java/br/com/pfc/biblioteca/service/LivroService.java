@@ -23,6 +23,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 public class LivroService {
@@ -35,6 +36,7 @@ public class LivroService {
     private ConverteDados conversor = new ConverteDados();
     private final String ENDERECO = "https://www.googleapis.com/books/v1/volumes?q=";
     private final String API_KEY = System.getenv("BOOK_API");
+    private final String CAPAS_OPEN_LIBRARY = "https://covers.openlibrary.org/b/isbn/";
 
     public LivroService(LivroRepository repository, ReservaRepository reservaRepository, UsuarioRepository usuarioRepository, LogAuditoriaService logService) {
         this.repository = repository;
@@ -65,6 +67,7 @@ public class LivroService {
         livro.setPreco(preco);
         livro.setEstoqueReserva(estoqueReserva);
         livro.setEstoqueCompra(estoqueCompra);
+        capaPeloIsbn(livro).ifPresent(livro::setCapaUrl);
         Livro salvo = repository.save(livro);
         logService.registrarLogUsuarioLogado("CADASTRO_LIVRO", "Livro " + salvo.getId() + " (" + salvo.getTitulo() + ") cadastrado");
         return salvo;
@@ -118,6 +121,28 @@ public class LivroService {
         Livro salvo = repository.save(livro);
         logService.registrarLogUsuarioLogado("ATUALIZACAO_LIVRO", "Livro " + salvo.getId() + " (" + salvo.getTitulo() + ") atualizado");
         return salvo;
+    }
+
+    public Livro buscarCapaPeloIsbn(UUID id) {
+        Livro livro = repository.findById(id)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Livro não encontrado"));
+        if (livro.getIsbn13() == null && livro.getIsbn10() == null) {
+            throw new RegraDeNegocioException("Preencha o ISBN-10 ou o ISBN-13 do livro antes de buscar a capa");
+        }
+        String capa = capaPeloIsbn(livro)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Capa não encontrada na Open Library para esse ISBN"));
+        livro.setCapaUrl(capa);
+        Livro salvo = repository.save(livro);
+        logService.registrarLogUsuarioLogado("ATUALIZACAO_LIVRO", "Capa do livro " + salvo.getId() + " (" + salvo.getTitulo() + ") trocada pela da Open Library");
+        return salvo;
+    }
+
+    private Optional<String> capaPeloIsbn(Livro livro) {
+        return Stream.of(livro.getIsbn13(), livro.getIsbn10())
+                .filter(isbn -> isbn != null && !isbn.isBlank())
+                .filter(isbn -> consumo.imagemExiste(CAPAS_OPEN_LIBRARY + isbn + "-L.jpg?default=false"))
+                .map(isbn -> CAPAS_OPEN_LIBRARY + isbn + "-L.jpg")
+                .findFirst();
     }
 
     private String normalizarIsbn(String valor, String formato, String mensagem) {
