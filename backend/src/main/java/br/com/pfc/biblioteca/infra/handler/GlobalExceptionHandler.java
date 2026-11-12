@@ -5,9 +5,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -45,6 +47,18 @@ public class GlobalExceptionHandler {
                 .map(campo -> campo.getDefaultMessage())
                 .orElse("Dados inválidos");
         ErroResposta erro = new ErroResposta(400, "Dados inválidos", mensagem);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(erro);
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErroResposta> tratarParametroInvalido(MethodArgumentTypeMismatchException e){
+        ErroResposta erro = new ErroResposta(400, "Dados inválidos", "Valor inválido para o parâmetro " + e.getName());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(erro);
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErroResposta> tratarCorpoInvalido(HttpMessageNotReadableException e){
+        ErroResposta erro = new ErroResposta(400, "Dados inválidos", "O corpo da requisição contém valores inválidos");
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(erro);
     }
 

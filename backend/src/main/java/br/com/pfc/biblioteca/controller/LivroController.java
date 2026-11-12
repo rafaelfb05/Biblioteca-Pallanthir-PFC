@@ -1,5 +1,6 @@
 package br.com.pfc.biblioteca.controller;
 
+import java.util.UUID;
 import br.com.pfc.biblioteca.dto.livro.AtualizarLivroRequest;
 import br.com.pfc.biblioteca.dto.livro.CadastroLivroRequest;
 import br.com.pfc.biblioteca.dto.livro.LivroDTO;
@@ -34,13 +35,13 @@ public class LivroController {
     }
 
     @PutMapping("/atualizar/{id}")
-    public ResponseEntity<LivroDTO> atualizarLivro(@PathVariable Long id, @RequestBody AtualizarLivroRequest request) {
+    public ResponseEntity<LivroDTO> atualizarLivro(@PathVariable UUID id, @RequestBody AtualizarLivroRequest request) {
         Livro livro = service.atualizarLivro(id, request);
         return ResponseEntity.ok(new LivroDTO(livro));
     }
 
     @DeleteMapping("/deletar/{id}")
-    public ResponseEntity<Void> deletarLivro(@PathVariable Long id,
+    public ResponseEntity<Void> deletarLivro(@PathVariable UUID id,
                                              @RequestParam(defaultValue = "false") boolean confirmado) {
         service.deletarLivro(id, confirmado);
         return ResponseEntity.noContent().build();

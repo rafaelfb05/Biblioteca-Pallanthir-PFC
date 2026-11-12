@@ -1,5 +1,6 @@
 package br.com.pfc.biblioteca.entity.jpa;
 
+import java.util.UUID;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
@@ -9,8 +10,8 @@ uniqueConstraints = @UniqueConstraint(columnNames = {"usuario_id", "livro_id"}))
 public class Avaliacao {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
     @ManyToOne
     private Usuario usuario;
     @ManyToOne
@@ -31,11 +32,11 @@ public class Avaliacao {
         this.dataAvaliacao= LocalDateTime.now();
     }
 
-    public Long getId() {
+    public UUID getId() {
         return id;
     }
 
-    public void setId(Long id) {
+    public void setId(UUID id) {
         this.id = id;
     }
 

@@ -1,5 +1,6 @@
 package br.com.pfc.biblioteca.controller;
 
+import java.util.UUID;
 import br.com.pfc.biblioteca.dto.pedido.PedidoDTO;
 import br.com.pfc.biblioteca.service.PedidoService;
 import org.springframework.http.ResponseEntity;
@@ -28,7 +29,7 @@ public class PedidoController {
     }
 
     @GetMapping("/{id}")
-    public PedidoDTO obter(@PathVariable Long id){
+    public PedidoDTO obter(@PathVariable UUID id){
         return service.obterPedido(id);
     }
 }

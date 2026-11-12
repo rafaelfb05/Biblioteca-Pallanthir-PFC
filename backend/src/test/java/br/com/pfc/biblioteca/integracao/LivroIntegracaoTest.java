@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -74,9 +75,9 @@ class LivroIntegracaoTest extends TesteIntegracaoBase {
         return corpo;
     }
 
-    private boolean catalogoContem(long livroId) {
+    private boolean catalogoContem(Object livroId) {
         for (JsonNode livro : get("/livros", null).corpo()) {
-            if (livro.path("id").asLong() == livroId) {
+            if (livro.path("id").asText().equals(livroId.toString())) {
                 return true;
             }
         }
@@ -95,7 +96,7 @@ class LivroIntegracaoTest extends TesteIntegracaoBase {
         assertThat(resposta.corpo().path("numeroPagina").asInt()).isEqualTo(310);
         assertThat(resposta.corpo().path("estoqueReserva").asInt()).isEqualTo(2);
         assertThat(resposta.corpo().path("estoqueCompra").asInt()).isEqualTo(3);
-        assertThat(catalogoContem(resposta.corpo().path("id").asLong())).isTrue();
+        assertThat(catalogoContem(resposta.corpo().path("id").asText())).isTrue();
     }
 
     @Test
@@ -143,7 +144,7 @@ class LivroIntegracaoTest extends TesteIntegracaoBase {
 
     @Test
     void edicaoDeLivroInexistenteDevolve404() {
-        Resposta resposta = put("/livros/atualizar/999999", token(criarFuncionario()), Map.of("preco", 70.0));
+        Resposta resposta = put("/livros/atualizar/" + UUID.randomUUID(), token(criarFuncionario()), Map.of("preco", 70.0));
 
         assertThat(resposta.status()).isEqualTo(404);
     }

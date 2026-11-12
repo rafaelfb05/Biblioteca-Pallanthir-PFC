@@ -1,11 +1,12 @@
 package br.com.pfc.biblioteca.dto.livro;
 
+import java.util.UUID;
 import br.com.pfc.biblioteca.enums.Materia;
 import br.com.pfc.biblioteca.entity.jpa.Livro;
 
 import java.util.List;
 
-public record LivroDTO(Long id,
+public record LivroDTO(UUID id,
                        String titulo,
                        List<String> autores,
                        String anoLancamento,

@@ -1,5 +1,6 @@
 package br.com.pfc.biblioteca.service;
 
+import java.util.UUID;
 import br.com.pfc.biblioteca.dto.pedido.PedidoDTO;
 import br.com.pfc.biblioteca.entity.jpa.*;
 import br.com.pfc.biblioteca.enums.StatusPedido;
@@ -104,7 +105,7 @@ public class PedidoService {
 
     @Transactional
     public List<PedidoDTO> meusPedidos(){
-        Long usuarioId = usuarioLogado().getId();
+        UUID usuarioId = usuarioLogado().getId();
         repository.findByUsuarioIdAndStatus(usuarioId, StatusPedido.AGUARDANDO_PAGAMENTO)
                 .forEach(this::sincronizarComMercadoPago);
         return repository.findByUsuarioIdOrderByDataCriacaoDesc(usuarioId)
@@ -113,7 +114,7 @@ public class PedidoService {
     }
 
     @Transactional
-    public PedidoDTO obterPedido(Long id){
+    public PedidoDTO obterPedido(UUID id){
         Usuario usuario = usuarioLogado();
         Pedido pedido = repository.findById(id)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Pedido não encontrado"));
@@ -140,10 +141,16 @@ public class PedidoService {
     @Transactional
     public void processarNotificacao(String orderId){
         MercadoPagoService.OrderMP order = mercadoPagoService.buscarOrder(orderId);
-        if (order == null || order.externalReference() == null
-                || !order.externalReference().matches("\\d+")) return;
+        if (order == null || order.externalReference() == null) return;
 
-        Pedido pedido = repository.buscarComLock(Long.valueOf(order.externalReference())).orElse(null);
+        UUID pedidoId;
+        try {
+            pedidoId = UUID.fromString(order.externalReference());
+        } catch (IllegalArgumentException e) {
+            return;
+        }
+
+        Pedido pedido = repository.buscarComLock(pedidoId).orElse(null);
         if (pedido == null) return;
 
         boolean pago = "processed".equals(order.status());
@@ -196,7 +203,7 @@ public class PedidoService {
     }
 
     private void removerDoCarrinho(Pedido pedido) {
-        Set<Long> livrosDoPedido = pedido.getItens().stream()
+        Set<UUID> livrosDoPedido = pedido.getItens().stream()
                 .map(item -> item.getLivro().getId())
                 .collect(Collectors.toSet());
         List<ItemCarrinho> itens = itemCarrinhoRepository

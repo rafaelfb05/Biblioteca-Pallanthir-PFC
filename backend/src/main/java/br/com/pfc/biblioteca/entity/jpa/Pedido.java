@@ -1,5 +1,6 @@
 package br.com.pfc.biblioteca.entity.jpa;
 
+import java.util.UUID;
 import br.com.pfc.biblioteca.enums.StatusPedido;
 import jakarta.persistence.*;
 
@@ -13,8 +14,8 @@ import java.util.List;
 public class Pedido {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    public Long id;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
     @ManyToOne(optional = false)
     private Usuario usuario;
     @OneToMany(mappedBy = "pedido", cascade = CascadeType.ALL)
@@ -38,11 +39,11 @@ public class Pedido {
         itens.add(item);
     }
 
-    public Long getId() {
+    public UUID getId() {
         return id;
     }
 
-    public void setId(Long id) {
+    public void setId(UUID id) {
         this.id = id;
     }
 

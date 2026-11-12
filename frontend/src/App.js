@@ -58,6 +58,9 @@ const LIMITE_COMENTARIO = 500;
 const NOTAS = [1, 2, 3, 4, 5];
 const FILTRO_LOGS_VAZIO = { usuarioId: "", texto: "" };
 const CHAVE_SESSAO = "pallanthir:usuario";
+const FORMATO_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const numeroDoPedido = (id) => String(id).slice(0, 8).toUpperCase();
 const CHAVE_ULTIMA_ATIVIDADE = "pallanthir:ultimaAtividade";
 const TEMPO_LIMITE_INATIVIDADE = 15 * 60 * 1000;
 const RENOVAR_TOKEN_ANTES_DE = 5 * 60 * 1000;
@@ -743,6 +746,7 @@ function App() {
       const ultima = lerUltimaAtividade();
       if (
         !sessao.token ||
+        !FORMATO_UUID.test(String(sessao.id)) ||
         tokenExpirado(sessao.token) ||
         Date.now() - ultima >= TEMPO_LIMITE_INATIVIDADE
       ) {
@@ -3310,7 +3314,7 @@ function App() {
 
           {ehEstudante && carrinho.itens.length > 0 && pedidoAguardando && (
             <p className="retorno-pagamento pendente">
-              O pedido #{pedidoAguardando.id} está aguardando pagamento até{" "}
+              O pedido #{numeroDoPedido(pedidoAguardando.id)} está aguardando pagamento até{" "}
               {formatarData(pedidoAguardando.dataExpiracao)}. Os itens saem do
               carrinho quando o pagamento for aprovado ou o prazo terminar.
             </p>
@@ -3487,7 +3491,7 @@ function App() {
                     >
                       {ROTULO_STATUS_PEDIDO[pedido.status] || pedido.status}
                     </span>
-                    <h3>Pedido #{pedido.id}</h3>
+                    <h3>Pedido #{numeroDoPedido(pedido.id)}</h3>
                     <small>Feito em {formatarData(pedido.dataCriacao)}</small>
                     <ul className="pedido-itens">
                       {(pedido.itens || []).map((item) => (

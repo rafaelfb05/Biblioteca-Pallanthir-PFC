@@ -1,5 +1,6 @@
 package br.com.pfc.biblioteca.service;
 
+import java.util.UUID;
 import br.com.pfc.biblioteca.dto.carrinho.AdicionarCarrinhoRequest;
 import br.com.pfc.biblioteca.dto.carrinho.CarrinhoDTO;
 import br.com.pfc.biblioteca.dto.carrinho.ItemCarrinhoDTO;
@@ -68,7 +69,7 @@ public class CarrinhoService {
     }
 
     @Transactional
-    public CarrinhoDTO remover(Long livroId){
+    public CarrinhoDTO remover(UUID livroId){
         Usuario usuario = usuarioLogado();
         validarSemPedidoAguardando(usuario);
         ItemCarrinho item = repository.findByUsuarioIdAndLivroId(usuario.getId(), livroId)
@@ -84,7 +85,7 @@ public class CarrinhoService {
         return montar(usuarioLogado().getId());
     }
 
-    private CarrinhoDTO montar(Long usuarioId){
+    private CarrinhoDTO montar(UUID usuarioId){
         List<ItemCarrinhoDTO> itens = repository.findByUsuarioIdAndAtivoTrue(usuarioId).stream()
                 .map(i -> {
                     BigDecimal preco = BigDecimal.valueOf(i.getLivro().getPreco()).setScale(2, RoundingMode.HALF_UP);

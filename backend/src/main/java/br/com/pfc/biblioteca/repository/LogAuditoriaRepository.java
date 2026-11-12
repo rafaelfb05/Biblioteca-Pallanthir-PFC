@@ -9,5 +9,5 @@ public interface LogAuditoriaRepository extends MongoRepository <LogAuditoria, S
 
     List<LogAuditoria> findAllByOrderByDataHoraDesc();
 
-    List<LogAuditoria> findByUsuarioIdOrderByDataHoraDesc(Long usuarioId);
+    List<LogAuditoria> findByUsuarioIdOrderByDataHoraDesc(String usuarioId);
 }

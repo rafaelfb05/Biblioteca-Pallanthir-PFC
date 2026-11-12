@@ -10,9 +10,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import java.time.LocalDateTime;
 import java.util.Map;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -22,15 +23,15 @@ class PagamentoIntegracaoTest extends TesteIntegracaoBase {
     @Autowired
     private PedidoService pedidoService;
 
-    private record Compra(Usuario estudante, Livro livro, long pedidoId, String orderId) {
+    private record Compra(Usuario estudante, Livro livro, UUID pedidoId, String orderId) {
     }
 
     private Compra comprar(int estoqueCompra, int quantidade) {
         Usuario estudante = criarEstudante();
         Livro livro = criarLivro(25, 0, estoqueCompra);
         adicionarAoCarrinho(token(estudante), livro, quantidade);
-        long pedidoId = post("/pedidos/checkout", token(estudante), null).corpo().path("id").asLong();
-        return new Compra(estudante, livro, pedidoId, orderDoPedido(pedidoId));
+        String pedidoId = post("/pedidos/checkout", token(estudante), null).corpo().path("id").asText();
+        return new Compra(estudante, livro, UUID.fromString(pedidoId), orderDoPedido(pedidoId));
     }
 
     private StatusPedido status(Compra compra) {
@@ -71,7 +72,7 @@ class PagamentoIntegracaoTest extends TesteIntegracaoBase {
         assertThat(status(compra)).isEqualTo(StatusPedido.APROVADO);
         assertThat(itensNoCarrinho(compra)).isZero();
         assertThat(recarregar(compra.livro()).getEstoqueCompra()).isEqualTo(3);
-        verify(logService).registrarLog(anyLong(), anyString(), eq("PAGAMENTO_APROVADO"), anyString());
+        verify(logService).registrarLog(any(UUID.class), anyString(), eq("PAGAMENTO_APROVADO"), anyString());
     }
 
     @Test
@@ -139,7 +140,7 @@ class PagamentoIntegracaoTest extends TesteIntegracaoBase {
 
         assertThat(status(compra)).isEqualTo(StatusPedido.EXPIRADO);
         assertThat(recarregar(compra.livro()).getEstoqueCompra()).isEqualTo(5);
-        verify(logService).registrarLog(anyLong(), anyString(), eq("PAGAMENTO_EM_PEDIDO_EXPIRADO"), anyString());
+        verify(logService).registrarLog(any(UUID.class), anyString(), eq("PAGAMENTO_EM_PEDIDO_EXPIRADO"), anyString());
     }
 
     @Test

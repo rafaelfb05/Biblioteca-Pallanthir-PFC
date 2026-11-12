@@ -25,7 +25,7 @@ class AvaliacaoIntegracaoTest extends TesteIntegracaoBase {
 
     private boolean rankingContem(Livro livro) {
         for (JsonNode item : get("/avaliacoes/ranking", null).corpo()) {
-            if (item.path("id").asLong() == livro.getId()) {
+            if (item.path("id").asText().equals(livro.getId().toString())) {
                 return true;
             }
         }
@@ -76,7 +76,7 @@ class AvaliacaoIntegracaoTest extends TesteIntegracaoBase {
         Livro livro = criarLivro(30, 1, 0);
         Usuario autor = criarEstudante();
         Usuario outro = criarEstudante();
-        long avaliacaoId = avaliar(autor, livro, 2, "Fraco").corpo().path("id").asLong();
+        String avaliacaoId = avaliar(autor, livro, 2, "Fraco").corpo().path("id").asText();
 
         assertThat(delete("/avaliacoes/livros/" + avaliacaoId, token(outro)).status()).isEqualTo(400);
         assertThat(resumo(livro).path("total").asInt()).isEqualTo(1);

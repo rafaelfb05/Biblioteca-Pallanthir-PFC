@@ -1,4 +1,5 @@
 package br.com.pfc.biblioteca.dto.livro;
 
-public record RankingLivroDTO(Long id, String titulo, String capaUrl, Double media, Long total) {
+import java.util.UUID;
+public record RankingLivroDTO(UUID id, String titulo, String capaUrl, Double media, Long total) {
 }

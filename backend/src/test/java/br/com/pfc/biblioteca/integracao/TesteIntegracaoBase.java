@@ -199,9 +199,9 @@ public abstract class TesteIntegracaoBase {
         return post("/carrinho/itens", token, Map.of("livroId", livro.getId(), "quantidade", quantidade));
     }
 
-    protected String orderDoPedido(long pedidoId) {
+    protected String orderDoPedido(String pedidoId) {
         return ordensMercadoPago.values().stream()
-                .filter(order -> order.externalReference().equals(String.valueOf(pedidoId)))
+                .filter(order -> order.externalReference().equals(pedidoId))
                 .map(MercadoPagoService.OrderMP::id)
                 .findFirst()
                 .orElseThrow();

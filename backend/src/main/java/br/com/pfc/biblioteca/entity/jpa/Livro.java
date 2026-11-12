@@ -1,5 +1,6 @@
 package br.com.pfc.biblioteca.entity.jpa;
 
+import java.util.UUID;
 import br.com.pfc.biblioteca.dto.livro.DadosLivro;
 import br.com.pfc.biblioteca.enums.Materia;
 import jakarta.persistence.*;
@@ -11,8 +12,8 @@ import java.util.List;
 @Table(name = "livros")
 public class Livro {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
     private String titulo;
     private List<String> autores;
     private String anoLancamento;
@@ -46,11 +47,11 @@ public class Livro {
         }
     }
 
-    public Long getId() {
+    public UUID getId() {
         return id;
     }
 
-    public void setId(Long id) {
+    public void setId(UUID id) {
         this.id = id;
     }
 

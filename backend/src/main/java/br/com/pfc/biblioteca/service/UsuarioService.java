@@ -96,7 +96,7 @@ public class UsuarioService {
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado"));
     }
 
-    private void garantirPropriaConta(Long usuarioId, String acao){
+    private void garantirPropriaConta(UUID usuarioId, String acao){
         Usuario logado = usuarioLogado();
         if(!logado.getId().equals(usuarioId)){
             logService.registrarLog(logado.getId(), logado.getEmail(), "ACESSO_NEGADO", "Tentativa de " + acao + " do usuário " + usuarioId);
@@ -104,7 +104,7 @@ public class UsuarioService {
         }
     }
 
-    public Usuario atualizarUsuario(Long id, UsuarioRequest request) {
+    public Usuario atualizarUsuario(UUID id, UsuarioRequest request) {
         garantirPropriaConta(id, "atualizar a conta");
         Usuario usuario = repository.findById(id)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado"));
@@ -123,7 +123,7 @@ public class UsuarioService {
     }
 
     @Transactional
-    public Usuario excluirUsuario(Long id) {
+    public Usuario excluirUsuario(UUID id) {
         String emailLogado = SecurityContextHolder.getContext().getAuthentication().getName();
 
         Usuario usuario = repository.findById(id)
@@ -152,7 +152,7 @@ public class UsuarioService {
         return salvo;
     }
     @Transactional
-    public void adicionarFavorito(Long usuarioId, Long livroId){
+    public void adicionarFavorito(UUID usuarioId, UUID livroId){
         garantirPropriaConta(usuarioId, "favoritar livros");
         Usuario usuario = repository.findById(usuarioId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado"));
@@ -171,7 +171,7 @@ public class UsuarioService {
     }
 
     @Transactional
-    public void removerFavorito(Long usuarioId, Long livroId) {
+    public void removerFavorito(UUID usuarioId, UUID livroId) {
         garantirPropriaConta(usuarioId, "remover favoritos");
         Usuario usuario = repository.findById(usuarioId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado"));
@@ -181,7 +181,7 @@ public class UsuarioService {
 
     }
 
-    public List<LivroDTO> listarFavoritos(Long usuarioId) {
+    public List<LivroDTO> listarFavoritos(UUID usuarioId) {
         garantirPropriaConta(usuarioId, "listar os favoritos");
         Usuario usuario = repository.findById(usuarioId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado"));

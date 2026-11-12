@@ -1,9 +1,10 @@
 package br.com.pfc.biblioteca.dto.usuario;
 
+import java.util.UUID;
 import br.com.pfc.biblioteca.enums.TipoUsuario;
 import br.com.pfc.biblioteca.entity.jpa.Usuario;
 
-public record UsuarioDTO(Long id,
+public record UsuarioDTO(UUID id,
                          String nome,
                          String email,
                          TipoUsuario tipo) {

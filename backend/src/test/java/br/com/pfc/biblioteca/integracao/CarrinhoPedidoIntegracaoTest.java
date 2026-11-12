@@ -156,7 +156,7 @@ class CarrinhoPedidoIntegracaoTest extends TesteIntegracaoBase {
         Usuario dono = criarEstudante();
         Usuario outro = criarEstudante();
         adicionarAoCarrinho(token(dono), criarLivro(10, 0, 5), 1);
-        long pedidoId = post("/pedidos/checkout", token(dono), null).corpo().path("id").asLong();
+        String pedidoId = post("/pedidos/checkout", token(dono), null).corpo().path("id").asText();
 
         assertThat(get("/pedidos/" + pedidoId, token(dono)).status()).isEqualTo(200);
         assertThat(get("/pedidos/" + pedidoId, token(outro)).status()).isEqualTo(400);

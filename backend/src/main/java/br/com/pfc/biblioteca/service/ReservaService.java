@@ -1,5 +1,6 @@
 package br.com.pfc.biblioteca.service;
 
+import java.util.UUID;
 import br.com.pfc.biblioteca.dto.reserva.ReservaDTO;
 import br.com.pfc.biblioteca.enums.StatusReserva;
 import br.com.pfc.biblioteca.infra.exception.ConflitoException;
@@ -35,7 +36,7 @@ public class ReservaService {
     }
 
     @Transactional
-    public Reserva reservarLivro(Long usuarioId, Long livroId){
+    public Reserva reservarLivro(UUID usuarioId, UUID livroId){
         Usuario usuario = usuarioRepository.findById(usuarioId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado"));
 
@@ -61,7 +62,7 @@ public class ReservaService {
     }
 
     @Transactional
-    public void cancelarReserva(Long reservaId){
+    public void cancelarReserva(UUID reservaId){
         String emailLogado = SecurityContextHolder.getContext().getAuthentication().getName();
 
         Reserva reserva = repository.findById(reservaId)
@@ -86,7 +87,7 @@ public class ReservaService {
     }
 
     @Transactional
-    public void entregarLivro(Long reservaId){
+    public void entregarLivro(UUID reservaId){
         Reserva reserva = repository.findById(reservaId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Reserva não encontrada!"));
 
@@ -100,7 +101,7 @@ public class ReservaService {
     }
 
     @Transactional
-    public void devolverLivro(Long reservaId){
+    public void devolverLivro(UUID reservaId){
         Reserva reserva = repository.findById(reservaId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Reserva não encontrada!"));
 
@@ -117,7 +118,7 @@ public class ReservaService {
         logService.registrarLogUsuarioLogado("DEVOLUCAO_LIVRO", "Reserva " + reservaId + " do usuário " + reserva.getUsuario().getId() + " devolvida");
     }
 
-    public List<ReservaDTO> listarReservasPorUsuario(Long usuarioId) {
+    public List<ReservaDTO> listarReservasPorUsuario(UUID usuarioId) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         String emailLogado = auth.getName();
         boolean ehFuncionario = auth.getAuthorities().stream()

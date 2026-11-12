@@ -1,5 +1,6 @@
 package br.com.pfc.biblioteca.entity.jpa;
 
+import java.util.UUID;
 import br.com.pfc.biblioteca.enums.StatusReserva;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
@@ -8,8 +9,8 @@ import java.time.LocalDateTime;
 @Table(name = "reservas")
 public class Reserva {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
     @ManyToOne
     private Usuario usuario;
     @ManyToOne
@@ -27,11 +28,11 @@ public class Reserva {
         this.status=StatusReserva.RESERVADO;
     }
 
-    public Long getId() {
+    public UUID getId() {
         return id;
     }
 
-    public void setId(Long id) {
+    public void setId(UUID id) {
         this.id = id;
     }
 

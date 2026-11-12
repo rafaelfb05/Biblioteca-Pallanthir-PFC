@@ -1,5 +1,6 @@
 package br.com.pfc.biblioteca.controller;
 
+import java.util.UUID;
 import br.com.pfc.biblioteca.dto.avaliacao.AvaliacaoDTO;
 import br.com.pfc.biblioteca.dto.avaliacao.AvaliacaoRequest;
 import br.com.pfc.biblioteca.dto.livro.RankingLivroDTO;
@@ -22,17 +23,17 @@ public class AvaliacaoController {
     }
 
     @PostMapping("/livro/{livroId}")
-    public ResponseEntity<AvaliacaoDTO> avaliar(@PathVariable Long livroId, @RequestBody @Valid AvaliacaoRequest request){
+    public ResponseEntity<AvaliacaoDTO> avaliar(@PathVariable UUID livroId, @RequestBody @Valid AvaliacaoRequest request){
         return ResponseEntity.ok(service.avaliarLivro(livroId, request));
     }
 
     @GetMapping("/livro/{livroId}")
-    public ResumoAvaliacoesDTO obterResumo(@PathVariable Long livroId){
+    public ResumoAvaliacoesDTO obterResumo(@PathVariable UUID livroId){
         return service.obterResumo(livroId);
     }
 
     @DeleteMapping("/livros/{livroId}")
-    public ResponseEntity<Void> remover(@PathVariable Long livroId){
+    public ResponseEntity<Void> remover(@PathVariable UUID livroId){
         service.removerAvaliacao(livroId);
         return ResponseEntity.noContent().build();
     }

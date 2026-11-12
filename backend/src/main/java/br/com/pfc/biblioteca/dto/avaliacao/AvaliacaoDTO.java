@@ -1,10 +1,11 @@
 package br.com.pfc.biblioteca.dto.avaliacao;
 
+import java.util.UUID;
 import br.com.pfc.biblioteca.entity.jpa.Avaliacao;
 
 import java.time.LocalDateTime;
 
-public record AvaliacaoDTO(Long id, String nomeUsuario, Integer nota,
+public record AvaliacaoDTO(UUID id, String nomeUsuario, Integer nota,
                            String comentario, LocalDateTime dataAvaliacao) {
 
     public AvaliacaoDTO(Avaliacao a){

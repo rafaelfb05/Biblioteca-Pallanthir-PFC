@@ -1,5 +1,6 @@
 package br.com.pfc.biblioteca.controller;
 
+import java.util.UUID;
 import br.com.pfc.biblioteca.entity.mongo.LogAuditoria;
 import br.com.pfc.biblioteca.service.LogAuditoriaService;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -25,7 +26,7 @@ public class LogAuditoriaController {
     }
 
     @GetMapping("/usuarios/{usuarioId}")
-    public List<LogAuditoria> listarPorUsuario(@PathVariable Long usuarioId) {
+    public List<LogAuditoria> listarPorUsuario(@PathVariable UUID usuarioId) {
         return service.listarPorUsuario(usuarioId);
     }
 }
