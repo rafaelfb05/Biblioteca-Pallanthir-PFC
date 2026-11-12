@@ -18,6 +18,8 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.ByteBuffer;
+import java.util.Base64;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
@@ -47,6 +49,13 @@ public class MercadoPagoService {
     private final HttpClient http = HttpClient.newHttpClient();
     private final ObjectMapper mapper = new ObjectMapper();
 
+    static String codigoExterno(UUID id) {
+        ByteBuffer bytes = ByteBuffer.allocate(16);
+        bytes.putLong(id.getMostSignificantBits());
+        bytes.putLong(id.getLeastSignificantBits());
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes.array());
+    }
+
     public OrderCriada criarOrder(Pedido pedido, int minutosValidade) {
         ObjectNode corpo = mapper.createObjectNode();
         corpo.put("type", "online");
@@ -61,7 +70,7 @@ public class MercadoPagoService {
             item.put("title", ip.getLivro().getTitulo());
             item.put("unit_price", ip.getPrecoUnitario().toPlainString());
             item.put("quantity", ip.getQuantidade());
-            item.put("external_code", String.valueOf(ip.getLivro().getId()));
+            item.put("external_code", codigoExterno(ip.getLivro().getId()));
         }
 
         ObjectNode online = corpo.putObject("config").putObject("online");
