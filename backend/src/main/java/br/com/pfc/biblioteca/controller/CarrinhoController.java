@@ -1,5 +1,6 @@
 package br.com.pfc.biblioteca.controller;
 
+import java.util.UUID;
 import br.com.pfc.biblioteca.dto.carrinho.AdicionarCarrinhoRequest;
 import br.com.pfc.biblioteca.dto.carrinho.CarrinhoDTO;
 import br.com.pfc.biblioteca.service.CarrinhoService;
@@ -27,7 +28,7 @@ public class CarrinhoController {
     }
 
     @DeleteMapping("/itens/{livroId}")
-    public CarrinhoDTO remover(@PathVariable Long livroId){
+    public CarrinhoDTO remover(@PathVariable UUID livroId){
         return service.remover(livroId);
     }
 }

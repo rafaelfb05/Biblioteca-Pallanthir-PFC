@@ -1,5 +1,6 @@
 package br.com.pfc.biblioteca.entity.jpa;
 
+import java.util.UUID;
 import jakarta.persistence.*;
 
 import java.math.BigDecimal;
@@ -8,8 +9,8 @@ import java.math.BigDecimal;
 @Table(name = "itens_pedido")
 public class ItemPedido {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
     @ManyToOne(optional = false)
     private Pedido pedido;
     @ManyToOne(optional = false)
@@ -27,11 +28,11 @@ public class ItemPedido {
         this.precoUnitario=precoUnitario;
     }
 
-    public Long getId() {
+    public UUID getId() {
         return id;
     }
 
-    public void setId(Long id) {
+    public void setId(UUID id) {
         this.id = id;
     }
 

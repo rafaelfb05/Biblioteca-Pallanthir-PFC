@@ -1,5 +1,6 @@
 package br.com.pfc.biblioteca.entity.jpa;
 
+import java.util.UUID;
 import br.com.pfc.biblioteca.dto.usuario.UsuarioRequest;
 import br.com.pfc.biblioteca.enums.TipoUsuario;
 import jakarta.persistence.*;
@@ -15,8 +16,8 @@ import java.util.List;
 @Table(name = "usuarios")
 public class Usuario {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
     @NotBlank
     private String nome;
     @Email
@@ -56,11 +57,11 @@ public class Usuario {
         this.dataAceiteTermos = dataAceiteTermos;
     }
 
-    public Long getId() {
+    public UUID getId() {
         return id;
     }
 
-    public void setId(Long id) {
+    public void setId(UUID id) {
         this.id = id;
     }
 

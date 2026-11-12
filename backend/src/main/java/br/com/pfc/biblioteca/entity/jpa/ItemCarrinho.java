@@ -1,5 +1,6 @@
 package br.com.pfc.biblioteca.entity.jpa;
 
+import java.util.UUID;
 import jakarta.persistence.*;
 
 @Entity
@@ -7,8 +8,8 @@ import jakarta.persistence.*;
 public class ItemCarrinho {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
     @ManyToOne(optional = false)
     private Usuario usuario;
     @ManyToOne(optional = false)
@@ -23,11 +24,11 @@ public class ItemCarrinho {
         this.livro=livro;
     }
 
-    public Long getId() {
+    public UUID getId() {
         return id;
     }
 
-    public void setId(Long id) {
+    public void setId(UUID id) {
         this.id = id;
     }
 

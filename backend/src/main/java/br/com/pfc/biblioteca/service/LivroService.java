@@ -1,5 +1,6 @@
 package br.com.pfc.biblioteca.service;
 
+import java.util.UUID;
 import br.com.pfc.biblioteca.dto.livro.AtualizarLivroRequest;
 import br.com.pfc.biblioteca.dto.livro.DadosLivro;
 import br.com.pfc.biblioteca.dto.livro.LivroDTO;
@@ -83,7 +84,7 @@ public class LivroService {
                 .collect(Collectors.toList());
     }
 
-    public Livro atualizarLivro(Long id, AtualizarLivroRequest request) {
+    public Livro atualizarLivro(UUID id, AtualizarLivroRequest request) {
         Livro livro = repository.findById(id)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Livro não encontrado"));
 
@@ -117,7 +118,7 @@ public class LivroService {
     }
 
     @Transactional
-    public void deletarLivro(Long id, boolean confirmado) {
+    public void deletarLivro(UUID id, boolean confirmado) {
         Livro livro = repository.findById(id)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Livro não encontrado"));
 

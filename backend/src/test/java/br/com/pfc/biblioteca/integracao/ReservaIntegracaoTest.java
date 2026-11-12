@@ -18,7 +18,7 @@ class ReservaIntegracaoTest extends TesteIntegracaoBase {
 
     private JsonNode reservaDoLivro(Usuario usuario, Livro livro) {
         for (JsonNode reserva : get("/reservas/usuario/" + usuario.getId(), token(usuario)).corpo()) {
-            if (reserva.path("livroId").asLong() == livro.getId()) {
+            if (reserva.path("livroId").asText().equals(livro.getId().toString())) {
                 return reserva;
             }
         }
@@ -74,7 +74,7 @@ class ReservaIntegracaoTest extends TesteIntegracaoBase {
         Usuario estudante = criarEstudante();
         Livro livro = criarLivro(30, 1, 0);
         reservar(estudante, livro);
-        long reservaId = reservaDoLivro(estudante, livro).path("id").asLong();
+        String reservaId = reservaDoLivro(estudante, livro).path("id").asText();
 
         Resposta resposta = put("/reservas/" + reservaId + "/cancelar", token(estudante), null);
 
@@ -89,7 +89,7 @@ class ReservaIntegracaoTest extends TesteIntegracaoBase {
         Usuario funcionario = criarFuncionario();
         Livro livro = criarLivro(30, 2, 0);
         reservar(estudante, livro);
-        long reservaId = reservaDoLivro(estudante, livro).path("id").asLong();
+        String reservaId = reservaDoLivro(estudante, livro).path("id").asText();
 
         assertThat(put("/reservas/" + reservaId + "/entregar", token(funcionario), null).status()).isEqualTo(200);
         assertThat(reservaDoLivro(estudante, livro).path("status").asText()).isEqualTo("ENTREGUE");
@@ -107,7 +107,7 @@ class ReservaIntegracaoTest extends TesteIntegracaoBase {
         Usuario funcionario = criarFuncionario();
         Livro livro = criarLivro(30, 1, 0);
         reservar(estudante, livro);
-        long reservaId = reservaDoLivro(estudante, livro).path("id").asLong();
+        String reservaId = reservaDoLivro(estudante, livro).path("id").asText();
 
         assertThat(put("/reservas/" + reservaId + "/devolver", token(funcionario), null).status()).isEqualTo(400);
         assertThat(recarregar(livro).getEstoqueReserva()).isZero();
@@ -119,7 +119,7 @@ class ReservaIntegracaoTest extends TesteIntegracaoBase {
         Usuario funcionario = criarFuncionario();
         Livro livro = criarLivro(30, 1, 0);
         reservar(estudante, livro);
-        long reservaId = reservaDoLivro(estudante, livro).path("id").asLong();
+        String reservaId = reservaDoLivro(estudante, livro).path("id").asText();
         put("/reservas/" + reservaId + "/cancelar", token(estudante), null);
 
         assertThat(put("/reservas/" + reservaId + "/entregar", token(funcionario), null).status()).isEqualTo(400);
@@ -130,7 +130,7 @@ class ReservaIntegracaoTest extends TesteIntegracaoBase {
         Usuario estudante = criarEstudante();
         Livro livro = criarLivro(30, 1, 0);
         reservar(estudante, livro);
-        long reservaId = reservaDoLivro(estudante, livro).path("id").asLong();
+        String reservaId = reservaDoLivro(estudante, livro).path("id").asText();
 
         assertThat(put("/reservas/" + reservaId + "/entregar", token(estudante), null).status()).isEqualTo(403);
     }
@@ -146,6 +146,18 @@ class ReservaIntegracaoTest extends TesteIntegracaoBase {
         Resposta doFuncionario = get("/reservas/usuario/" + outro.getId(), token(funcionario));
         assertThat(doFuncionario.status()).isEqualTo(200);
         assertThat(doFuncionario.corpo().size()).isEqualTo(1);
+    }
+
+    @Test
+    void identificadorInvalidoDevolve400() {
+        Usuario estudante = criarEstudante();
+
+        Resposta naUrl = get("/reservas/usuario/10", token(estudante));
+        Resposta noCorpo = post("/carrinho/itens", token(estudante), java.util.Map.of("livroId", "10", "quantidade", 1));
+
+        assertThat(naUrl.status()).isEqualTo(400);
+        assertThat(naUrl.mensagem()).contains("usuarioId");
+        assertThat(noCorpo.status()).isEqualTo(400);
     }
 
     @Test

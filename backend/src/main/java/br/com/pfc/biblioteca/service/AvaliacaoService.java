@@ -1,5 +1,6 @@
 package br.com.pfc.biblioteca.service;
 
+import java.util.UUID;
 import br.com.pfc.biblioteca.dto.avaliacao.AvaliacaoDTO;
 import br.com.pfc.biblioteca.dto.avaliacao.AvaliacaoRequest;
 import br.com.pfc.biblioteca.dto.livro.RankingLivroDTO;
@@ -37,7 +38,7 @@ public class AvaliacaoService {
         this.logService = logService;
     }
 
-    public AvaliacaoDTO avaliarLivro(Long livroId, AvaliacaoRequest request){
+    public AvaliacaoDTO avaliarLivro(UUID livroId, AvaliacaoRequest request){
         Usuario usuario = UsuarioLogado();
 
         Livro livro = livroRepository.findById(livroId)
@@ -58,7 +59,7 @@ public class AvaliacaoService {
         return new AvaliacaoDTO(salva);
     }
 
-    public ResumoAvaliacoesDTO obterResumo(Long livroId){
+    public ResumoAvaliacoesDTO obterResumo(UUID livroId){
         Double media = repository.calcularMedia(livroId);
         Double mediaArredondada = media == null ? 0.0 : Math.round(media * 10) / 10.0;
 
@@ -71,7 +72,7 @@ public class AvaliacaoService {
         return new ResumoAvaliacoesDTO(mediaArredondada, lista.size(), lista);
     }
 
-    public void removerAvaliacao(Long avaliacaoId){
+    public void removerAvaliacao(UUID avaliacaoId){
         Usuario usuario = UsuarioLogado();
 
         Avaliacao avaliacao = repository.findById(avaliacaoId)

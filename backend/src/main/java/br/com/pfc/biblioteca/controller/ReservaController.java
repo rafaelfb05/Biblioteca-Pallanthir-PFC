@@ -1,5 +1,6 @@
 package br.com.pfc.biblioteca.controller;
 
+import java.util.UUID;
 import br.com.pfc.biblioteca.dto.reserva.ReservaDTO;
 import br.com.pfc.biblioteca.service.ReservaService;
 import org.springframework.http.ResponseEntity;
@@ -18,31 +19,31 @@ public class ReservaController {
     }
 
     @PostMapping("/{usuarioId}/{livroId}")
-    public ResponseEntity<Void> reservar(@PathVariable Long usuarioId, @PathVariable Long livroId){
+    public ResponseEntity<Void> reservar(@PathVariable UUID usuarioId, @PathVariable UUID livroId){
         service.reservarLivro(usuarioId, livroId);
         return ResponseEntity.ok().build();
     }
 
     @PutMapping("/{reservaId}/cancelar")
-    public ResponseEntity<Void> cancelar(@PathVariable Long reservaId){
+    public ResponseEntity<Void> cancelar(@PathVariable UUID reservaId){
         service.cancelarReserva(reservaId);
         return ResponseEntity.ok().build();
     }
 
     @PutMapping("/{reservaId}/entregar")
-    public ResponseEntity<Void> entregar(@PathVariable Long reservaId){
+    public ResponseEntity<Void> entregar(@PathVariable UUID reservaId){
         service.entregarLivro(reservaId);
         return ResponseEntity.ok().build();
     }
 
     @PutMapping("/{reservaId}/devolver")
-    public ResponseEntity<Void> devolver(@PathVariable Long reservaId){
+    public ResponseEntity<Void> devolver(@PathVariable UUID reservaId){
         service.devolverLivro(reservaId);
         return ResponseEntity.ok().build();
     }
 
     @GetMapping("/usuario/{usuarioId}")
-    public List<ReservaDTO> listarPorUsuario(@PathVariable Long usuarioId){
+    public List<ReservaDTO> listarPorUsuario(@PathVariable UUID usuarioId){
         return service.listarReservasPorUsuario(usuarioId);
     }
 }

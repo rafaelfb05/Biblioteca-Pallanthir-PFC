@@ -1,5 +1,6 @@
 package br.com.pfc.biblioteca.repository;
 
+import java.util.UUID;
 import br.com.pfc.biblioteca.enums.StatusReserva;
 import br.com.pfc.biblioteca.entity.jpa.Reserva;
 import org.springframework.data.domain.PageRequest;
@@ -10,14 +11,14 @@ import java.awt.print.Pageable;
 import java.util.List;
 import java.util.Objects;
 
-public interface ReservaRepository extends JpaRepository<Reserva, Long> {
-    List<Reserva> findByUsuarioId(Long usuarioId);
+public interface ReservaRepository extends JpaRepository<Reserva, UUID> {
+    List<Reserva> findByUsuarioId(UUID usuarioId);
 
-    List<Reserva> findByLivroId(Long livroId);
+    List<Reserva> findByLivroId(UUID livroId);
 
-    boolean existsByUsuarioIdAndStatusIn(Long usuarioId, List<StatusReserva> status);
+    boolean existsByUsuarioIdAndStatusIn(UUID usuarioId, List<StatusReserva> status);
 
-    boolean existsByLivroIdAndStatusIn(Long livroId, List<StatusReserva> status);
+    boolean existsByLivroIdAndStatusIn(UUID livroId, List<StatusReserva> status);
 
     long countByStatus(StatusReserva status);
 

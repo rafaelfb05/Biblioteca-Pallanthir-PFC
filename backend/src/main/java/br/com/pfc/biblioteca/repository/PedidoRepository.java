@@ -1,5 +1,6 @@
 package br.com.pfc.biblioteca.repository;
 
+import java.util.UUID;
 import br.com.pfc.biblioteca.entity.jpa.Pedido;
 import br.com.pfc.biblioteca.enums.StatusPedido;
 import jakarta.persistence.LockModeType;
@@ -13,19 +14,19 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
-public interface PedidoRepository extends JpaRepository<Pedido, Long> {
+public interface PedidoRepository extends JpaRepository<Pedido, UUID> {
 
-    List<Pedido> findByUsuarioIdOrderByDataCriacaoDesc(Long usuarioId);
+    List<Pedido> findByUsuarioIdOrderByDataCriacaoDesc(UUID usuarioId);
 
-    List<Pedido> findByUsuarioIdAndStatus(Long usuarioId, StatusPedido status);
+    List<Pedido> findByUsuarioIdAndStatus(UUID usuarioId, StatusPedido status);
 
-    boolean existsByUsuarioIdAndStatus(Long usuarioId, StatusPedido status);
+    boolean existsByUsuarioIdAndStatus(UUID usuarioId, StatusPedido status);
 
     List<Pedido> findByStatusAndDataExpiracaoBefore(StatusPedido status, LocalDateTime limite);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT p FROM Pedido p WHERE p.id = :id")
-    Optional<Pedido> buscarComLock(Long id);
+    Optional<Pedido> buscarComLock(UUID id);
 
     @Query("""
         SELECT i.livro.materia, SUM(i.quantidade) FROM ItemPedido i

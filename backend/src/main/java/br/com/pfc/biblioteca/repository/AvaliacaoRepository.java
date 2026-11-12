@@ -1,5 +1,6 @@
 package br.com.pfc.biblioteca.repository;
 
+import java.util.UUID;
 import br.com.pfc.biblioteca.dto.livro.RankingLivroDTO;
 import br.com.pfc.biblioteca.entity.jpa.Avaliacao;
 import org.springframework.data.domain.Pageable;
@@ -10,16 +11,16 @@ import org.springframework.data.jpa.repository.Query;
 import java.util.List;
 import java.util.Optional;
 
-public interface AvaliacaoRepository extends JpaRepository<Avaliacao, Long> {
+public interface AvaliacaoRepository extends JpaRepository<Avaliacao, UUID> {
 
-    Optional<Avaliacao> findByUsuarioIdAndLivroId(Long usuarioId, Long livroId);
+    Optional<Avaliacao> findByUsuarioIdAndLivroId(UUID usuarioId, UUID livroId);
 
-    List<Avaliacao> findByLivroIdAndAtivoTrueOrderByDataAvaliacaoDesc(Long livroId);
+    List<Avaliacao> findByLivroIdAndAtivoTrueOrderByDataAvaliacaoDesc(UUID livroId);
 
-    long countByLivroIdAndAtivoTrue(Long livroId);
+    long countByLivroIdAndAtivoTrue(UUID livroId);
 
     @Query("SELECT AVG(a.nota) FROM Avaliacao a WHERE a.livro.id = :livroId AND a.ativo = true")
-    Double calcularMedia(long livroId);
+    Double calcularMedia(UUID livroId);
 
     @Query("""
         SELECT new br.com.pfc.biblioteca.dto.livro.RankingLivroDTO(

@@ -35,7 +35,7 @@ class DashboardIntegracaoTest extends TesteIntegracaoBase {
         Livro livro = criarLivro(Materia.MEDICINA, 40, 2, 4);
         post("/reservas/" + estudante.getId() + "/" + livro.getId(), token(estudante), null);
         adicionarAoCarrinho(token(estudante), livro, 2);
-        long pedidoId = post("/pedidos/checkout", token(estudante), null).corpo().path("id").asLong();
+        String pedidoId = post("/pedidos/checkout", token(estudante), null).corpo().path("id").asText();
         String orderId = orderDoPedido(pedidoId);
         definirStatusNoMercadoPago(orderId, "processed");
         notificarWebhook(orderId, SEGREDO_WEBHOOK);

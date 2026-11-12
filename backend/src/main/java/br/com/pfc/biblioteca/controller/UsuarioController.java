@@ -1,5 +1,6 @@
 package br.com.pfc.biblioteca.controller;
 
+import java.util.UUID;
 import br.com.pfc.biblioteca.dto.auth.*;
 import br.com.pfc.biblioteca.dto.livro.LivroDTO;
 import br.com.pfc.biblioteca.dto.usuario.UsuarioDTO;
@@ -34,29 +35,29 @@ public class UsuarioController {
     }
 
     @PutMapping("/atualizar/{id}")
-    public ResponseEntity<UsuarioDTO> atualizarUsuario(@PathVariable Long id, @RequestBody UsuarioRequest request) {
+    public ResponseEntity<UsuarioDTO> atualizarUsuario(@PathVariable UUID id, @RequestBody UsuarioRequest request) {
         Usuario usuario = service.atualizarUsuario(id, request);
         return ResponseEntity.ok(new UsuarioDTO(usuario));
     }
 
     @DeleteMapping("/deletar/{id}")
-    public ResponseEntity<Void> deletarUsuario(@PathVariable Long id) {
+    public ResponseEntity<Void> deletarUsuario(@PathVariable UUID id) {
         service.excluirUsuario(id);
         return ResponseEntity.noContent().build();
     }
     @PostMapping("/{usuarioId}/favoritar/{livroId}")
-    public ResponseEntity<Void> adicionarFavorito(@PathVariable Long usuarioId, @PathVariable Long livroId){
+    public ResponseEntity<Void> adicionarFavorito(@PathVariable UUID usuarioId, @PathVariable UUID livroId){
         service.adicionarFavorito(usuarioId, livroId);
         return ResponseEntity.ok().build();
     }
 
     @GetMapping("/{usuarioId}/favoritos")
-    public List<LivroDTO> listarFavoritos(@PathVariable Long usuarioId){
+    public List<LivroDTO> listarFavoritos(@PathVariable UUID usuarioId){
         return service.listarFavoritos(usuarioId);
     }
 
     @DeleteMapping("/{usuarioId}/favoritar/{livroId}")
-    public ResponseEntity<Void> removerFavorito(@PathVariable Long usuarioId, @PathVariable Long livroId){
+    public ResponseEntity<Void> removerFavorito(@PathVariable UUID usuarioId, @PathVariable UUID livroId){
         service.removerFavorito(usuarioId, livroId);
         return ResponseEntity.ok().build();
     }

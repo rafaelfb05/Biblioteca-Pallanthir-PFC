@@ -1,5 +1,6 @@
 package br.com.pfc.biblioteca.service;
 
+import java.util.UUID;
 import br.com.pfc.biblioteca.entity.jpa.Usuario;
 import br.com.pfc.biblioteca.entity.mongo.LogAuditoria;
 import br.com.pfc.biblioteca.repository.LogAuditoriaRepository;
@@ -26,7 +27,7 @@ public class LogAuditoriaService {
         this.usuarioRepository = usuarioRepository;
     }
 
-    public void registrarLog(Long usuarioId, String usuarioEmail, String acao, String descricao){
+    public void registrarLog(UUID usuarioId, String usuarioEmail, String acao, String descricao){
         LogAuditoria log = new LogAuditoria(usuarioId, usuarioEmail, acao, descricao);
         CompletableFuture.runAsync(() -> repository.save(log))
                 .exceptionally(erro -> {
@@ -38,7 +39,7 @@ public class LogAuditoriaService {
     public void registrarLogUsuarioLogado(String acao, String descricao){
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         String emailLogado = auth != null ? auth.getName() : null;
-        Long usuarioId = emailLogado == null ? null : usuarioRepository.findByEmailAndAtivoTrue(emailLogado)
+        UUID usuarioId = emailLogado == null ? null : usuarioRepository.findByEmailAndAtivoTrue(emailLogado)
                 .map(Usuario::getId)
                 .orElse(null);
         registrarLog(usuarioId, emailLogado, acao, descricao);
@@ -48,7 +49,7 @@ public class LogAuditoriaService {
         return repository.findAllByOrderByDataHoraDesc();
     }
 
-    public List<LogAuditoria> listarPorUsuario(Long usuarioId){
-        return repository.findByUsuarioIdOrderByDataHoraDesc(usuarioId);
+    public List<LogAuditoria> listarPorUsuario(UUID usuarioId){
+        return repository.findByUsuarioIdOrderByDataHoraDesc(usuarioId.toString());
     }
 }

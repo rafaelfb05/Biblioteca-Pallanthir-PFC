@@ -4,6 +4,10 @@ import App from "./App";
 jest.mock("./Componentes/ModalDocumento", () => () => null);
 
 const API = "http://localhost:8080";
+const ID_USUARIO = "11111111-1111-4111-8111-111111111111";
+const ID_LIVRO = "22222222-2222-4222-8222-222222222222";
+const ID_LIVRO_SEM_VENDA = "33333333-3333-4333-8333-333333333333";
+const ID_PEDIDO = "44444444-4444-4444-8444-444444444444";
 
 const livro = (id, titulo, extras = {}) => ({
   id,
@@ -25,19 +29,19 @@ const tokenValido = () =>
 const entrarComo = (tipo) => {
   localStorage.setItem(
     "pallanthir:usuario",
-    JSON.stringify({ id: 1, nome: "Ana", email: "ana@teste.com", tipo, token: tokenValido() })
+    JSON.stringify({ id: ID_USUARIO, nome: "Ana", email: "ana@teste.com", tipo, token: tokenValido() })
   );
   localStorage.setItem("pallanthir:ultimaAtividade", String(Date.now()));
 };
 
 const pedidoPendente = {
-  id: 7,
+  id: ID_PEDIDO,
   status: "AGUARDANDO_PAGAMENTO",
   total: 40,
   dataCriacao: "2026-11-12T10:00:00",
   dataExpiracao: "2026-11-12T10:30:00",
   linkPagamento: "https://www.mercadopago.com.br/checkout/v1/redirect?order_id=ORD7",
-  itens: [{ livroId: 1, titulo: "Clean Code", quantidade: 1, precoUnitario: 40 }],
+  itens: [{ livroId: ID_LIVRO, titulo: "Clean Code", quantidade: 1, precoUnitario: 40 }],
 };
 
 let chamadas;
@@ -45,10 +49,10 @@ let chamadas;
 const simularApi = (rotasExtras = {}) => {
   chamadas = [];
   const rotas = {
-    "GET /livros": () => [200, [livro(1, "Clean Code"), livro(2, "Sem Venda", { estoqueCompra: 0 })]],
+    "GET /livros": () => [200, [livro(ID_LIVRO, "Clean Code"), livro(ID_LIVRO_SEM_VENDA, "Sem Venda", { estoqueCompra: 0 })]],
     "GET /livros/materias": () => [200, [{ nome: "TI", rotulo: "Ti", quantidade: 2 }]],
-    "GET /usuarios/1/favoritos": () => [200, []],
-    "GET /reservas/usuario/1": () => [200, []],
+    ["GET /usuarios/" + ID_USUARIO + "/favoritos"]: () => [200, []],
+    ["GET /reservas/usuario/" + ID_USUARIO]: () => [200, []],
     "GET /carrinho": () => [200, { itens: [], total: 0 }],
     "GET /pedidos": () => [200, []],
     "GET /avaliacoes/ranking": () => [200, []],
@@ -76,7 +80,7 @@ const chamadasPara = (metodo, caminho) =>
 const carrinhoCom = (quantidade, preco = 40) => ({
   itens: [
     {
-      livroId: 1,
+      livroId: ID_LIVRO,
       titulo: "Clean Code",
       capaUrl: null,
       precoUnitario: preco,
@@ -165,7 +169,7 @@ test("carrinho com pedido pendente avisa e fica bloqueado", async () => {
 
   await abrirCarrinho();
 
-  expect(await screen.findByText(/O pedido #7 está aguardando pagamento/)).toBeInTheDocument();
+  expect(await screen.findByText(/O pedido #44444444 está aguardando pagamento/)).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Remover" })).toBeDisabled();
   expect(screen.getByRole("button", { name: "Aumentar quantidade" })).toBeDisabled();
 });
@@ -212,7 +216,7 @@ test("retorno do Mercado Pago abre Meus pedidos com aviso e limpa a URL", async 
 
   expect(await screen.findByRole("heading", { name: "Meus pedidos" })).toBeInTheDocument();
   expect(screen.getByText(/Recebemos o retorno do Mercado Pago/)).toBeInTheDocument();
-  expect(await screen.findByText("Pedido #7")).toBeInTheDocument();
+  expect(await screen.findByText("Pedido #44444444")).toBeInTheDocument();
   expect(window.location.pathname).toBe("/");
 });
 
@@ -224,6 +228,20 @@ test("retorno sem sessão pede login e explica que o pagamento não foi afetado"
   expect(await screen.findByRole("button", { name: "Entre na sua conta" })).toBeInTheDocument();
   expect(screen.getByText(/não afeta o seu pagamento/)).toBeInTheDocument();
   expect(chamadasPara("GET", "/pedidos")).toHaveLength(0);
+});
+
+test("sessão antiga com id numérico é descartada", async () => {
+  simularApi();
+  localStorage.setItem(
+    "pallanthir:usuario",
+    JSON.stringify({ id: 1, nome: "Ana", email: "ana@teste.com", tipo: "ESTUDANTE", token: tokenValido() })
+  );
+  localStorage.setItem("pallanthir:ultimaAtividade", String(Date.now()));
+  render(<App />);
+
+  expect(await screen.findByRole("button", { name: "Entrar" })).toBeInTheDocument();
+  expect(localStorage.getItem("pallanthir:usuario")).toBeNull();
+  expect(chamadas.some((c) => c.caminho.includes("/usuarios/1/"))).toBe(false);
 });
 
 test("funcionário vê a dashboard e não vê carrinho nem pedidos", async () => {

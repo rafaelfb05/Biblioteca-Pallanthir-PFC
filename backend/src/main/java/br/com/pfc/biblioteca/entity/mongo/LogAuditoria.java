@@ -4,12 +4,13 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Document(collection = "logs_auditoria")
 public class LogAuditoria {
     @Id
     private String id;
-    private Long usuarioId;
+    private String usuarioId;
     private String usuarioEmail;
     private String acao;
     private String descricao;
@@ -17,8 +18,8 @@ public class LogAuditoria {
 
     public LogAuditoria(){}
 
-    public LogAuditoria(Long usuarioId, String usuarioEmail, String acao, String descricao) {
-        this.usuarioId = usuarioId;
+    public LogAuditoria(UUID usuarioId, String usuarioEmail, String acao, String descricao) {
+        this.usuarioId = usuarioId == null ? null : usuarioId.toString();
         this.usuarioEmail = usuarioEmail;
         this.acao = acao;
         this.descricao = descricao;
@@ -29,7 +30,7 @@ public class LogAuditoria {
         return id;
     }
 
-    public Long getUsuarioId() {
+    public String getUsuarioId() {
         return usuarioId;
     }
 

@@ -16,7 +16,7 @@ public class JwtService {
     public String gerarToken(Usuario usuario){
         return Jwts.builder()
                 .subject(usuario.getEmail())
-                .claim("id", usuario.getId())
+                .claim("id", usuario.getId().toString())
                 .claim("tipo", usuario.getTipo().name())
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + 1000 * 60 * 15))

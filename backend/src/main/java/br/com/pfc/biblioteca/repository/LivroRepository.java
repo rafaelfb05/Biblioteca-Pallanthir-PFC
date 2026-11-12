@@ -1,5 +1,6 @@
 package br.com.pfc.biblioteca.repository;
 
+import java.util.UUID;
 
 import br.com.pfc.biblioteca.enums.Materia;
 import br.com.pfc.biblioteca.entity.jpa.Livro;
@@ -11,7 +12,7 @@ import org.springframework.data.jpa.repository.Query;
 import java.util.List;
 import java.util.Optional;
 
-public interface LivroRepository extends JpaRepository<Livro, Long> {
+public interface LivroRepository extends JpaRepository<Livro, UUID> {
 
     List<Livro> findByAtivoTrue();
 
@@ -25,7 +26,7 @@ public interface LivroRepository extends JpaRepository<Livro, Long> {
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT l FROM Livro l WHERE l.id = :id")
-    Optional<Livro> buscarComLock(Long id);
+    Optional<Livro> buscarComLock(UUID id);
 
 @Query("SELECT COALESCE(SUM(l.estoqueReserva), 0L) FROM Livro l WHERE l.ativo = true")
     long somarEstoqueReserva();
