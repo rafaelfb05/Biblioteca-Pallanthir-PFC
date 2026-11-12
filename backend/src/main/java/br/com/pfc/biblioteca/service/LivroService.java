@@ -8,6 +8,7 @@ import br.com.pfc.biblioteca.enums.Materia;
 import br.com.pfc.biblioteca.enums.StatusReserva;
 import br.com.pfc.biblioteca.infra.exception.ConflitoException;
 import br.com.pfc.biblioteca.infra.exception.RecursoNaoEncontradoException;
+import br.com.pfc.biblioteca.infra.exception.RegraDeNegocioException;
 import br.com.pfc.biblioteca.entity.jpa.Livro;
 import br.com.pfc.biblioteca.repository.LivroRepository;
 import br.com.pfc.biblioteca.repository.ReservaRepository;
@@ -15,6 +16,8 @@ import br.com.pfc.biblioteca.repository.UsuarioRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -41,7 +44,14 @@ public class LivroService {
 
 
     public Livro salvarLivro(String titulo, Materia materia, Double preco, Integer estoqueReserva, Integer estoqueCompra) {
-        var json = consumo.obterDados(ENDERECO + titulo.replace(" ", "+") + "&key=" + API_KEY);
+        String json;
+        try {
+            json = consumo.obterDados(ENDERECO + URLEncoder.encode(titulo.trim(), StandardCharsets.UTF_8)
+                    + "&key=" + URLEncoder.encode(String.valueOf(API_KEY), StandardCharsets.UTF_8));
+        } catch (RegraDeNegocioException e) {
+            logService.registrarLogUsuarioLogado("FALHA_CADASTRO_LIVRO", "Livro \"" + titulo + "\": " + e.getMessage());
+            throw e;
+        }
         DadosLivro.DadosBusca dadosBusca = conversor.obterDados(json, DadosLivro.DadosBusca.class);
 
         if (dadosBusca.items() == null || dadosBusca.items().isEmpty()) {
