@@ -84,7 +84,8 @@ public class LivroService {
     }
 
     public Livro atualizarLivro(Long id, AtualizarLivroRequest request) {
-        Livro livro = repository.findById(id).orElse(null);
+        Livro livro = repository.findById(id)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Livro não encontrado"));
 
         if (request.titulo() != null) {
             livro.setTitulo(request.titulo());

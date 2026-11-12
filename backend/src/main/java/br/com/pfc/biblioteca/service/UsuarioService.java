@@ -210,7 +210,7 @@ public class UsuarioService {
             }
             repository.save(usuario);
             logService.registrarLog(usuario.getId(), usuario.getEmail(), "FALHA_LOGIN", "Senha incorreta");
-            throw new CredenciaisInvalidasException("Email ou senha incorretos!");
+            throw new CredenciaisInvalidasException("Email ou senha incorretos");
         }
 
         usuario.setTentativasFalhas(0);
