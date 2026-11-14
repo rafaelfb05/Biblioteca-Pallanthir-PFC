@@ -2,6 +2,7 @@ package br.com.pfc.biblioteca.integracao;
 
 import br.com.pfc.biblioteca.entity.jpa.Livro;
 import br.com.pfc.biblioteca.entity.jpa.Usuario;
+import br.com.pfc.biblioteca.enums.Materia;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.junit.jupiter.api.Test;
 
@@ -24,7 +25,11 @@ class AvaliacaoIntegracaoTest extends TesteIntegracaoBase {
     }
 
     private boolean rankingContem(Livro livro) {
-        for (JsonNode item : get("/avaliacoes/ranking", null).corpo()) {
+        return rankingContem("/avaliacoes/ranking", livro);
+    }
+
+    private boolean rankingContem(String caminho, Livro livro) {
+        for (JsonNode item : get(caminho, null).corpo()) {
             if (item.path("id").asText().equals(livro.getId().toString())) {
                 return true;
             }
@@ -105,5 +110,22 @@ class AvaliacaoIntegracaoTest extends TesteIntegracaoBase {
 
         assertThat(rankingContem(comDuas)).isFalse();
         assertThat(rankingContem(comTres)).isTrue();
+    }
+
+    @Test
+    void rankingPodeSerFiltradoPorMateria() {
+        Livro deDireito = criarLivro(Materia.DIREITO, 30, 1, 0);
+        Livro deTi = criarLivro(Materia.TI, 30, 1, 0);
+        for (int i = 0; i < 6; i++) {
+            avaliar(criarEstudante(), deDireito, 5, null);
+            avaliar(criarEstudante(), deTi, 5, null);
+        }
+
+        assertThat(rankingContem("/avaliacoes/ranking?materia=DIREITO", deDireito)).isTrue();
+        assertThat(rankingContem("/avaliacoes/ranking?materia=DIREITO", deTi)).isFalse();
+        assertThat(rankingContem("/avaliacoes/ranking?materia=TI", deTi)).isTrue();
+        assertThat(rankingContem(deDireito)).isTrue();
+        assertThat(rankingContem(deTi)).isTrue();
+        assertThat(get("/avaliacoes/ranking?materia=INEXISTENTE", null).status()).isEqualTo(400);
     }
 }
