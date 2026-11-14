@@ -2595,7 +2595,9 @@ function App() {
           <span className="auth-logo" aria-hidden="true">
             Pallanthir
           </span>
-          <h3>{TITULOS_AUTENTICACAO[modoAutenticacao]}</h3>
+          <h3 className="oculto-visualmente">
+            {TITULOS_AUTENTICACAO[modoAutenticacao]}
+          </h3>
           <p className="modal-sub">{subtituloAutenticacao}</p>
         </div>
 
@@ -4790,7 +4792,7 @@ function App() {
         <div className="hero-content">
           <div className="hero-tag">
             <span></span>
-            BIBLIOTECA VIRTUAL
+            UM OLHAR SOBRE O CONHECIMENTO
           </div>
           <h1>
             Encontre seu próximo
