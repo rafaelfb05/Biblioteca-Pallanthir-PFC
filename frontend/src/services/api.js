@@ -175,7 +175,11 @@ export const avaliacoesApi = {
     }),
   remover: (avaliacaoId) =>
     request(`/avaliacoes/livros/${avaliacaoId}`, { method: "DELETE" }),
-  ranking: () => request("/avaliacoes/ranking"),
+  ranking: (materia) =>
+    request(
+      "/avaliacoes/ranking" +
+        (materia ? "?materia=" + encodeURIComponent(materia) : "")
+    ),
 };
 
 export const carrinhoApi = {

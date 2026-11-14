@@ -527,6 +527,36 @@ test("detalhes do pedido mostram os livros com capa e o total", async () => {
   expect(screen.queryByRole("dialog", { name: "Pedido #44444444" })).not.toBeInTheDocument();
 });
 
+test("ranking pode ser filtrado por matéria", async () => {
+  const item = (id, titulo) => ({ id, titulo, capaUrl: null, media: 4.5, total: 3 });
+  simularApi({
+    "GET /livros/materias": () => [200, [{ nome: "TI", rotulo: "Ti", quantidade: 2 }, { nome: "DIREITO", rotulo: "Direito", quantidade: 1 }]],
+  });
+  const fetchOriginal = global.fetch;
+  global.fetch = jest.fn((url, opcoes) => {
+    if (String(url).includes("/avaliacoes/ranking?materia=DIREITO")) {
+      return Promise.resolve({ ok: true, status: 200, text: () => Promise.resolve(JSON.stringify([item("d1", "Código Civil Comentado")])) });
+    }
+    if (String(url).endsWith("/avaliacoes/ranking")) {
+      return Promise.resolve({ ok: true, status: 200, text: () => Promise.resolve(JSON.stringify([item("t1", "Clean Code"), item("d1", "Código Civil Comentado")])) });
+    }
+    return fetchOriginal(url, opcoes);
+  });
+  render(<App />);
+
+  fireEvent.click(await screen.findByRole("button", { name: /^Ranking/ }));
+  expect(await screen.findByText("Código Civil Comentado", { selector: ".ranking-info strong" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Todas" })).toHaveAttribute("aria-pressed", "true");
+
+  fireEvent.click(screen.getByRole("button", { name: "Direito" }));
+
+  expect(await screen.findByRole("heading", { name: "Top 10 mais bem avaliados em Direito" })).toBeInTheDocument();
+  await waitFor(() => expect(screen.queryByText("Clean Code", { selector: ".ranking-info strong" })).not.toBeInTheDocument());
+  expect(screen.getByText("Código Civil Comentado", { selector: ".ranking-info strong" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Direito" })).toHaveAttribute("aria-pressed", "true");
+  expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith("/avaliacoes/ranking?materia=DIREITO"))).toBe(true);
+});
+
 test("funcionário vê a dashboard e não vê carrinho nem pedidos", async () => {
   simularApi({
     "GET /dashboard": () => [
