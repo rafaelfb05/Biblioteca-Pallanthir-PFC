@@ -8,12 +8,14 @@ import br.com.pfc.biblioteca.dto.avaliacao.ResumoAvaliacoesDTO;
 import br.com.pfc.biblioteca.entity.jpa.Avaliacao;
 import br.com.pfc.biblioteca.entity.jpa.Livro;
 import br.com.pfc.biblioteca.entity.jpa.Usuario;
+import br.com.pfc.biblioteca.enums.Materia;
 import br.com.pfc.biblioteca.infra.exception.RecursoNaoEncontradoException;
 import br.com.pfc.biblioteca.infra.exception.RegraDeNegocioException;
 import br.com.pfc.biblioteca.repository.AvaliacaoRepository;
 import br.com.pfc.biblioteca.repository.LivroRepository;
 import br.com.pfc.biblioteca.repository.UsuarioRepository;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
@@ -88,11 +90,18 @@ public class AvaliacaoService {
                 "avaliacao id " + avaliacaoId);
     }
 
-    public List<RankingLivroDTO> obterRanking(){
-        return repository.buscarRanking(MINIMO_AVALIACOES, PageRequest.of(0, 10))
-                .stream()
+    public List<RankingLivroDTO> obterRanking(Materia materia){
+        Pageable top10 = PageRequest.of(0, 10);
+
+        List<RankingLivroDTO> resultado = (materia == null)
+                ? repository.buscarRanking(MINIMO_AVALIACOES, top10)
+                : repository.buscarRankingPorMateria(materia, MINIMO_AVALIACOES, top10);
+
+        return resultado.stream()
                 .map(r -> new RankingLivroDTO(
-                        r.id(), r.titulo(), r.capaUrl(), Math.round(r.media() * 10) / 10.0, r.total()))
+                        r.id(), r.titulo(), r.capaUrl(),
+                        Math.round(r.media() * 10) / 10.0,
+                        r.total()))
                 .collect(Collectors.toList());
     }
 

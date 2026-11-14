@@ -5,6 +5,7 @@ import br.com.pfc.biblioteca.dto.avaliacao.AvaliacaoDTO;
 import br.com.pfc.biblioteca.dto.avaliacao.AvaliacaoRequest;
 import br.com.pfc.biblioteca.dto.livro.RankingLivroDTO;
 import br.com.pfc.biblioteca.dto.avaliacao.ResumoAvaliacoesDTO;
+import br.com.pfc.biblioteca.enums.Materia;
 import br.com.pfc.biblioteca.service.AvaliacaoService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -39,7 +40,7 @@ public class AvaliacaoController {
     }
 
     @GetMapping("/ranking")
-    public List<RankingLivroDTO> ranking(){
-        return service.obterRanking();
+    public List<RankingLivroDTO> ranking(@RequestParam(required = false)Materia materia){
+        return service.obterRanking(materia);
     }
 }
