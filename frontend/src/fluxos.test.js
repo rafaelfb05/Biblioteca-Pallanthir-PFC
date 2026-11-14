@@ -546,13 +546,19 @@ test("ranking pode ser filtrado por matéria", async () => {
 
   fireEvent.click(await screen.findByRole("button", { name: /^Ranking/ }));
   expect(await screen.findByText("Código Civil Comentado", { selector: ".ranking-info strong" })).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Todas" })).toHaveAttribute("aria-pressed", "true");
+  const filtrar = screen.getByRole("button", { name: /^Filtrar/ });
+  expect(filtrar).toHaveAttribute("aria-expanded", "false");
+  fireEvent.click(filtrar);
+  expect(filtrar).toHaveAttribute("aria-expanded", "true");
+  expect(screen.getByRole("button", { name: "Todas as matérias" })).toHaveAttribute("aria-pressed", "true");
 
   fireEvent.click(screen.getByRole("button", { name: "Direito" }));
+  expect(screen.getByRole("button", { name: /^Filtrar/ })).toHaveAttribute("aria-expanded", "false");
 
   expect(await screen.findByRole("heading", { name: "Top 10 mais bem avaliados em Direito" })).toBeInTheDocument();
   await waitFor(() => expect(screen.queryByText("Clean Code", { selector: ".ranking-info strong" })).not.toBeInTheDocument());
   expect(screen.getByText("Código Civil Comentado", { selector: ".ranking-info strong" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Filtrar Direito" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Direito" })).toHaveAttribute("aria-pressed", "true");
   expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith("/avaliacoes/ranking?materia=DIREITO"))).toBe(true);
 });

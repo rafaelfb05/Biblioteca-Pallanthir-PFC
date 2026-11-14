@@ -693,6 +693,8 @@ function App() {
   const [ranking, setRanking] = useState([]);
   const [materiaDoRanking, setMateriaDoRanking] = useState("");
   const consultaDoRanking = useRef(0);
+  const [filtroRankingAberto, setFiltroRankingAberto] = useState(false);
+  const filtroRankingRef = useRef(null);
   const [carregandoRanking, setCarregandoRanking] = useState(false);
   const [erroRanking, setErroRanking] = useState(null);
 
@@ -1410,6 +1412,7 @@ function App() {
   };
 
   const filtrarRanking = async (materia) => {
+    setFiltroRankingAberto(false);
     setMateriaDoRanking(materia);
     await carregarRanking(materia);
   };
@@ -2196,6 +2199,31 @@ function App() {
       setSalvando(false);
     }
   };
+
+  useEffect(() => {
+    if (!filtroRankingAberto) {
+      return undefined;
+    }
+    const aoClicarFora = (evento) => {
+      if (
+        filtroRankingRef.current &&
+        !filtroRankingRef.current.contains(evento.target)
+      ) {
+        setFiltroRankingAberto(false);
+      }
+    };
+    const aoTeclar = (evento) => {
+      if (evento.key === "Escape") {
+        setFiltroRankingAberto(false);
+      }
+    };
+    document.addEventListener("mousedown", aoClicarFora);
+    document.addEventListener("keydown", aoTeclar);
+    return () => {
+      document.removeEventListener("mousedown", aoClicarFora);
+      document.removeEventListener("keydown", aoTeclar);
+    };
+  }, [filtroRankingAberto]);
 
   useEffect(() => {
     if (!menuAberto) {
@@ -3865,25 +3893,66 @@ function App() {
           </p>
 
           {materias.length > 0 && (
-            <div
-              className="ranking-filtros"
-              role="group"
-              aria-label="Filtrar ranking por matéria"
-            >
-              {[{ nome: "", rotulo: "Todas" }, ...materias].map((materia) => (
-                <button
-                  type="button"
-                  key={materia.nome || "todas"}
-                  className={
-                    "ranking-filtro" +
-                    (materiaDoRanking === materia.nome ? " ativo" : "")
-                  }
-                  aria-pressed={materiaDoRanking === materia.nome}
-                  onClick={() => filtrarRanking(materia.nome)}
+            <div className="ranking-filtro-area" ref={filtroRankingRef}>
+              <button
+                type="button"
+                className={
+                  "ranking-filtro-botao" +
+                  (filtroRankingAberto || materiaDoRanking ? " ativo" : "")
+                }
+                onClick={() => setFiltroRankingAberto((aberto) => !aberto)}
+                aria-expanded={filtroRankingAberto}
+                aria-controls="ranking-filtro-opcoes"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  width="16"
+                  height="16"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  aria-hidden="true"
                 >
-                  {materia.rotulo}
-                </button>
-              ))}
+                  <path d="M4 6h16M7 12h10M10 18h4" />
+                </svg>
+                Filtrar
+                {materiaDoRanking && (
+                  <span className="ranking-filtro-selecionado">
+                    {(materias.find((m) => m.nome === materiaDoRanking) || {})
+                      .rotulo || materiaDoRanking}
+                  </span>
+                )}
+              </button>
+              <div
+                id="ranking-filtro-opcoes"
+                className={
+                  "ranking-filtro-painel" + (filtroRankingAberto ? " aberto" : "")
+                }
+                role="group"
+                aria-label="Filtrar ranking por matéria"
+              >
+                <span className="ranking-filtro-titulo">Matéria</span>
+                {[{ nome: "", rotulo: "Todas as matérias" }, ...materias].map(
+                  (materia) => (
+                    <button
+                      type="button"
+                      key={materia.nome || "todas"}
+                      className={
+                        "ranking-filtro-opcao" +
+                        (materiaDoRanking === materia.nome ? " ativo" : "")
+                      }
+                      aria-pressed={materiaDoRanking === materia.nome}
+                      onClick={() => filtrarRanking(materia.nome)}
+                    >
+                      {materia.rotulo}
+                      {materiaDoRanking === materia.nome && (
+                        <span aria-hidden="true">✓</span>
+                      )}
+                    </button>
+                  )
+                )}
+              </div>
             </div>
           )}
 
