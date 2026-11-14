@@ -373,7 +373,7 @@ function CampoSenha({ rotulo, valor, aoMudar, autoComplete }) {
           aria-label={visivel ? "Ocultar senha" : "Mostrar senha"}
           title={visivel ? "Ocultar senha" : "Mostrar senha"}
         >
-          {visivel ? "Ocultar" : "Mostrar"}
+          <span aria-hidden="true">{visivel ? "🙈" : "👁️"}</span>
         </button>
       </div>
     </label>
@@ -2568,21 +2568,6 @@ function App() {
   const modalAutenticacao = mostrarAutenticacao && (
     <div className="modal modal-auth">
       <div className="modal-box auth-box">
-        <aside className="auth-marca" aria-hidden="true">
-          <span className="auth-marca-logo">Pallanthir</span>
-          <p className="auth-marca-frase">
-            Sua biblioteca virtual para encontrar o próximo livro.
-          </p>
-          <ul className="auth-marca-lista">
-            <li>Reserve exemplares para retirar na biblioteca</li>
-            <li>Compre livros com pagamento pelo Mercado Pago</li>
-            <li>Favorite, avalie e acompanhe o ranking</li>
-          </ul>
-          <span className="auth-marca-rodape">
-            Acesso protegido com verificação em duas etapas
-          </span>
-        </aside>
-
         <div className="auth-conteudo">
         <div className="modal-header">
           <h3>{TITULOS_AUTENTICACAO[modoAutenticacao]}</h3>
@@ -2662,16 +2647,6 @@ function App() {
                 {salvando ? "Enviando código..." : "Entrar"}
               </button>
             </div>
-            <p className="auth-alternar">
-              Ainda não tem conta?{" "}
-              <button
-                type="button"
-                className="link-button"
-                onClick={() => trocarModoAutenticacao("cadastro")}
-              >
-                Criar conta
-              </button>
-            </p>
           </form>
         )}
 
@@ -2950,16 +2925,6 @@ function App() {
                 {salvando ? "Salvando..." : "Criar minha conta"}
               </button>
             </div>
-            <p className="auth-alternar">
-              Já tem conta?{" "}
-              <button
-                type="button"
-                className="link-button"
-                onClick={() => trocarModoAutenticacao("login")}
-              >
-                Entrar
-              </button>
-            </p>
           </form>
         )}
         </div>
@@ -4255,19 +4220,19 @@ function App() {
                         cancelado.
                       </small>
                     )}
+                    <button
+                      type="button"
+                      className="link-button pedido-detalhes-link"
+                      onClick={() => setPedidoDetalhado(pedido)}
+                    >
+                      Ver detalhes →
+                    </button>
                   </div>
 
                   <div className="pedido-lateral">
                     <strong className="carrinho-subtotal">
                       {formatarPreco(pedido.total)}
                     </strong>
-                    <button
-                      type="button"
-                      className="pedido-detalhes-botao"
-                      onClick={() => setPedidoDetalhado(pedido)}
-                    >
-                      Ver detalhes
-                    </button>
                     {pedido.status === "AGUARDANDO_PAGAMENTO" &&
                       pedido.linkPagamento && (
                         <button
@@ -4385,6 +4350,24 @@ function App() {
                 </button>
               ) : (
                 <CapaGenerica titulo={livroAberto.titulo} tamanho="grande" />
+              )}
+              {!ehFuncionario && (
+                <button
+                  type="button"
+                  className={
+                    "favorite favorite-livro" + (favoritado ? " ativo" : "")
+                  }
+                  onClick={() => alternarFavorito(livroAberto)}
+                  disabled={favoritoEmEdicao === livroAberto.id}
+                  aria-label={
+                    favoritado ? "Remover dos favoritos" : "Adicionar aos favoritos"
+                  }
+                  title={
+                    favoritado ? "Remover dos favoritos" : "Adicionar aos favoritos"
+                  }
+                >
+                  {favoritado ? "♥" : "♡"}
+                </button>
               )}
             </div>
 
@@ -4556,16 +4539,6 @@ function App() {
               </div>
 
               <div className="livro-acoes">
-                {!ehFuncionario && (
-                  <button
-                    type="button"
-                    className={"favoritar-button" + (favoritado ? " ativo" : "")}
-                    onClick={() => alternarFavorito(livroAberto)}
-                    disabled={favoritoEmEdicao === livroAberto.id}
-                  >
-                    {favoritado ? "♥ Remover dos favoritos" : "♡ Favoritar"}
-                  </button>
-                )}
                 {ehFuncionario ? null : reservaAberta &&
                   reservaAberta.status === "ENTREGUE" ? (
                   <button type="button" className="reservar-button" disabled>

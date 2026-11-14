@@ -514,7 +514,7 @@ test("detalhes do pedido mostram os livros com capa e o total", async () => {
   render(<App />);
 
   fireEvent.click(await screen.findByRole("button", { name: "Pedidos" }));
-  fireEvent.click(await screen.findByRole("button", { name: "Ver detalhes" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Ver detalhes →" }));
 
   const janela = await screen.findByRole("dialog", { name: "Pedido #44444444" });
   expect(within(janela).getByAltText("Capa de Clean Code")).toHaveAttribute("src", "https://covers.openlibrary.org/b/isbn/1-L.jpg");
