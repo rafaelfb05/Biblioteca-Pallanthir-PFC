@@ -21,6 +21,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -67,7 +68,7 @@ public class LivroService {
         livro.setPreco(preco);
         livro.setEstoqueReserva(estoqueReserva);
         livro.setEstoqueCompra(estoqueCompra);
-        capaPeloIsbn(livro).ifPresent(livro::setCapaUrl);
+        livro.setCapaUrl(capaPeloIsbn(livro).orElse(null));
         Livro salvo = repository.save(livro);
         logService.registrarLogUsuarioLogado("CADASTRO_LIVRO", "Livro " + salvo.getId() + " (" + salvo.getTitulo() + ") cadastrado");
         return salvo;
@@ -112,28 +113,19 @@ public class LivroService {
         if (request.estoqueCompra() != null) {
             livro.setEstoqueCompra(request.estoqueCompra());
         }
+        String isbn10Anterior = livro.getIsbn10();
+        String isbn13Anterior = livro.getIsbn13();
         if (request.isbn10() != null) {
             livro.setIsbn10(normalizarIsbn(request.isbn10(), "^\\d{9}[\\dX]$", "ISBN-10 inválido: informe 10 caracteres (9 números e um número ou X no final)"));
         }
         if (request.isbn13() != null) {
             livro.setIsbn13(normalizarIsbn(request.isbn13(), "^\\d{13}$", "ISBN-13 inválido: informe 13 números"));
         }
+        if (!Objects.equals(isbn10Anterior, livro.getIsbn10()) || !Objects.equals(isbn13Anterior, livro.getIsbn13())) {
+            livro.setCapaUrl(capaPeloIsbn(livro).orElse(null));
+        }
         Livro salvo = repository.save(livro);
         logService.registrarLogUsuarioLogado("ATUALIZACAO_LIVRO", "Livro " + salvo.getId() + " (" + salvo.getTitulo() + ") atualizado");
-        return salvo;
-    }
-
-    public Livro buscarCapaPeloIsbn(UUID id) {
-        Livro livro = repository.findById(id)
-                .orElseThrow(() -> new RecursoNaoEncontradoException("Livro não encontrado"));
-        if (livro.getIsbn13() == null && livro.getIsbn10() == null) {
-            throw new RegraDeNegocioException("Preencha o ISBN-10 ou o ISBN-13 do livro antes de buscar a capa");
-        }
-        String capa = capaPeloIsbn(livro)
-                .orElseThrow(() -> new RecursoNaoEncontradoException("Capa não encontrada na Open Library para esse ISBN"));
-        livro.setCapaUrl(capa);
-        Livro salvo = repository.save(livro);
-        logService.registrarLogUsuarioLogado("ATUALIZACAO_LIVRO", "Capa do livro " + salvo.getId() + " (" + salvo.getTitulo() + ") trocada pela da Open Library");
         return salvo;
     }
 
