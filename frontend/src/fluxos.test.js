@@ -388,7 +388,7 @@ test("logs podem ser filtrados por ação e por período", async () => {
   fireEvent.change(screen.getByLabelText("Até"), { target: { value: "2026-11-09" } });
   expect(screen.getByText("Nenhum registro encontrado.")).toBeInTheDocument();
 
-  fireEvent.click(screen.getByRole("button", { name: "Limpar filtros" }));
+  fireEvent.click(screen.getByRole("button", { name: /Limpar filtros/ }));
   expect(screen.getByText("3 registros")).toBeInTheDocument();
 });
 
@@ -430,6 +430,73 @@ test("versão dos termos muda quando o texto muda e ignora quebra de linha do Wi
   expect(versaoDosTermos("Termos\r\nv1", "Política")).toBe(versaoDosTermos("Termos\nv1", "Política"));
   expect(versaoDosTermos("Termos v1", "Política")).not.toBe(versaoDosTermos("Termos v2", "Política"));
   expect(versaoDosTermos("Termos", "Política")).toMatch(/^[0-9a-f]{28}$/);
+});
+
+test("funcionário edita o livro direto na página e salva", async () => {
+  simularApi({
+    ["GET /avaliacoes/livro/" + ID_LIVRO]: () => [200, { media: 0, total: 0, avaliacoes: [] }],
+    ["PUT /livros/atualizar/" + ID_LIVRO]: (corpo) => [200, livro(ID_LIVRO, corpo.titulo, corpo)],
+  });
+  entrarComo("FUNCIONARIO");
+  render(<App />);
+
+  fireEvent.click(await screen.findByRole("heading", { name: "Clean Code" }));
+  expect(screen.queryByRole("textbox", { name: "Título" })).not.toBeInTheDocument();
+
+  fireEvent.click(await screen.findByRole("button", { name: "✎ Atualizar livro" }));
+  fireEvent.change(screen.getByRole("textbox", { name: "Título" }), { target: { value: "Código Limpo" } });
+  fireEvent.change(screen.getByRole("spinbutton", { name: "Páginas" }), { target: { value: "425" } });
+  fireEvent.change(screen.getByRole("textbox", { name: "ISBN-13" }), { target: { value: "978-8576082675" } });
+  fireEvent.click(screen.getByRole("button", { name: "Salvar alterações" }));
+
+  expect(await screen.findByText('"Código Limpo" foi atualizado.')).toBeInTheDocument();
+  const corpo = chamadasPara("PUT", "/livros/atualizar/" + ID_LIVRO)[0].corpo;
+  expect(corpo).toMatchObject({ titulo: "Código Limpo", numeroPagina: 425, isbn13: "978-8576082675" });
+  expect(screen.queryByRole("textbox", { name: "Título" })).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "✎ Atualizar livro" })).toBeInTheDocument();
+});
+
+test("cancelar a edição do livro descarta as mudanças", async () => {
+  simularApi({ ["GET /avaliacoes/livro/" + ID_LIVRO]: () => [200, { media: 0, total: 0, avaliacoes: [] }] });
+  entrarComo("FUNCIONARIO");
+  render(<App />);
+
+  fireEvent.click(await screen.findByRole("heading", { name: "Clean Code" }));
+  fireEvent.click(await screen.findByRole("button", { name: "✎ Atualizar livro" }));
+  fireEvent.change(screen.getByRole("textbox", { name: "Título" }), { target: { value: "Outro título" } });
+  fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+
+  expect(screen.getByRole("heading", { level: 1, name: "Clean Code" })).toBeInTheDocument();
+  expect(chamadasPara("PUT", "/livros/atualizar/" + ID_LIVRO)).toHaveLength(0);
+});
+
+test.each([
+  ["Reservas", /^Reservas/, "para ver suas reservas."],
+  ["Favoritos", /^Favoritos/, "para ver os livros que você favoritou."],
+])("visitante em %s vê o link para entrar na conta", async (_, botao, texto) => {
+  simularApi();
+  render(<App />);
+
+  fireEvent.click(await screen.findByRole("button", { name: botao }));
+  expect(await screen.findByText(texto, { exact: false })).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: "Entre na sua conta" }));
+  expect(await screen.findByRole("heading", { name: "Entrar" })).toBeInTheDocument();
+});
+
+test("sair fica só em Minha conta e encerra a sessão", async () => {
+  simularApi();
+  entrarComo("ESTUDANTE");
+  render(<App />);
+
+  await screen.findByRole("heading", { name: "Clean Code" });
+  expect(screen.queryByRole("button", { name: /^Sair/ })).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByTitle("Minha conta"));
+  fireEvent.click(await screen.findByRole("button", { name: /Sair da conta/ }));
+
+  expect(await screen.findByText("Você saiu da sua conta.")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Entrar" })).toBeInTheDocument();
 });
 
 test("funcionário vê a dashboard e não vê carrinho nem pedidos", async () => {
