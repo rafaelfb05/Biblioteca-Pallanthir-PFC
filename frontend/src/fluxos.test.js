@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import App from "./App";
 import { versaoDosTermos } from "./services/termos";
 
@@ -497,6 +497,34 @@ test("sair fica só em Minha conta e encerra a sessão", async () => {
 
   expect(await screen.findByText("Você saiu da sua conta.")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Entrar" })).toBeInTheDocument();
+});
+
+test("detalhes do pedido mostram os livros com capa e o total", async () => {
+  const aprovado = {
+    ...pedidoPendente,
+    status: "APROVADO",
+    total: 120,
+    itens: [
+      { livroId: ID_LIVRO, titulo: "Clean Code", quantidade: 2, precoUnitario: 40, capaUrl: "https://covers.openlibrary.org/b/isbn/1-L.jpg" },
+      { livroId: ID_LIVRO_SEM_VENDA, titulo: "Sem Venda", quantidade: 1, precoUnitario: 40, capaUrl: null },
+    ],
+  };
+  simularApi({ "GET /pedidos": () => [200, [aprovado]] });
+  entrarComo("ESTUDANTE");
+  render(<App />);
+
+  fireEvent.click(await screen.findByRole("button", { name: "Pedidos" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Ver detalhes" }));
+
+  const janela = await screen.findByRole("dialog", { name: "Pedido #44444444" });
+  expect(within(janela).getByAltText("Capa de Clean Code")).toHaveAttribute("src", "https://covers.openlibrary.org/b/isbn/1-L.jpg");
+  expect(within(janela).getByRole("img", { name: "Capa genérica de Sem Venda" })).toBeInTheDocument();
+  expect(within(janela).getByText("2 unidades ×", { exact: false })).toBeInTheDocument();
+  expect(within(janela).getByText("Pagamento aprovado pelo Mercado Pago.")).toBeInTheDocument();
+  expect(within(janela).getByText("R$ 120,00")).toBeInTheDocument();
+
+  fireEvent.click(within(janela).getByRole("button", { name: "Fechar" }));
+  expect(screen.queryByRole("dialog", { name: "Pedido #44444444" })).not.toBeInTheDocument();
 });
 
 test("funcionário vê a dashboard e não vê carrinho nem pedidos", async () => {

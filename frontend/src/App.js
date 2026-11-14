@@ -380,6 +380,48 @@ function CampoSenha({ rotulo, valor, aoMudar, autoComplete }) {
   );
 }
 
+const REGRAS_DA_SENHA = [
+  ["8 caracteres ou mais", (senha) => senha.length >= 8],
+  ["Letra maiúscula", (senha) => /[A-Z]/.test(senha)],
+  ["Letra minúscula", (senha) => /[a-z]/.test(senha)],
+  ["Número", (senha) => /\d/.test(senha)],
+  ["Símbolo (@ # $ % ^ & + = !)", (senha) => /[@#$%^&+=!]/.test(senha)],
+];
+
+function RegrasDaSenha({ senha, confirmacao }) {
+  const texto = senha || "";
+  const iguais = texto.length > 0 && texto === confirmacao;
+  return (
+    <ul className="regras-senha" aria-label="Requisitos da senha">
+      {REGRAS_DA_SENHA.map(([descricao, atende]) => (
+        <li key={descricao} className={atende(texto) ? "ok" : undefined}>
+          <span aria-hidden="true">{atende(texto) ? "✓" : "•"}</span>
+          {descricao}
+        </li>
+      ))}
+      <li className={iguais ? "ok" : undefined}>
+        <span aria-hidden="true">{iguais ? "✓" : "•"}</span>
+        As duas senhas são iguais
+      </li>
+    </ul>
+  );
+}
+
+function CapaDoItem({ capaUrl, titulo }) {
+  const [falhou, setFalhou] = useState(false);
+
+  if (!capaUrl || falhou) {
+    return <CapaGenerica titulo={titulo} tamanho="mini" />;
+  }
+  return (
+    <img
+      src={capaNaResolucao(capaUrl, ZOOM_CAPA_CARTAO)}
+      alt={"Capa de " + titulo}
+      onError={() => setFalhou(true)}
+    />
+  );
+}
+
 function CapaGenerica({ titulo, tamanho }) {
   return (
     <div
@@ -585,6 +627,7 @@ function App() {
   const [itemCarrinhoEmEdicao, setItemCarrinhoEmEdicao] = useState(null);
   const [finalizandoCompra, setFinalizandoCompra] = useState(false);
   const [pedidos, setPedidos] = useState([]);
+  const [pedidoDetalhado, setPedidoDetalhado] = useState(null);
   const [carregandoPedidos, setCarregandoPedidos] = useState(true);
   const [erroPedidos, setErroPedidos] = useState(null);
   const [retornoPagamento, setRetornoPagamento] = useState(
@@ -2238,7 +2281,7 @@ function App() {
               className={"nav-link" + (pagina === "ranking" ? " active" : "")}
               onClick={irParaRanking}
             >
-              Ranking ♛
+              Ranking
             </button>
             {!ehFuncionario && (
               <button
@@ -2268,6 +2311,22 @@ function App() {
                 onClick={irParaCarrinho}
               >
                 Carrinho{" "}
+                <svg
+                  className="icone-menu"
+                  viewBox="0 0 24 24"
+                  width="15"
+                  height="15"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <circle cx="9" cy="20" r="1.4" />
+                  <circle cx="18" cy="20" r="1.4" />
+                  <path d="M2.5 3h2.6l2.4 11.2a1.5 1.5 0 0 0 1.5 1.2h8.9a1.5 1.5 0 0 0 1.5-1.1L21.5 7H6" />
+                </svg>{" "}
                 {quantidadeNoCarrinho > 0 && "(" + quantidadeNoCarrinho + ")"}
               </button>
             )}
@@ -2507,8 +2566,24 @@ function App() {
   );
 
   const modalAutenticacao = mostrarAutenticacao && (
-    <div className="modal">
-      <div className="modal-box">
+    <div className="modal modal-auth">
+      <div className="modal-box auth-box">
+        <aside className="auth-marca" aria-hidden="true">
+          <span className="auth-marca-logo">Pallanthir</span>
+          <p className="auth-marca-frase">
+            Sua biblioteca virtual para encontrar o próximo livro.
+          </p>
+          <ul className="auth-marca-lista">
+            <li>Reserve exemplares para retirar na biblioteca</li>
+            <li>Compre livros com pagamento pelo Mercado Pago</li>
+            <li>Favorite, avalie e acompanhe o ranking</li>
+          </ul>
+          <span className="auth-marca-rodape">
+            Acesso protegido com verificação em duas etapas
+          </span>
+        </aside>
+
+        <div className="auth-conteudo">
         <div className="modal-header">
           <h3>{TITULOS_AUTENTICACAO[modoAutenticacao]}</h3>
           <button type="button" onClick={fecharAutenticacao}>
@@ -2566,6 +2641,19 @@ function App() {
               valor={formLogin.senha}
               aoMudar={(senha) => setFormLogin({ ...formLogin, senha })}
             />
+            <button
+              type="button"
+              className="link-button auth-esqueci"
+              onClick={() => {
+                setFormRecuperacao({
+                  ...FORM_RECUPERACAO_VAZIO,
+                  email: formLogin.email.trim(),
+                });
+                trocarModoAutenticacao("recuperar");
+              }}
+            >
+              Esqueci minha senha
+            </button>
 
             {erro && <p className="erro">{erro}</p>}
 
@@ -2574,21 +2662,16 @@ function App() {
                 {salvando ? "Enviando código..." : "Entrar"}
               </button>
             </div>
-            <div className="links-autenticacao">
+            <p className="auth-alternar">
+              Ainda não tem conta?{" "}
               <button
                 type="button"
                 className="link-button"
-                onClick={() => {
-                  setFormRecuperacao({
-                    ...FORM_RECUPERACAO_VAZIO,
-                    email: formLogin.email.trim(),
-                  });
-                  trocarModoAutenticacao("recuperar");
-                }}
+                onClick={() => trocarModoAutenticacao("cadastro")}
               >
-                Esqueci minha senha
+                Criar conta
               </button>
-            </div>
+            </p>
           </form>
         )}
 
@@ -2758,37 +2841,60 @@ function App() {
                 }
               />
             </label>
-            <CampoSenha
-              rotulo="Senha"
-              autoComplete="new-password"
-              valor={formUsuario.senha}
-              aoMudar={(senha) => setFormUsuario({ ...formUsuario, senha })}
-            />
-            <small className="dica-senha">{DICA_SENHA}</small>
-            <CampoSenha
-              rotulo="Confirmar senha"
-              autoComplete="new-password"
-              valor={formUsuario.confirmarSenha}
-              aoMudar={(confirmarSenha) =>
-                setFormUsuario({ ...formUsuario, confirmarSenha })
-              }
-            />
-            <label>
-              Tipo de conta
-              <select
-                value={formUsuario.tipo}
-                onChange={(e) =>
-                  setFormUsuario({
-                    ...formUsuario,
-                    tipo: e.target.value,
-                    codigoAcesso: "",
-                  })
+            <div className="auth-linha">
+              <CampoSenha
+                rotulo="Senha"
+                autoComplete="new-password"
+                valor={formUsuario.senha}
+                aoMudar={(senha) => setFormUsuario({ ...formUsuario, senha })}
+              />
+              <CampoSenha
+                rotulo="Confirmar senha"
+                autoComplete="new-password"
+                valor={formUsuario.confirmarSenha}
+                aoMudar={(confirmarSenha) =>
+                  setFormUsuario({ ...formUsuario, confirmarSenha })
                 }
+              />
+            </div>
+            <RegrasDaSenha
+              senha={formUsuario.senha}
+              confirmacao={formUsuario.confirmarSenha}
+            />
+            <div className="auth-campo">
+              <span className="auth-rotulo">Tipo de conta</span>
+              <div
+                className="tipo-conta"
+                role="radiogroup"
+                aria-label="Tipo de conta"
               >
-                <option value="ESTUDANTE">Estudante</option>
-                <option value="FUNCIONARIO">Funcionário</option>
-              </select>
-            </label>
+                {[
+                  ["ESTUDANTE", "Estudante", "Reserve, compre e avalie livros"],
+                  ["FUNCIONARIO", "Funcionário", "Gerencie o acervo da biblioteca"],
+                ].map(([valor, rotulo, descricao]) => (
+                  <button
+                    type="button"
+                    key={valor}
+                    role="radio"
+                    aria-checked={formUsuario.tipo === valor}
+                    className={
+                      "tipo-conta-opcao" +
+                      (formUsuario.tipo === valor ? " ativa" : "")
+                    }
+                    onClick={() =>
+                      setFormUsuario({
+                        ...formUsuario,
+                        tipo: valor,
+                        codigoAcesso: "",
+                      })
+                    }
+                  >
+                    <strong>{rotulo}</strong>
+                    <span>{descricao}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
             {formUsuario.tipo === "FUNCIONARIO" && (
               <CampoSenha
                 rotulo="Código de acesso de funcionário"
@@ -2804,14 +2910,14 @@ function App() {
               <div className="aceite-documentos">
                 <button
                   type="button"
-                  className="favoritar-button"
+                  className="aceite-link"
                   onClick={() => setDocumentoAberto("termos")}
                 >
                   Ler Termos de Uso
                 </button>
                 <button
                   type="button"
-                  className="favoritar-button"
+                  className="aceite-link"
                   onClick={() => setDocumentoAberto("privacidade")}
                 >
                   Ler Política de Privacidade
@@ -2841,11 +2947,22 @@ function App() {
                 type="submit"
                 disabled={salvando || !formUsuario.aceitouTermos}
               >
-                {salvando ? "Salvando..." : "Cadastrar"}
+                {salvando ? "Salvando..." : "Criar minha conta"}
               </button>
             </div>
+            <p className="auth-alternar">
+              Já tem conta?{" "}
+              <button
+                type="button"
+                className="link-button"
+                onClick={() => trocarModoAutenticacao("login")}
+              >
+                Entrar
+              </button>
+            </p>
           </form>
         )}
+        </div>
       </div>
       {modalDocumento}
     </div>
@@ -2855,6 +2972,118 @@ function App() {
     <p className="aviso" onAnimationEnd={() => setAviso(null)}>
       {aviso}
     </p>
+  );
+
+  const modalDetalhesDoPedido = pedidoDetalhado && (
+    <div className="modal" onClick={() => setPedidoDetalhado(null)}>
+      <div
+        className="modal-box pedido-detalhes"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="pedido-detalhes-titulo"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="modal-header">
+          <div>
+            <span
+              className={
+                "reserva-status " + pedidoDetalhado.status.toLowerCase()
+              }
+            >
+              {ROTULO_STATUS_PEDIDO[pedidoDetalhado.status] ||
+                pedidoDetalhado.status}
+            </span>
+            <h3 id="pedido-detalhes-titulo">
+              Pedido #{numeroDoPedido(pedidoDetalhado.id)}
+            </h3>
+            <p className="modal-sub">
+              Feito em {formatarData(pedidoDetalhado.dataCriacao)}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setPedidoDetalhado(null)}
+            aria-label="Fechar detalhes do pedido"
+          >
+            ✕
+          </button>
+        </div>
+
+        <ul className="pedido-detalhes-itens">
+          {(pedidoDetalhado.itens || []).map((item) => (
+            <li key={item.livroId}>
+              <div className="pedido-detalhes-capa">
+                <CapaDoItem capaUrl={item.capaUrl} titulo={item.titulo} />
+              </div>
+              <div className="pedido-detalhes-livro">
+                <strong>{item.titulo}</strong>
+                <span>
+                  {item.quantidade}{" "}
+                  {item.quantidade === 1 ? "unidade" : "unidades"} ×{" "}
+                  {formatarPreco(item.precoUnitario)}
+                </span>
+                <button
+                  type="button"
+                  className="link-button"
+                  onClick={() => {
+                    const livroDoItem = livros.find(
+                      (livro) => livro.id === item.livroId
+                    );
+                    setPedidoDetalhado(null);
+                    if (livroDoItem) {
+                      abrirLivro(livroDoItem);
+                    }
+                  }}
+                  disabled={!livros.some((livro) => livro.id === item.livroId)}
+                >
+                  Ver livro →
+                </button>
+              </div>
+              <strong className="pedido-detalhes-subtotal">
+                {formatarPreco(
+                  Number(item.precoUnitario || 0) * Number(item.quantidade || 0)
+                )}
+              </strong>
+            </li>
+          ))}
+        </ul>
+
+        <div className="pedido-detalhes-resumo">
+          {pedidoDetalhado.status === "AGUARDANDO_PAGAMENTO" && (
+            <p>Pague até {formatarData(pedidoDetalhado.dataExpiracao)}.</p>
+          )}
+          {pedidoDetalhado.status === "APROVADO" && (
+            <p>Pagamento aprovado pelo Mercado Pago.</p>
+          )}
+          {pedidoDetalhado.status === "EXPIRADO" && (
+            <p>O prazo de pagamento terminou ou o pagamento foi cancelado.</p>
+          )}
+          <div>
+            <span>Total</span>
+            <strong>{formatarPreco(pedidoDetalhado.total)}</strong>
+          </div>
+        </div>
+
+        <div className="modal-actions">
+          {pedidoDetalhado.status === "AGUARDANDO_PAGAMENTO" &&
+            pedidoDetalhado.linkPagamento && (
+              <button
+                type="button"
+                onClick={() => irParaMercadoPago(pedidoDetalhado.linkPagamento)}
+              >
+                Pagar com Mercado Pago
+              </button>
+            )}
+          <button
+            type="button"
+            className="pedido-detalhes-fechar"
+            onClick={() => setPedidoDetalhado(null)}
+          >
+            Fechar
+          </button>
+        </div>
+      </div>
+    </div>
   );
 
   const termosLiberados = termosLidos.termos && termosLidos.privacidade;
@@ -2985,20 +3214,14 @@ function App() {
                   <span className="conta-selo">
                     {ROTULO_TIPO_USUARIO[usuario.tipo] || usuario.tipo}
                   </span>
-                  {dataAceiteTermos && (
-                    <span className="conta-selo neutro">
-                      Termos aceitos em {formatarData(dataAceiteTermos)}
-                    </span>
-                  )}
                 </div>
                 <button type="button" className="conta-sair" onClick={sair}>
-                  <span aria-hidden="true">⎋</span>
                   Sair da conta
                 </button>
               </div>
 
               <div className="conta-grid">
-                <div className="conta-bloco">
+                <div className="conta-bloco conta-dados">
                   <span className="section-label">DADOS PESSOAIS</span>
                   <h3>Suas informações</h3>
                   <p className="conta-bloco-sub">
@@ -3064,6 +3287,13 @@ function App() {
                     <p className="conta-bloco-sub">
                       Consulte quando quiser os documentos que você aceitou.
                     </p>
+                    {dataAceiteTermos && (
+                      <p className="conta-aceite">
+                        <span aria-hidden="true">✓</span>
+                        Você aceitou a versão atual em{" "}
+                        {formatarData(dataAceiteTermos)}
+                      </p>
+                    )}
                     <div className="conta-documentos">
                       <button
                         type="button"
@@ -4031,6 +4261,13 @@ function App() {
                     <strong className="carrinho-subtotal">
                       {formatarPreco(pedido.total)}
                     </strong>
+                    <button
+                      type="button"
+                      className="pedido-detalhes-botao"
+                      onClick={() => setPedidoDetalhado(pedido)}
+                    >
+                      Ver detalhes
+                    </button>
                     {pedido.status === "AGUARDANDO_PAGAMENTO" &&
                       pedido.linkPagamento && (
                         <button
@@ -4052,6 +4289,7 @@ function App() {
 
         {modalCadastroLivro}
         {modalAutenticacao}
+        {modalDetalhesDoPedido}
       </div>
     );
   }
@@ -4154,9 +4392,6 @@ function App() {
               className={"livro-dados" + (editandoLivro ? " editando" : "")}
               onSubmit={atualizarLivro}
             >
-              <span className="book-category">
-                {livroAberto.materia || "Sem matéria"}
-              </span>
               {editandoLivro ? (
                 <input
                   className="livro-titulo-input"
