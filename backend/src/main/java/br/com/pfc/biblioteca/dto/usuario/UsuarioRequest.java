@@ -17,5 +17,6 @@ public record UsuarioRequest(
         String senha,
         TipoUsuario tipo,
         String codigoAcesso,
-        Boolean aceitouTermos) {
+        Boolean aceitouTermos,
+        String versaoTermos) {
 }

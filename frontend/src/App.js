@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 import ModalDocumento from "./Componentes/ModalDocumento";
+import { carregarVersaoDosTermos } from "./services/termos";
 import {
   avaliacoesApi,
   carrinhoApi,
@@ -56,7 +57,28 @@ const FORM_AVALIACAO_VAZIO = { nota: 0, comentario: "" };
 const RESUMO_AVALIACOES_VAZIO = { media: 0, total: 0, avaliacoes: [] };
 const LIMITE_COMENTARIO = 500;
 const NOTAS = [1, 2, 3, 4, 5];
-const FILTRO_LOGS_VAZIO = { usuarioId: "", texto: "" };
+const FILTRO_LOGS_VAZIO = { usuarioId: "", texto: "", acao: "", de: "", ate: "" };
+const LIVROS_POR_PAGINA = 18;
+
+const paginasVisiveis = (atual, total) => {
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, i) => i + 1);
+  }
+  const paginas = [1];
+  const inicio = Math.max(2, atual - 1);
+  const fim = Math.min(total - 1, atual + 1);
+  if (inicio > 2) {
+    paginas.push("…");
+  }
+  for (let numero = inicio; numero <= fim; numero++) {
+    paginas.push(numero);
+  }
+  if (fim < total - 1) {
+    paginas.push("…");
+  }
+  paginas.push(total);
+  return paginas;
+};
 const CHAVE_SESSAO = "pallanthir:usuario";
 const FORMATO_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -201,6 +223,9 @@ const classeDaAcao = (acao) => {
   }
   if (/EXCLUSAO|CANCELAMENTO/.test(texto)) {
     return "log-acao alerta";
+  }
+  if (/ACEITE/.test(texto)) {
+    return "log-acao informacao";
   }
   return "log-acao sucesso";
 };
@@ -572,6 +597,11 @@ function App() {
   const [avisoAutenticacao, setAvisoAutenticacao] = useState(null);
   const [salvando, setSalvando] = useState(false);
   const [menuAberto, setMenuAberto] = useState(false);
+  const [paginaLivros, setPaginaLivros] = useState(1);
+  const [termosPendentes, setTermosPendentes] = useState(null);
+  const [termosLidos, setTermosLidos] = useState({ termos: false, privacidade: false });
+  const [aceiteTermos, setAceiteTermos] = useState(false);
+  const [erroTermos, setErroTermos] = useState(null);
   const [dialogoExclusao, setDialogoExclusao] = useState(null);
   const menuRef = useRef(null);
   const [documentoAberto, setDocumentoAberto] = useState(null);
@@ -1773,6 +1803,12 @@ function App() {
     try {
       setSalvando(true);
       setErro(null);
+      let versaoTermos = null;
+      try {
+        versaoTermos = await carregarVersaoDosTermos();
+      } catch (e) {
+        console.error(e);
+      }
       await usuariosApi.cadastrar({
         nome: formUsuario.nome.trim(),
         email,
@@ -1783,6 +1819,7 @@ function App() {
             ? formUsuario.codigoAcesso.trim()
             : null,
         aceitouTermos: formUsuario.aceitouTermos,
+        versaoTermos,
       });
       setFormUsuario(FORM_USUARIO_VAZIO);
       setFormLogin({ email, senha: "" });
@@ -1797,6 +1834,23 @@ function App() {
   };
 
   const livrosExibidos = filtro.tipo === "todos" ? livros : resultado;
+  const totalPaginasLivros = Math.max(
+    1,
+    Math.ceil(livrosExibidos.length / LIVROS_POR_PAGINA)
+  );
+  const paginaLivrosAtual = Math.min(paginaLivros, totalPaginasLivros);
+  const livrosDaPagina = livrosExibidos.slice(
+    (paginaLivrosAtual - 1) * LIVROS_POR_PAGINA,
+    paginaLivrosAtual * LIVROS_POR_PAGINA
+  );
+
+  const irParaPaginaDeLivros = (numero) => {
+    setPaginaLivros(numero);
+    const secao = document.getElementById("livros");
+    if (secao && secao.scrollIntoView) {
+      secao.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  };
 
   const tituloDaLista =
     filtro.tipo === "busca"
@@ -1829,17 +1883,40 @@ function App() {
       );
   }, [usuariosGestao, filtroUsuarios]);
 
+  const acoesDosLogs = useMemo(
+    () => [...new Set(logs.map((log) => log.acao).filter(Boolean))].sort(),
+    [logs]
+  );
+
+  const periodoDosLogsInvalido = Boolean(
+    filtroLogs.de && filtroLogs.ate && filtroLogs.de > filtroLogs.ate
+  );
+
   const logsExibidos = useMemo(() => {
     const termo = filtroLogs.texto.trim().toLowerCase();
-    if (!termo) {
-      return logs;
-    }
-    return logs.filter((log) =>
-      [log.acao, log.descricao, log.usuarioEmail]
-        .map((valor) => String(valor || "").toLowerCase())
-        .some((valor) => valor.includes(termo))
-    );
-  }, [logs, filtroLogs.texto]);
+    return logs.filter((log) => {
+      const dia = String(log.dataHora || "").slice(0, 10);
+      if (filtroLogs.acao && log.acao !== filtroLogs.acao) {
+        return false;
+      }
+      if (filtroLogs.de && dia < filtroLogs.de) {
+        return false;
+      }
+      if (filtroLogs.ate && dia > filtroLogs.ate) {
+        return false;
+      }
+      return (
+        !termo ||
+        [log.acao, log.descricao, log.usuarioEmail]
+          .map((valor) => String(valor || "").toLowerCase())
+          .some((valor) => valor.includes(termo))
+      );
+    });
+  }, [logs, filtroLogs.texto, filtroLogs.acao, filtroLogs.de, filtroLogs.ate]);
+
+  const filtrosDeLogsAtivos = Boolean(
+    filtroLogs.texto || filtroLogs.acao || filtroLogs.de || filtroLogs.ate
+  );
 
   const reservasAtivas = useMemo(
     () =>
@@ -1964,6 +2041,56 @@ function App() {
   );
 
   useEffect(() => {
+    setPaginaLivros(1);
+  }, [filtro]);
+
+  const idUsuarioLogado = usuario ? usuario.id : null;
+
+  useEffect(() => {
+    setTermosPendentes(null);
+    if (!idUsuarioLogado) {
+      return undefined;
+    }
+    let ativo = true;
+    Promise.all([carregarVersaoDosTermos(), usuariosApi.statusTermos()])
+      .then(([versao, status]) => {
+        if (ativo && versao && (!status || status.versaoAceita !== versao)) {
+          setTermosLidos({ termos: false, privacidade: false });
+          setAceiteTermos(false);
+          setErroTermos(null);
+          setTermosPendentes({ versao });
+        }
+      })
+      .catch((e) => console.error(e));
+    return () => {
+      ativo = false;
+    };
+  }, [idUsuarioLogado]);
+
+  useEffect(() => {
+    if (termosPendentes && documentoAberto) {
+      setTermosLidos((lidos) => ({ ...lidos, [documentoAberto]: true }));
+    }
+  }, [termosPendentes, documentoAberto]);
+
+  const aceitarTermosAtualizados = async () => {
+    try {
+      setSalvando(true);
+      setErroTermos(null);
+      await usuariosApi.aceitarTermos(termosPendentes.versao);
+      setTermosPendentes(null);
+      setAviso("Obrigado! Você aceitou a nova versão dos termos.");
+    } catch (e) {
+      setErroTermos(
+        mensagemDeErro(e, "Não foi possível registrar o aceite. Tente novamente.")
+      );
+      console.error(e);
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  useEffect(() => {
     if (!menuAberto) {
       return undefined;
     }
@@ -2004,15 +2131,6 @@ function App() {
         Pallanthir
       </button>
       <div className="header-actions">
-        {ehFuncionario && (
-          <button
-            type="button"
-            className="cadastro-button"
-            onClick={abrirCadastroLivro}
-          >
-            + Cadastrar livro
-          </button>
-        )}
         {!ehFuncionario && (
           <button
             type="button"
@@ -2709,6 +2827,88 @@ function App() {
     </p>
   );
 
+  const termosLiberados = termosLidos.termos && termosLidos.privacidade;
+
+  if (termosPendentes) {
+    return (
+      <div className="app">
+        {cabecalho}
+        <div className="modal">
+          <div
+            className="modal-box dialogo termos"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="termos-titulo"
+          >
+            <div className="dialogo-icone" aria-hidden="true">
+              §
+            </div>
+            <h3 id="termos-titulo">Os termos foram atualizados</h3>
+            <p>
+              Atualizamos os Termos de Uso e a Política de Privacidade. Para
+              continuar usando a Pallanthir, leia os dois documentos e aceite a
+              nova versão.
+            </p>
+            <div className="termos-documentos">
+              <button
+                type="button"
+                className={"termos-documento" + (termosLidos.termos ? " lido" : "")}
+                onClick={() => setDocumentoAberto("termos")}
+              >
+                {termosLidos.termos ? "✓ " : ""}Termos de Uso
+              </button>
+              <button
+                type="button"
+                className={
+                  "termos-documento" + (termosLidos.privacidade ? " lido" : "")
+                }
+                onClick={() => setDocumentoAberto("privacidade")}
+              >
+                {termosLidos.privacidade ? "✓ " : ""}Política de Privacidade
+              </button>
+            </div>
+            <label
+              className={"termos-aceite" + (termosLiberados ? "" : " bloqueado")}
+            >
+              <input
+                type="checkbox"
+                checked={aceiteTermos}
+                disabled={!termosLiberados}
+                onChange={(e) => setAceiteTermos(e.target.checked)}
+              />
+              Li e aceito os Termos de Uso e a Política de Privacidade
+            </label>
+            {!termosLiberados && (
+              <p className="termos-dica">
+                Abra os dois documentos para liberar o aceite.
+              </p>
+            )}
+            {erroTermos && <p className="erro">{erroTermos}</p>}
+            <div className="dialogo-acoes">
+              <button
+                type="button"
+                className="dialogo-secundario"
+                onClick={sair}
+                disabled={salvando}
+              >
+                Sair da conta
+              </button>
+              <button
+                type="button"
+                className="dialogo-principal"
+                onClick={aceitarTermosAtualizados}
+                disabled={!aceiteTermos || salvando}
+              >
+                {salvando ? "Salvando..." : "Aceitar e continuar"}
+              </button>
+            </div>
+          </div>
+        </div>
+        {modalDocumento}
+      </div>
+    );
+  }
+
   if (pagina === "conta") {
     return (
       <div className="app">
@@ -3136,14 +3336,67 @@ function App() {
                     </option>
                   ))}
                 </select>
+                <select
+                  aria-label="Filtrar por ação"
+                  value={filtroLogs.acao}
+                  onChange={(e) =>
+                    setFiltroLogs({ ...filtroLogs, acao: e.target.value })
+                  }
+                >
+                  <option value="">Todas as ações</option>
+                  {acoesDosLogs.map((acao) => (
+                    <option key={acao} value={acao}>
+                      {acao}
+                    </option>
+                  ))}
+                </select>
                 <input
                   type="text"
-                  placeholder="Filtrar por ação, descrição ou e-mail"
+                  placeholder="Buscar na descrição ou no e-mail"
                   value={filtroLogs.texto}
                   onChange={(e) =>
                     setFiltroLogs({ ...filtroLogs, texto: e.target.value })
                   }
                 />
+              </div>
+
+              <div className="logs-filtros logs-periodo">
+                <label>
+                  De
+                  <input
+                    type="date"
+                    value={filtroLogs.de}
+                    max={filtroLogs.ate || undefined}
+                    onChange={(e) =>
+                      setFiltroLogs({ ...filtroLogs, de: e.target.value })
+                    }
+                  />
+                </label>
+                <label>
+                  Até
+                  <input
+                    type="date"
+                    value={filtroLogs.ate}
+                    min={filtroLogs.de || undefined}
+                    onChange={(e) =>
+                      setFiltroLogs({ ...filtroLogs, ate: e.target.value })
+                    }
+                  />
+                </label>
+                {filtrosDeLogsAtivos && (
+                  <button
+                    type="button"
+                    className="link-button"
+                    onClick={() =>
+                      setFiltroLogs({
+                        ...FILTRO_LOGS_VAZIO,
+                        usuarioId: filtroLogs.usuarioId,
+                      })
+                    }
+                  >
+                    Limpar filtros
+                  </button>
+                )}
                 <button
                   type="button"
                   className="favoritar-button"
@@ -3153,6 +3406,21 @@ function App() {
                   {carregandoPainel ? "Carregando..." : "Atualizar"}
                 </button>
               </div>
+
+              {periodoDosLogsInvalido && (
+                <p className="erro">
+                  A data inicial precisa ser igual ou anterior à data final.
+                </p>
+              )}
+
+              {!carregandoPainel && logs.length > 0 && (
+                <p className="logs-contagem">
+                  {(logsExibidos.length === 1
+                    ? "1 registro"
+                    : logsExibidos.length + " registros") +
+                    (filtrosDeLogsAtivos ? " com os filtros escolhidos" : "")}
+                </p>
+              )}
 
               {!carregandoPainel && logsExibidos.length === 0 && (
                 <p>Nenhum registro encontrado.</p>
@@ -4254,8 +4522,70 @@ function App() {
             <p>{mensagemListaVazia}</p>
           )}
 
-          {!carregando && livrosExibidos.map(cartaoLivro)}
+          {!carregando && livrosDaPagina.map(cartaoLivro)}
         </div>
+
+        {!carregando && totalPaginasLivros > 1 && (
+          <nav className="paginacao" aria-label="Páginas de livros">
+            <button
+              type="button"
+              className="paginacao-seta"
+              onClick={() => irParaPaginaDeLivros(paginaLivrosAtual - 1)}
+              disabled={paginaLivrosAtual === 1}
+            >
+              ← Anterior
+            </button>
+            <div className="paginacao-numeros">
+              {paginasVisiveis(paginaLivrosAtual, totalPaginasLivros).map(
+                (numero, indice) =>
+                  numero === "…" ? (
+                    <span
+                      key={"reticencias-" + indice}
+                      className="paginacao-reticencias"
+                    >
+                      …
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      key={numero}
+                      className={
+                        "paginacao-numero" +
+                        (numero === paginaLivrosAtual ? " atual" : "")
+                      }
+                      aria-current={
+                        numero === paginaLivrosAtual ? "page" : undefined
+                      }
+                      aria-label={"Página " + numero}
+                      onClick={() => irParaPaginaDeLivros(numero)}
+                    >
+                      {numero}
+                    </button>
+                  )
+              )}
+            </div>
+            <button
+              type="button"
+              className="paginacao-seta"
+              onClick={() => irParaPaginaDeLivros(paginaLivrosAtual + 1)}
+              disabled={paginaLivrosAtual === totalPaginasLivros}
+            >
+              Próxima →
+            </button>
+            <p className="paginacao-resumo">
+              {"Mostrando " +
+                ((paginaLivrosAtual - 1) * LIVROS_POR_PAGINA + 1) +
+                "–" +
+                Math.min(
+                  paginaLivrosAtual * LIVROS_POR_PAGINA,
+                  livrosExibidos.length
+                ) +
+                " de " +
+                livrosExibidos.length +
+                " livros"}
+            </p>
+          </nav>
+        )}
       </section>
 
       {modalCadastroLivro}

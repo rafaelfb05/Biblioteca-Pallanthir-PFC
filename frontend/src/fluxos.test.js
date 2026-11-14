@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import App from "./App";
+import { versaoDosTermos } from "./services/termos";
 
 jest.mock("./Componentes/ModalDocumento", () => () => null);
 
@@ -56,6 +57,7 @@ const simularApi = (rotasExtras = {}) => {
     "GET /carrinho": () => [200, { itens: [], total: 0 }],
     "GET /pedidos": () => [200, []],
     "GET /avaliacoes/ranking": () => [200, []],
+    "GET /usuarios/termos": () => [200, { versaoAceita: versaoDosTermos("[]", "[]"), dataAceite: "2026-11-01T10:00:00" }],
     "POST /usuarios/renovar-token": () => [200, { token: tokenValido(), usuario: { nome: "Ana" } }],
     ...rotasExtras,
   };
@@ -311,6 +313,123 @@ test("exclusão de conta pede confirmação na janela e exclui ao confirmar", as
 
   expect(await screen.findByText("Sua conta foi excluída.")).toBeInTheDocument();
   expect(chamadasPara("DELETE", "/usuarios/deletar/" + ID_USUARIO)).toHaveLength(1);
+});
+
+test("acervo mostra 18 livros por página e troca de página", async () => {
+  const muitos = Array.from({ length: 20 }, (_, i) =>
+    livro("55555555-5555-4555-8555-" + String(i).padStart(12, "0"), "Livro " + (i + 1))
+  );
+  simularApi({ "GET /livros": () => [200, muitos] });
+  render(<App />);
+
+  expect(await screen.findByRole("heading", { name: "Livro 1" })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Livro 18" })).toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: "Livro 19" })).not.toBeInTheDocument();
+  expect(screen.getByText("Mostrando 1–18 de 20 livros")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "← Anterior" })).toBeDisabled();
+
+  fireEvent.click(screen.getByRole("button", { name: "Página 2" }));
+
+  expect(await screen.findByRole("heading", { name: "Livro 19" })).toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: "Livro 1" })).not.toBeInTheDocument();
+  expect(screen.getByText("Mostrando 19–20 de 20 livros")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Próxima →" })).toBeDisabled();
+});
+
+test("acervo com até 18 livros não mostra a paginação", async () => {
+  simularApi();
+  render(<App />);
+
+  await screen.findByRole("heading", { name: "Clean Code" });
+  expect(screen.queryByRole("navigation", { name: "Páginas de livros" })).not.toBeInTheDocument();
+});
+
+test("cadastrar livro aparece só na tela principal do funcionário", async () => {
+  simularApi({ "GET /logs": () => [200, []], "GET /usuarios": () => [200, []] });
+  entrarComo("FUNCIONARIO");
+  render(<App />);
+
+  await screen.findByRole("heading", { name: "Clean Code" });
+  expect(screen.getAllByRole("button", { name: "+ Cadastrar livro" })).toHaveLength(1);
+
+  fireEvent.click(screen.getByRole("button", { name: "Logs" }));
+  await screen.findByRole("heading", { name: "Logs do sistema" });
+  expect(screen.queryByRole("button", { name: "+ Cadastrar livro" })).not.toBeInTheDocument();
+});
+
+test("logs podem ser filtrados por ação e por período", async () => {
+  const log = (id, acao, dataHora, descricao) => ({ id, acao, dataHora, descricao, usuarioEmail: "ana@teste.com" });
+  simularApi({
+    "GET /logs": () => [
+      200,
+      [
+        log("1", "ACEITE_TERMOS", "2026-11-14T09:00:00", "Aceitou os termos"),
+        log("2", "SUCESSO_LOGIN", "2026-11-10T08:00:00", "Login feito"),
+        log("3", "SUCESSO_LOGIN", "2026-11-01T08:00:00", "Login antigo"),
+      ],
+    ],
+    "GET /usuarios": () => [200, []],
+  });
+  entrarComo("FUNCIONARIO");
+  render(<App />);
+
+  fireEvent.click(await screen.findByRole("button", { name: "Logs" }));
+  expect(await screen.findByText("Login antigo")).toBeInTheDocument();
+  expect(screen.getByText("3 registros")).toBeInTheDocument();
+
+  fireEvent.change(screen.getByRole("combobox", { name: "Filtrar por ação" }), { target: { value: "SUCESSO_LOGIN" } });
+  expect(screen.queryByText("Aceitou os termos")).not.toBeInTheDocument();
+  expect(screen.getByText("2 registros com os filtros escolhidos")).toBeInTheDocument();
+
+  fireEvent.change(screen.getByLabelText("De"), { target: { value: "2026-11-05" } });
+  expect(screen.getByText("Login feito")).toBeInTheDocument();
+  expect(screen.queryByText("Login antigo")).not.toBeInTheDocument();
+
+  fireEvent.change(screen.getByLabelText("Até"), { target: { value: "2026-11-09" } });
+  expect(screen.getByText("Nenhum registro encontrado.")).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: "Limpar filtros" }));
+  expect(screen.getByText("3 registros")).toBeInTheDocument();
+});
+
+test("usuário precisa ler e aceitar os termos quando eles mudam", async () => {
+  simularApi({
+    "GET /usuarios/termos": () => [200, { versaoAceita: "versao-antiga", dataAceite: "2026-01-01T10:00:00" }],
+    "POST /usuarios/termos/aceite": (corpo) => [200, { versaoAceita: corpo.versao, dataAceite: "2026-11-14T10:00:00" }],
+  });
+  entrarComo("ESTUDANTE");
+  render(<App />);
+
+  expect(await screen.findByRole("alertdialog")).toHaveTextContent("Os termos foram atualizados");
+  const aceitar = screen.getByRole("button", { name: "Aceitar e continuar" });
+  expect(aceitar).toBeDisabled();
+  expect(screen.getByRole("checkbox")).toBeDisabled();
+
+  fireEvent.click(screen.getByRole("button", { name: "Termos de Uso" }));
+  fireEvent.click(screen.getByRole("button", { name: "Política de Privacidade" }));
+  fireEvent.click(await screen.findByRole("checkbox"));
+  expect(aceitar).toBeEnabled();
+  fireEvent.click(aceitar);
+
+  expect(await screen.findByText("Obrigado! Você aceitou a nova versão dos termos.")).toBeInTheDocument();
+  expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+  expect(chamadasPara("POST", "/usuarios/termos/aceite")[0].corpo).toEqual({ versao: versaoDosTermos("[]", "[]") });
+});
+
+test("usuário com os termos em dia não vê a janela de aceite", async () => {
+  simularApi();
+  entrarComo("ESTUDANTE");
+  render(<App />);
+
+  await screen.findByRole("heading", { name: "Clean Code" });
+  await waitFor(() => expect(chamadasPara("GET", "/usuarios/termos")).toHaveLength(1));
+  expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+});
+
+test("versão dos termos muda quando o texto muda e ignora quebra de linha do Windows", () => {
+  expect(versaoDosTermos("Termos\r\nv1", "Política")).toBe(versaoDosTermos("Termos\nv1", "Política"));
+  expect(versaoDosTermos("Termos v1", "Política")).not.toBe(versaoDosTermos("Termos v2", "Política"));
+  expect(versaoDosTermos("Termos", "Política")).toMatch(/^[0-9a-f]{28}$/);
 });
 
 test("funcionário vê a dashboard e não vê carrinho nem pedidos", async () => {

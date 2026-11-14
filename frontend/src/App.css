@@ -2263,3 +2263,175 @@
     flex-direction: column-reverse;
   }
 }
+
+.log-acao.informacao {
+  background: rgba(70, 140, 255, 0.15);
+  color: #7aa7ff;
+}
+
+.logs-periodo {
+  align-items: flex-end;
+  margin-top: -10px;
+}
+
+.logs-periodo label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: #96969d;
+  font-size: 11px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.logs-periodo input[type="date"] {
+  flex: none;
+  min-width: 170px;
+  color-scheme: dark;
+}
+
+.logs-periodo .favoritar-button {
+  margin-left: auto;
+}
+
+.logs-periodo .link-button {
+  height: 42px;
+}
+
+.logs-contagem {
+  margin-bottom: 14px;
+  color: #77777f;
+  font-size: 13px;
+}
+
+.paginacao {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 40px;
+}
+
+.paginacao-numeros {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.paginacao button {
+  min-width: 40px;
+  height: 40px;
+  padding: 0 14px;
+  border: 1px solid #2f2f36;
+  border-radius: 8px;
+  background: #121216;
+  color: #c9c9cf;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.paginacao button:hover:not(:disabled) {
+  border-color: #e51d2a;
+  color: #ffffff;
+}
+
+.paginacao .paginacao-numero.atual {
+  border-color: #e51d2a;
+  background: #e51d2a;
+  color: #ffffff;
+}
+
+.paginacao button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.paginacao-reticencias {
+  padding: 0 4px;
+  color: #6f6f77;
+}
+
+.paginacao-resumo {
+  flex-basis: 100%;
+  margin-top: 4px;
+  color: #77777f;
+  font-size: 13px;
+  text-align: center;
+}
+
+.dialogo.termos .dialogo-icone {
+  background: rgba(70, 140, 255, 0.14);
+  border: 1px solid rgba(70, 140, 255, 0.4);
+  color: #7aa7ff;
+  font-family: Georgia, serif;
+}
+
+.termos-documentos {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.termos-documento {
+  flex: 1;
+  padding: 11px 12px;
+  border: 1px solid #3a3a42;
+  border-radius: 7px;
+  background: transparent;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.termos-documento:hover {
+  border-color: #e51d2a;
+}
+
+.termos-documento.lido {
+  border-color: rgba(45, 190, 120, 0.5);
+  color: #2dbe78;
+}
+
+.termos-aceite {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 20px;
+  color: #c9c9cf;
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: left;
+  cursor: pointer;
+}
+
+.termos-aceite input {
+  margin-top: 3px;
+  accent-color: #e51d2a;
+}
+
+.termos-aceite.bloqueado {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.dialogo .termos-dica {
+  margin-top: 8px;
+  color: #6f6f77;
+  font-size: 12px;
+  text-align: left;
+}
+
+@media (max-width: 600px) {
+  .termos-documentos {
+    flex-direction: column;
+  }
+
+  .logs-periodo .favoritar-button {
+    margin-left: 0;
+  }
+}

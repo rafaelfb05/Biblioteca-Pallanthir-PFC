@@ -39,6 +39,8 @@ public class Usuario {
     private String codigo2FA;
     private LocalDateTime expiracao2FA;
     private LocalDateTime dataAceiteTermos;
+    @Column(length = 64)
+    private String versaoTermos;
 
     public Usuario(){}
 
@@ -47,6 +49,14 @@ public class Usuario {
         this.email=request.email();
         this.senha=request.senha();
         this.tipo=request.tipo();
+    }
+
+    public String getVersaoTermos() {
+        return versaoTermos;
+    }
+
+    public void setVersaoTermos(String versaoTermos) {
+        this.versaoTermos = versaoTermos;
     }
 
     public LocalDateTime getDataAceiteTermos() {
