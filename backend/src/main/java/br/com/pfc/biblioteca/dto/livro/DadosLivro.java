@@ -11,7 +11,6 @@ public record DadosLivro(
         @JsonAlias("authors") List<String> autores,
         @JsonAlias("publishedDate") String anoLancamento,
         @JsonAlias("pageCount") int numeroPagina,
-        @JsonAlias("imageLinks") ImagemLivro imagem,
         @JsonAlias("industryIdentifiers") List<Identificador> identificadores
 ) {
     public String isbn(String tipo) {
@@ -24,9 +23,6 @@ public record DadosLivro(
                 .findFirst()
                 .orElse(null);
     }
-
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public record ImagemLivro(@JsonAlias("thumbnail") String capaUrl) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record Identificador(@JsonAlias("type") String tipo, @JsonAlias("identifier") String codigo) {}

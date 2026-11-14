@@ -145,15 +145,16 @@ class LivroIntegracaoTest extends TesteIntegracaoBase {
     }
 
     @Test
-    void cadastroMantemACapaDaGoogleBooksQuandoAOpenLibraryNaoTem() {
+    void cadastroUsaACapaGenericaQuandoAOpenLibraryNaoTem() {
         Resposta resposta = post("/livros/cadastro", token(criarFuncionario()), novoLivro("O Hobbit"));
 
-        assertThat(resposta.corpo().path("capaUrl").asText()).isEqualTo("http://books.google.com/capa.jpg");
+        assertThat(resposta.status()).isEqualTo(200);
+        assertThat(resposta.corpo().path("capaUrl").isNull()).isTrue();
         assertThat(consultasNaOpenLibrary).hasSize(2);
     }
 
     @Test
-    void cadastroSemCapaEmNenhumaFonteFicaSemCapa() {
+    void cadastroSemIsbnUsaACapaGenerica() {
         Resposta resposta = post("/livros/cadastro", token(criarFuncionario()), novoLivro("Sem capa nenhuma"));
 
         assertThat(resposta.status()).isEqualTo(200);
@@ -162,15 +163,13 @@ class LivroIntegracaoTest extends TesteIntegracaoBase {
     }
 
     @Test
-    void buscaDeCapaPeloIsbnTrocaACapaQuandoEncontra() {
+    void edicaoComIsbnNovoTrocaACapaPelaDaOpenLibrary() {
         Livro livro = criarLivro(50, 1, 0);
         livro.setCapaUrl("http://books.google.com/antiga.jpg");
-        livro.setIsbn13("9780000000001");
-        livro.setIsbn10("8595084742");
         livroRepository.save(livro);
         capasNaOpenLibrary.add("8595084742");
 
-        Resposta resposta = put("/livros/atualizar/" + livro.getId() + "/capa", token(criarFuncionario()), null);
+        Resposta resposta = put("/livros/atualizar/" + livro.getId(), token(criarFuncionario()), Map.of("isbn13", "9780000000001", "isbn10", "85-950-8474-2"));
 
         assertThat(resposta.status()).isEqualTo(200);
         assertThat(resposta.corpo().path("capaUrl").asText()).isEqualTo("https://covers.openlibrary.org/b/isbn/8595084742-L.jpg");
@@ -178,29 +177,28 @@ class LivroIntegracaoTest extends TesteIntegracaoBase {
     }
 
     @Test
-    void buscaDeCapaSemResultadoMantemACapaAtual() {
+    void edicaoComIsbnSemCapaNaOpenLibraryColocaACapaGenerica() {
+        Livro livro = criarLivro(50, 1, 0);
+        livro.setCapaUrl("http://books.google.com/antiga.jpg");
+        livroRepository.save(livro);
+
+        Resposta resposta = put("/livros/atualizar/" + livro.getId(), token(criarFuncionario()), Map.of("isbn13", "9780000000001"));
+
+        assertThat(resposta.status()).isEqualTo(200);
+        assertThat(recarregar(livro).getCapaUrl()).isNull();
+    }
+
+    @Test
+    void edicaoSemMudarOIsbnMantemACapa() {
         Livro livro = criarLivro(50, 1, 0);
         livro.setCapaUrl("http://books.google.com/antiga.jpg");
         livro.setIsbn13("9780000000001");
         livroRepository.save(livro);
 
-        Resposta resposta = put("/livros/atualizar/" + livro.getId() + "/capa", token(criarFuncionario()), null);
+        Resposta resposta = put("/livros/atualizar/" + livro.getId(), token(criarFuncionario()), Map.of("preco", 60.0, "isbn13", "978-0000000001", "isbn10", ""));
 
-        assertThat(resposta.status()).isEqualTo(404);
-        assertThat(resposta.mensagem()).isEqualTo("Capa não encontrada na Open Library para esse ISBN");
+        assertThat(resposta.status()).isEqualTo(200);
         assertThat(recarregar(livro).getCapaUrl()).isEqualTo("http://books.google.com/antiga.jpg");
-    }
-
-    @Test
-    void buscaDeCapaExigeIsbnEFuncionario() {
-        Livro livro = criarLivro(50, 1, 0);
-
-        Resposta semIsbn = put("/livros/atualizar/" + livro.getId() + "/capa", token(criarFuncionario()), null);
-        Resposta estudante = put("/livros/atualizar/" + livro.getId() + "/capa", token(criarEstudante()), null);
-
-        assertThat(semIsbn.status()).isEqualTo(400);
-        assertThat(semIsbn.mensagem()).isEqualTo("Preencha o ISBN-10 ou o ISBN-13 do livro antes de buscar a capa");
-        assertThat(estudante.status()).isEqualTo(403);
         assertThat(consultasNaOpenLibrary).isEmpty();
     }
 

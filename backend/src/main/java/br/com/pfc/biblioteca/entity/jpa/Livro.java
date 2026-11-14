@@ -43,12 +43,6 @@ public class Livro {
         }
         this.anoLancamento=dados.anoLancamento();
         this.numeroPagina=dados.numeroPagina();
-        if (dados.imagem() == null) {
-            System.out.println("Capa não encontrada");
-            this.capaUrl = null;
-        } else {
-            this.capaUrl = dados.imagem().capaUrl();
-        }
         this.isbn10 = dados.isbn("ISBN_10");
         this.isbn13 = dados.isbn("ISBN_13");
     }
