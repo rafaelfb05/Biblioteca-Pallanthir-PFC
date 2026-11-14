@@ -691,6 +691,8 @@ function App() {
   const [formAvaliacao, setFormAvaliacao] = useState(FORM_AVALIACAO_VAZIO);
   const [salvandoAvaliacao, setSalvandoAvaliacao] = useState(false);
   const [ranking, setRanking] = useState([]);
+  const [materiaDoRanking, setMateriaDoRanking] = useState("");
+  const consultaDoRanking = useRef(0);
   const [carregandoRanking, setCarregandoRanking] = useState(false);
   const [erroRanking, setErroRanking] = useState(null);
 
@@ -789,19 +791,28 @@ function App() {
     }
   }, []);
 
-  const carregarRanking = useCallback(async () => {
+  const carregarRanking = useCallback(async (materia) => {
+    const consulta = consultaDoRanking.current + 1;
+    consultaDoRanking.current = consulta;
     try {
       setCarregandoRanking(true);
       setErroRanking(null);
-      setRanking((await avaliacoesApi.ranking()) || []);
+      const resultado = (await avaliacoesApi.ranking(materia)) || [];
+      if (consultaDoRanking.current === consulta) {
+        setRanking(resultado);
+      }
     } catch (e) {
-      setRanking([]);
-      setErroRanking(
-        mensagemDeErro(e, "Não foi possível carregar o ranking de avaliações.")
-      );
+      if (consultaDoRanking.current === consulta) {
+        setRanking([]);
+        setErroRanking(
+          mensagemDeErro(e, "Não foi possível carregar o ranking de avaliações.")
+        );
+      }
       console.error(e);
     } finally {
-      setCarregandoRanking(false);
+      if (consultaDoRanking.current === consulta) {
+        setCarregandoRanking(false);
+      }
     }
   }, []);
 
@@ -1394,7 +1405,13 @@ function App() {
 
   const irParaRanking = async () => {
     abrirPagina("ranking");
-    await carregarRanking();
+    setMateriaDoRanking("");
+    await carregarRanking("");
+  };
+
+  const filtrarRanking = async (materia) => {
+    setMateriaDoRanking(materia);
+    await carregarRanking(materia);
   };
 
   const enviarAvaliacao = async (evento) => {
@@ -3829,7 +3846,13 @@ function App() {
           <div className="section-header">
             <div>
               <span className="section-label">RANKING</span>
-              <h2>Top 10 mais bem avaliados</h2>
+              <h2>
+                Top 10 mais bem avaliados
+                {materiaDoRanking &&
+                  " em " +
+                    ((materias.find((m) => m.nome === materiaDoRanking) || {})
+                      .rotulo || materiaDoRanking)}
+              </h2>
             </div>
             <button type="button" className="link-button" onClick={irParaInicio}>
               Voltar ao acervo →
@@ -3841,12 +3864,39 @@ function App() {
             Entram no ranking os livros com pelo menos 3 avaliações.
           </p>
 
+          {materias.length > 0 && (
+            <div
+              className="ranking-filtros"
+              role="group"
+              aria-label="Filtrar ranking por matéria"
+            >
+              {[{ nome: "", rotulo: "Todas" }, ...materias].map((materia) => (
+                <button
+                  type="button"
+                  key={materia.nome || "todas"}
+                  className={
+                    "ranking-filtro" +
+                    (materiaDoRanking === materia.nome ? " ativo" : "")
+                  }
+                  aria-pressed={materiaDoRanking === materia.nome}
+                  onClick={() => filtrarRanking(materia.nome)}
+                >
+                  {materia.rotulo}
+                </button>
+              ))}
+            </div>
+          )}
+
           {carregandoRanking && <p>Carregando ranking...</p>}
           {!carregandoRanking && erroRanking && (
             <p className="erro">{erroRanking}</p>
           )}
           {!carregandoRanking && !erroRanking && rankingDeLivros.length === 0 && (
-            <p>Nenhum livro tem avaliações suficientes para o ranking ainda.</p>
+            <p>
+              {materiaDoRanking
+                ? "Nenhum livro desta matéria tem avaliações suficientes para o ranking ainda."
+                : "Nenhum livro tem avaliações suficientes para o ranking ainda."}
+            </p>
           )}
 
           <ol className="ranking-lista">
