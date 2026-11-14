@@ -5,9 +5,9 @@ import br.com.pfc.biblioteca.entity.jpa.ItemPedido;
 
 import java.math.BigDecimal;
 
-public record ItemPedidoDTO(UUID livroId, String titulo, Integer quantidade, BigDecimal precoUnitario) {
+public record ItemPedidoDTO(UUID livroId, String titulo, Integer quantidade, BigDecimal precoUnitario, String capaUrl) {
 
     public ItemPedidoDTO(ItemPedido i){
-        this(i.getLivro().getId(), i.getLivro().getTitulo(), i.getQuantidade(), i.getPrecoUnitario());
+        this(i.getLivro().getId(), i.getLivro().getTitulo(), i.getQuantidade(), i.getPrecoUnitario(), i.getLivro().getCapaUrl());
     }
 }

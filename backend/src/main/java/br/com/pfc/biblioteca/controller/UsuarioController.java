@@ -3,6 +3,8 @@ package br.com.pfc.biblioteca.controller;
 import java.util.UUID;
 import br.com.pfc.biblioteca.dto.auth.*;
 import br.com.pfc.biblioteca.dto.livro.LivroDTO;
+import br.com.pfc.biblioteca.dto.usuario.AceiteTermosRequest;
+import br.com.pfc.biblioteca.dto.usuario.TermosDTO;
 import br.com.pfc.biblioteca.dto.usuario.UsuarioDTO;
 import br.com.pfc.biblioteca.dto.usuario.UsuarioRequest;
 import br.com.pfc.biblioteca.entity.jpa.Usuario;
@@ -60,6 +62,16 @@ public class UsuarioController {
     public ResponseEntity<Void> removerFavorito(@PathVariable UUID usuarioId, @PathVariable UUID livroId){
         service.removerFavorito(usuarioId, livroId);
         return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/termos")
+    public ResponseEntity<TermosDTO> statusDosTermos(){
+        return ResponseEntity.ok(service.statusDosTermos());
+    }
+
+    @PostMapping("/termos/aceite")
+    public ResponseEntity<TermosDTO> aceitarTermos(@RequestBody @Valid AceiteTermosRequest request){
+        return ResponseEntity.ok(service.aceitarTermos(request));
     }
 
     @PostMapping("/login")

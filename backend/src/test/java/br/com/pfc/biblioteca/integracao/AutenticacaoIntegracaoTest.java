@@ -12,6 +12,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -49,6 +50,47 @@ class AutenticacaoIntegracaoTest extends TesteIntegracaoBase {
         assertThat(salvo.getSenha()).isNotEqualTo(SENHA);
         assertThat(passwordEncoder.matches(SENHA, salvo.getSenha())).isTrue();
         assertThat(salvo.getDataAceiteTermos()).isNotNull();
+    }
+
+    @Test
+    void cadastroGuardaAVersaoDosTermosERegistraOAceiteNosLogs() {
+        String email = emailUnico();
+        Map<String, Object> corpo = cadastro(email, SENHA, "ESTUDANTE", true, null);
+        corpo.put("versaoTermos", "a1b2c3");
+
+        Resposta resposta = post("/usuarios/cadastro", null, corpo);
+
+        assertThat(resposta.status()).isEqualTo(200);
+        Usuario salvo = usuarioRepository.findByEmailAndAtivoTrue(email).orElseThrow();
+        assertThat(salvo.getVersaoTermos()).isEqualTo("a1b2c3");
+        verify(logService).registrarLog(eq(salvo.getId()), eq(email), eq("ACEITE_TERMOS"), contains("versão a1b2c3"));
+    }
+
+    @Test
+    void usuarioAceitaANovaVersaoDosTermos() {
+        Usuario estudante = criarEstudante();
+        String token = token(estudante);
+
+        assertThat(get("/usuarios/termos", token).corpo().path("versaoAceita").isNull()).isTrue();
+
+        Resposta aceite = post("/usuarios/termos/aceite", token, Map.of("versao", "versao-2"));
+
+        assertThat(aceite.status()).isEqualTo(200);
+        assertThat(aceite.corpo().path("versaoAceita").asText()).isEqualTo("versao-2");
+        assertThat(get("/usuarios/termos", token).corpo().path("versaoAceita").asText()).isEqualTo("versao-2");
+        Usuario salvo = usuarioRepository.findById(estudante.getId()).orElseThrow();
+        assertThat(salvo.getVersaoTermos()).isEqualTo("versao-2");
+        assertThat(salvo.getDataAceiteTermos()).isNotNull();
+        verify(logService).registrarLog(eq(estudante.getId()), eq(estudante.getEmail()), eq("ACEITE_TERMOS"), contains("após atualização"));
+    }
+
+    @Test
+    void aceiteDosTermosRecusaVersaoInvalidaEExigeLogin() {
+        String token = token(criarFuncionario());
+
+        assertThat(post("/usuarios/termos/aceite", token, Map.of("versao", "versão <script>")).status()).isEqualTo(400);
+        assertThat(post("/usuarios/termos/aceite", token, Map.of("versao", "")).status()).isEqualTo(400);
+        assertThat(post("/usuarios/termos/aceite", null, Map.of("versao", "v1")).status()).isIn(401, 403);
     }
 
     @Test

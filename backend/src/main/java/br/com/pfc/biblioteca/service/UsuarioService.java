@@ -2,6 +2,8 @@ package br.com.pfc.biblioteca.service;
 
 import br.com.pfc.biblioteca.dto.auth.*;
 import br.com.pfc.biblioteca.dto.livro.LivroDTO;
+import br.com.pfc.biblioteca.dto.usuario.AceiteTermosRequest;
+import br.com.pfc.biblioteca.dto.usuario.TermosDTO;
 import br.com.pfc.biblioteca.dto.usuario.UsuarioDTO;
 import br.com.pfc.biblioteca.dto.usuario.UsuarioRequest;
 import br.com.pfc.biblioteca.enums.StatusReserva;
@@ -81,9 +83,43 @@ public class UsuarioService {
         Usuario usuario = new Usuario(request);
         usuario.setSenha(passwordEncoder.encode(request.senha()));
         usuario.setDataAceiteTermos(LocalDateTime.now());
+        usuario.setVersaoTermos(versaoValida(request.versaoTermos()));
         Usuario salvo = repository.save(usuario);
         logService.registrarLog(salvo.getId(), salvo.getEmail(), "CADASTRO_USUARIO", "Usuário cadastrado como " + salvo.getTipo());
+        registrarAceiteDosTermos(salvo, "no cadastro");
         return salvo;
+    }
+
+    public TermosDTO statusDosTermos() {
+        Usuario usuario = usuarioLogado();
+        return new TermosDTO(usuario.getVersaoTermos(), usuario.getDataAceiteTermos());
+    }
+
+    @Transactional
+    public TermosDTO aceitarTermos(AceiteTermosRequest request) {
+        Usuario usuario = usuarioLogado();
+        usuario.setVersaoTermos(versaoValida(request.versao()));
+        usuario.setDataAceiteTermos(LocalDateTime.now());
+        Usuario salvo = repository.save(usuario);
+        registrarAceiteDosTermos(salvo, "após atualização dos documentos");
+        return new TermosDTO(salvo.getVersaoTermos(), salvo.getDataAceiteTermos());
+    }
+
+    private String versaoValida(String versao) {
+        if (versao == null || versao.isBlank()) {
+            return null;
+        }
+        String limpa = versao.trim();
+        if (!limpa.matches("^[A-Za-z0-9_-]{1,64}$")) {
+            throw new RegraDeNegocioException("Versão dos termos inválida");
+        }
+        return limpa;
+    }
+
+    private void registrarAceiteDosTermos(Usuario usuario, String momento) {
+        logService.registrarLog(usuario.getId(), usuario.getEmail(), "ACEITE_TERMOS",
+                "Aceitou os Termos de Uso e a Política de Privacidade " + momento
+                        + (usuario.getVersaoTermos() == null ? "" : " (versão " + usuario.getVersaoTermos() + ")"));
     }
 
     public List<UsuarioDTO> obterUsuarios() {

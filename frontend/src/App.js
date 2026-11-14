@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 import ModalDocumento from "./Componentes/ModalDocumento";
+import { carregarVersaoDosTermos } from "./services/termos";
 import {
   avaliacoesApi,
   carrinhoApi,
@@ -56,11 +57,41 @@ const FORM_AVALIACAO_VAZIO = { nota: 0, comentario: "" };
 const RESUMO_AVALIACOES_VAZIO = { media: 0, total: 0, avaliacoes: [] };
 const LIMITE_COMENTARIO = 500;
 const NOTAS = [1, 2, 3, 4, 5];
-const FILTRO_LOGS_VAZIO = { usuarioId: "", texto: "" };
+const FILTRO_LOGS_VAZIO = { usuarioId: "", texto: "", acao: "", de: "", ate: "" };
+const LIVROS_POR_PAGINA = 18;
+
+const paginasVisiveis = (atual, total) => {
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, i) => i + 1);
+  }
+  const paginas = [1];
+  const inicio = Math.max(2, atual - 1);
+  const fim = Math.min(total - 1, atual + 1);
+  if (inicio > 2) {
+    paginas.push("…");
+  }
+  for (let numero = inicio; numero <= fim; numero++) {
+    paginas.push(numero);
+  }
+  if (fim < total - 1) {
+    paginas.push("…");
+  }
+  paginas.push(total);
+  return paginas;
+};
 const CHAVE_SESSAO = "pallanthir:usuario";
 const FORMATO_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const numeroDoPedido = (id) => String(id).slice(0, 8).toUpperCase();
+
+const iniciaisDoNome = (nome) =>
+  String(nome || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((parte) => parte[0].toUpperCase())
+    .join("") || "?";
 
 const formatarIsbn13 = (isbn) => {
   if (!isbn) {
@@ -188,6 +219,9 @@ function GraficoMaterias({ titulo, descricao, itens, unidade }) {
   );
 }
 
+const MENSAGEM_EXCLUSAO_BLOQUEADA =
+  "Você possui livros reservados ou não devolvidos. Cancele as reservas ou devolva os livros na biblioteca antes de excluir a conta.";
+
 const mensagemDeErro = (erro, padrao) =>
   erro && erro.status && erro.message ? erro.message : padrao;
 
@@ -198,6 +232,9 @@ const classeDaAcao = (acao) => {
   }
   if (/EXCLUSAO|CANCELAMENTO/.test(texto)) {
     return "log-acao alerta";
+  }
+  if (/ACEITE/.test(texto)) {
+    return "log-acao informacao";
   }
   return "log-acao sucesso";
 };
@@ -336,10 +373,66 @@ function CampoSenha({ rotulo, valor, aoMudar, autoComplete }) {
           aria-label={visivel ? "Ocultar senha" : "Mostrar senha"}
           title={visivel ? "Ocultar senha" : "Mostrar senha"}
         >
-          {visivel ? "Ocultar" : "Mostrar"}
+          <svg
+            viewBox="0 0 24 24"
+            width="18"
+            height="18"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" />
+            <circle cx="12" cy="12" r="3" />
+            {visivel && <path d="M4 4l16 16" />}
+          </svg>
         </button>
       </div>
     </label>
+  );
+}
+
+const REGRAS_DA_SENHA = [
+  ["8 caracteres ou mais", (senha) => senha.length >= 8],
+  ["Letra maiúscula", (senha) => /[A-Z]/.test(senha)],
+  ["Letra minúscula", (senha) => /[a-z]/.test(senha)],
+  ["Número", (senha) => /\d/.test(senha)],
+  ["Símbolo (@ # $ % ^ & + = !)", (senha) => /[@#$%^&+=!]/.test(senha)],
+];
+
+function RegrasDaSenha({ senha, confirmacao }) {
+  const texto = senha || "";
+  const iguais = texto.length > 0 && texto === confirmacao;
+  return (
+    <ul className="regras-senha" aria-label="Requisitos da senha">
+      {REGRAS_DA_SENHA.map(([descricao, atende]) => (
+        <li key={descricao} className={atende(texto) ? "ok" : undefined}>
+          <span aria-hidden="true">{atende(texto) ? "✓" : "•"}</span>
+          {descricao}
+        </li>
+      ))}
+      <li className={iguais ? "ok" : undefined}>
+        <span aria-hidden="true">{iguais ? "✓" : "•"}</span>
+        As duas senhas são iguais
+      </li>
+    </ul>
+  );
+}
+
+function CapaDoItem({ capaUrl, titulo }) {
+  const [falhou, setFalhou] = useState(false);
+
+  if (!capaUrl || falhou) {
+    return <CapaGenerica titulo={titulo} tamanho="mini" />;
+  }
+  return (
+    <img
+      src={capaNaResolucao(capaUrl, ZOOM_CAPA_CARTAO)}
+      alt={"Capa de " + titulo}
+      onError={() => setFalhou(true)}
+    />
   );
 }
 
@@ -548,6 +641,7 @@ function App() {
   const [itemCarrinhoEmEdicao, setItemCarrinhoEmEdicao] = useState(null);
   const [finalizandoCompra, setFinalizandoCompra] = useState(false);
   const [pedidos, setPedidos] = useState([]);
+  const [pedidoDetalhado, setPedidoDetalhado] = useState(null);
   const [carregandoPedidos, setCarregandoPedidos] = useState(true);
   const [erroPedidos, setErroPedidos] = useState(null);
   const [retornoPagamento, setRetornoPagamento] = useState(
@@ -568,6 +662,16 @@ function App() {
   const [codigo2FA, setCodigo2FA] = useState("");
   const [avisoAutenticacao, setAvisoAutenticacao] = useState(null);
   const [salvando, setSalvando] = useState(false);
+  const [menuAberto, setMenuAberto] = useState(false);
+  const [paginaLivros, setPaginaLivros] = useState(1);
+  const [editandoLivro, setEditandoLivro] = useState(false);
+  const [dataAceiteTermos, setDataAceiteTermos] = useState(null);
+  const [termosPendentes, setTermosPendentes] = useState(null);
+  const [termosLidos, setTermosLidos] = useState({ termos: false, privacidade: false });
+  const [aceiteTermos, setAceiteTermos] = useState(false);
+  const [erroTermos, setErroTermos] = useState(null);
+  const [dialogoExclusao, setDialogoExclusao] = useState(null);
+  const menuRef = useRef(null);
   const [documentoAberto, setDocumentoAberto] = useState(null);
 
   const [formConta, setFormConta] = useState(FORM_CONTA_VAZIO);
@@ -1106,6 +1210,7 @@ function App() {
     setPagina("livro");
     setLivroAbertoId(livro.id);
     setFormEdicao({ ...livro });
+    setEditandoLivro(false);
     setErro(null);
     window.scrollTo({ top: 0 });
   };
@@ -1250,33 +1355,41 @@ function App() {
     await enviarCodigoRecuperacao(usuario.email);
   };
 
-  const excluirConta = async () => {
-    if (reservasAtivas.length > 0) {
-      setErro(
-        "Não é possível excluir a conta enquanto houver livros reservados ou não devolvidos."
-      );
-      return;
-    }
+  const excluirConta = () => {
+    setErro(null);
+    setDialogoExclusao(
+      reservasAtivas.length > 0
+        ? { bloqueado: true, mensagem: MENSAGEM_EXCLUSAO_BLOQUEADA }
+        : { bloqueado: false }
+    );
+  };
 
-    if (
-      !window.confirm(
-        "Excluir sua conta? Seus dados pessoais serão anonimizados e esta ação não pode ser desfeita."
-      )
-    ) {
-      return;
-    }
-
+  const confirmarExclusaoDaConta = async () => {
     try {
       setSalvando(true);
       setErro(null);
       await usuariosApi.deletar(usuario.id);
+      setDialogoExclusao(null);
       encerrarSessao("Sua conta foi excluída.");
     } catch (e) {
-      setErro(mensagemDeErro(e, "Não foi possível excluir a conta."));
+      if (e && e.status === 409) {
+        setDialogoExclusao({
+          bloqueado: true,
+          mensagem: mensagemDeErro(e, MENSAGEM_EXCLUSAO_BLOQUEADA),
+        });
+      } else {
+        setDialogoExclusao(null);
+        setErro(mensagemDeErro(e, "Não foi possível excluir a conta."));
+      }
       console.error(e);
     } finally {
       setSalvando(false);
     }
+  };
+
+  const verReservasAntesDeExcluir = async () => {
+    setDialogoExclusao(null);
+    await irParaReservas();
   };
 
   const irParaRanking = async () => {
@@ -1680,6 +1793,7 @@ function App() {
       });
       setAviso('"' + atualizado.titulo + '" foi atualizado.');
       setFormEdicao({ ...atualizado });
+      setEditandoLivro(false);
       setResultado((atual) =>
         atual.map((item) => (item.id === atualizado.id ? atualizado : item))
       );
@@ -1690,6 +1804,21 @@ function App() {
     } finally {
       setSalvando(false);
     }
+  };
+
+  const alterarEdicao = (campo, valor) =>
+    setFormEdicao((atual) => ({ ...atual, [campo]: valor }));
+
+  const iniciarEdicaoDoLivro = (livro) => {
+    setFormEdicao({ ...livro });
+    setErro(null);
+    setEditandoLivro(true);
+  };
+
+  const cancelarEdicaoDoLivro = (livro) => {
+    setFormEdicao({ ...livro });
+    setErro(null);
+    setEditandoLivro(false);
   };
 
   const deletarLivro = async (livro) => {
@@ -1759,6 +1888,12 @@ function App() {
     try {
       setSalvando(true);
       setErro(null);
+      let versaoTermos = null;
+      try {
+        versaoTermos = await carregarVersaoDosTermos();
+      } catch (e) {
+        console.error(e);
+      }
       await usuariosApi.cadastrar({
         nome: formUsuario.nome.trim(),
         email,
@@ -1769,6 +1904,7 @@ function App() {
             ? formUsuario.codigoAcesso.trim()
             : null,
         aceitouTermos: formUsuario.aceitouTermos,
+        versaoTermos,
       });
       setFormUsuario(FORM_USUARIO_VAZIO);
       setFormLogin({ email, senha: "" });
@@ -1783,6 +1919,23 @@ function App() {
   };
 
   const livrosExibidos = filtro.tipo === "todos" ? livros : resultado;
+  const totalPaginasLivros = Math.max(
+    1,
+    Math.ceil(livrosExibidos.length / LIVROS_POR_PAGINA)
+  );
+  const paginaLivrosAtual = Math.min(paginaLivros, totalPaginasLivros);
+  const livrosDaPagina = livrosExibidos.slice(
+    (paginaLivrosAtual - 1) * LIVROS_POR_PAGINA,
+    paginaLivrosAtual * LIVROS_POR_PAGINA
+  );
+
+  const irParaPaginaDeLivros = (numero) => {
+    setPaginaLivros(numero);
+    const secao = document.getElementById("livros");
+    if (secao && secao.scrollIntoView) {
+      secao.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  };
 
   const tituloDaLista =
     filtro.tipo === "busca"
@@ -1815,17 +1968,40 @@ function App() {
       );
   }, [usuariosGestao, filtroUsuarios]);
 
+  const acoesDosLogs = useMemo(
+    () => [...new Set(logs.map((log) => log.acao).filter(Boolean))].sort(),
+    [logs]
+  );
+
+  const periodoDosLogsInvalido = Boolean(
+    filtroLogs.de && filtroLogs.ate && filtroLogs.de > filtroLogs.ate
+  );
+
   const logsExibidos = useMemo(() => {
     const termo = filtroLogs.texto.trim().toLowerCase();
-    if (!termo) {
-      return logs;
-    }
-    return logs.filter((log) =>
-      [log.acao, log.descricao, log.usuarioEmail]
-        .map((valor) => String(valor || "").toLowerCase())
-        .some((valor) => valor.includes(termo))
-    );
-  }, [logs, filtroLogs.texto]);
+    return logs.filter((log) => {
+      const dia = String(log.dataHora || "").slice(0, 10);
+      if (filtroLogs.acao && log.acao !== filtroLogs.acao) {
+        return false;
+      }
+      if (filtroLogs.de && dia < filtroLogs.de) {
+        return false;
+      }
+      if (filtroLogs.ate && dia > filtroLogs.ate) {
+        return false;
+      }
+      return (
+        !termo ||
+        [log.acao, log.descricao, log.usuarioEmail]
+          .map((valor) => String(valor || "").toLowerCase())
+          .some((valor) => valor.includes(termo))
+      );
+    });
+  }, [logs, filtroLogs.texto, filtroLogs.acao, filtroLogs.de, filtroLogs.ate]);
+
+  const filtrosDeLogsAtivos = Boolean(
+    filtroLogs.texto || filtroLogs.acao || filtroLogs.de || filtroLogs.ate
+  );
 
   const reservasAtivas = useMemo(
     () =>
@@ -1949,114 +2125,102 @@ function App() {
     </div>
   );
 
+  useEffect(() => {
+    setPaginaLivros(1);
+  }, [filtro]);
+
+  const idUsuarioLogado = usuario ? usuario.id : null;
+
+  useEffect(() => {
+    setTermosPendentes(null);
+    setDataAceiteTermos(null);
+    if (!idUsuarioLogado) {
+      return undefined;
+    }
+    let ativo = true;
+    Promise.all([carregarVersaoDosTermos(), usuariosApi.statusTermos()])
+      .then(([versao, status]) => {
+        if (ativo && status) {
+          setDataAceiteTermos(status.dataAceite || null);
+        }
+        if (ativo && versao && (!status || status.versaoAceita !== versao)) {
+          setTermosLidos({ termos: false, privacidade: false });
+          setAceiteTermos(false);
+          setErroTermos(null);
+          setTermosPendentes({ versao });
+        }
+      })
+      .catch((e) => console.error(e));
+    return () => {
+      ativo = false;
+    };
+  }, [idUsuarioLogado]);
+
+  useEffect(() => {
+    if (termosPendentes && documentoAberto) {
+      setTermosLidos((lidos) => ({ ...lidos, [documentoAberto]: true }));
+    }
+  }, [termosPendentes, documentoAberto]);
+
+  const aceitarTermosAtualizados = async () => {
+    try {
+      setSalvando(true);
+      setErroTermos(null);
+      const aceite = await usuariosApi.aceitarTermos(termosPendentes.versao);
+      setDataAceiteTermos(aceite ? aceite.dataAceite : null);
+      setTermosPendentes(null);
+      setAviso("Obrigado! Você aceitou a nova versão dos termos.");
+    } catch (e) {
+      setErroTermos(
+        mensagemDeErro(e, "Não foi possível registrar o aceite. Tente novamente.")
+      );
+      console.error(e);
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!menuAberto) {
+      return undefined;
+    }
+    const aoClicarFora = (evento) => {
+      if (menuRef.current && !menuRef.current.contains(evento.target)) {
+        setMenuAberto(false);
+      }
+    };
+    const aoTeclar = (evento) => {
+      if (evento.key === "Escape") {
+        setMenuAberto(false);
+      }
+    };
+    document.addEventListener("mousedown", aoClicarFora);
+    document.addEventListener("keydown", aoTeclar);
+    return () => {
+      document.removeEventListener("mousedown", aoClicarFora);
+      document.removeEventListener("keydown", aoTeclar);
+    };
+  }, [menuAberto]);
+
+  useEffect(() => {
+    if (!dialogoExclusao) {
+      return undefined;
+    }
+    const aoTeclar = (evento) => {
+      if (evento.key === "Escape" && !salvando) {
+        setDialogoExclusao(null);
+      }
+    };
+    document.addEventListener("keydown", aoTeclar);
+    return () => document.removeEventListener("keydown", aoTeclar);
+  }, [dialogoExclusao, salvando]);
+
   const cabecalho = (
     <header className="header">
       <button type="button" className="logo" onClick={irParaInicio}>
         Pallanthir
       </button>
-      <nav className="nav">
-        <button
-          type="button"
-          className={
-            "nav-link" +
-            (pagina === "inicio" && filtro.tipo === "todos" ? " active" : "")
-          }
-          onClick={irParaInicio}
-        >
-          Início
-        </button>
-        <button
-          type="button"
-          className={"nav-link" + (pagina === "materias" ? " active" : "")}
-          onClick={irParaMaterias}
-        >
-          Matérias
-        </button>
-        <button
-          type="button"
-          className={"nav-link" + (pagina === "ranking" ? " active" : "")}
-          onClick={irParaRanking}
-        >
-          Ranking ♛
-        </button>
-        {!ehFuncionario && (
-          <button
-            type="button"
-            className={
-              "nav-link" + (pagina === "favoritos" ? " active" : "")
-            }
-            onClick={irParaFavoritos}
-          >
-            Favoritos ♡ {favoritos.length > 0 && "(" + favoritos.length + ")"}
-          </button>
-        )}
-        {!ehFuncionario && (
-          <button
-            type="button"
-            className={"nav-link" + (pagina === "reservas" ? " active" : "")}
-            onClick={irParaReservas}
-          >
-            Reservas{" "}
-            {reservasAtivas.length > 0 && "(" + reservasAtivas.length + ")"}
-          </button>
-        )}
-        {!ehFuncionario && (
-          <button
-            type="button"
-            className={"nav-link" + (pagina === "carrinho" ? " active" : "")}
-            onClick={irParaCarrinho}
-          >
-            Carrinho{" "}
-            {quantidadeNoCarrinho > 0 && "(" + quantidadeNoCarrinho + ")"}
-          </button>
-        )}
-        {!ehFuncionario && (
-          <button
-            type="button"
-            className={"nav-link" + (pagina === "pedidos" ? " active" : "")}
-            onClick={irParaPedidos}
-          >
-            Pedidos
-          </button>
-        )}
-        {ehFuncionario && (
-          <button
-            type="button"
-            className={"nav-link" + (pagina === "dashboard" ? " active" : "")}
-            onClick={irParaDashboard}
-          >
-            Dashboard
-          </button>
-        )}
-        {ehFuncionario && (
-          <button
-            type="button"
-            className={"nav-link" + (pagina === "gestao" ? " active" : "")}
-            onClick={irParaGestao}
-          >
-            Gestão
-          </button>
-        )}
-        {ehFuncionario && (
-          <button
-            type="button"
-            className={"nav-link" + (pagina === "logs" ? " active" : "")}
-            onClick={irParaLogs}
-          >
-            Logs
-          </button>
-        )}
-      </nav>
       <div className="header-actions">
-        {ehFuncionario && (
-          <button
-            type="button"
-            className="cadastro-button"
-            onClick={abrirCadastroLivro}
-          >
-            + Cadastrar livro
-          </button>
-        )}
         {!ehFuncionario && (
           <button
             type="button"
@@ -2081,9 +2245,6 @@ function App() {
               {usuario.nome}
               <small>{ROTULO_TIPO_USUARIO[usuario.tipo] || ""}</small>
             </button>
-            <button type="button" className="login-button" onClick={sair}>
-              Sair
-            </button>
           </div>
         ) : (
           <button
@@ -2094,6 +2255,133 @@ function App() {
             Entrar
           </button>
         )}
+        <div className="menu" ref={menuRef}>
+          <button
+            type="button"
+            className={"menu-botao" + (menuAberto ? " aberto" : "")}
+            onClick={() => setMenuAberto((aberto) => !aberto)}
+            aria-label={menuAberto ? "Fechar menu" : "Abrir menu"}
+            aria-expanded={menuAberto}
+            aria-controls="menu-navegacao"
+          >
+            <span />
+            <span />
+            <span />
+          </button>
+          <nav
+            id="menu-navegacao"
+            className={"menu-painel" + (menuAberto ? " aberto" : "")}
+            onClick={() => setMenuAberto(false)}
+          >
+            <button
+              type="button"
+              className={
+                "nav-link" +
+                (pagina === "inicio" && filtro.tipo === "todos" ? " active" : "")
+              }
+              onClick={irParaInicio}
+            >
+              Início
+            </button>
+            <button
+              type="button"
+              className={"nav-link" + (pagina === "materias" ? " active" : "")}
+              onClick={irParaMaterias}
+            >
+              Matérias
+            </button>
+            <button
+              type="button"
+              className={"nav-link" + (pagina === "ranking" ? " active" : "")}
+              onClick={irParaRanking}
+            >
+              Ranking
+            </button>
+            {!ehFuncionario && (
+              <button
+                type="button"
+                className={
+                  "nav-link" + (pagina === "favoritos" ? " active" : "")
+                }
+                onClick={irParaFavoritos}
+              >
+                Favoritos ♡ {favoritos.length > 0 && "(" + favoritos.length + ")"}
+              </button>
+            )}
+            {!ehFuncionario && (
+              <button
+                type="button"
+                className={"nav-link" + (pagina === "reservas" ? " active" : "")}
+                onClick={irParaReservas}
+              >
+                Reservas{" "}
+                {reservasAtivas.length > 0 && "(" + reservasAtivas.length + ")"}
+              </button>
+            )}
+            {!ehFuncionario && (
+              <button
+                type="button"
+                className={"nav-link" + (pagina === "carrinho" ? " active" : "")}
+                onClick={irParaCarrinho}
+              >
+                Carrinho{" "}
+                <svg
+                  className="icone-menu"
+                  viewBox="0 0 24 24"
+                  width="15"
+                  height="15"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <circle cx="9" cy="20" r="1.4" />
+                  <circle cx="18" cy="20" r="1.4" />
+                  <path d="M2.5 3h2.6l2.4 11.2a1.5 1.5 0 0 0 1.5 1.2h8.9a1.5 1.5 0 0 0 1.5-1.1L21.5 7H6" />
+                </svg>{" "}
+                {quantidadeNoCarrinho > 0 && "(" + quantidadeNoCarrinho + ")"}
+              </button>
+            )}
+            {!ehFuncionario && (
+              <button
+                type="button"
+                className={"nav-link" + (pagina === "pedidos" ? " active" : "")}
+                onClick={irParaPedidos}
+              >
+                Pedidos
+              </button>
+            )}
+            {ehFuncionario && (
+              <button
+                type="button"
+                className={"nav-link" + (pagina === "dashboard" ? " active" : "")}
+                onClick={irParaDashboard}
+              >
+                Dashboard
+              </button>
+            )}
+            {ehFuncionario && (
+              <button
+                type="button"
+                className={"nav-link" + (pagina === "gestao" ? " active" : "")}
+                onClick={irParaGestao}
+              >
+                Gestão
+              </button>
+            )}
+            {ehFuncionario && (
+              <button
+                type="button"
+                className={"nav-link" + (pagina === "logs" ? " active" : "")}
+                onClick={irParaLogs}
+              >
+                Logs
+              </button>
+            )}
+          </nav>
+        </div>
       </div>
     </header>
   );
@@ -2207,6 +2495,82 @@ function App() {
       " e escolha uma nova senha. O código vale por 15 minutos.",
   }[modoAutenticacao];
 
+  const modalExclusaoConta = dialogoExclusao && (
+    <div
+      className="modal"
+      onClick={() => !salvando && setDialogoExclusao(null)}
+    >
+      <div
+        className={
+          "modal-box dialogo" + (dialogoExclusao.bloqueado ? " bloqueado" : " perigo")
+        }
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="dialogo-exclusao-titulo"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="dialogo-icone" aria-hidden="true">
+          {dialogoExclusao.bloqueado ? "!" : "✕"}
+        </div>
+        <h3 id="dialogo-exclusao-titulo">
+          {dialogoExclusao.bloqueado
+            ? "Não é possível excluir sua conta"
+            : "Excluir sua conta?"}
+        </h3>
+        {dialogoExclusao.bloqueado ? (
+          <p>{dialogoExclusao.mensagem}</p>
+        ) : (
+          <>
+            <p>
+              Seus dados pessoais serão anonimizados e você perderá o acesso aos
+              seus favoritos, reservas e pedidos.
+            </p>
+            <p className="dialogo-alerta">Esta ação não pode ser desfeita.</p>
+          </>
+        )}
+        <div className="dialogo-acoes">
+          {dialogoExclusao.bloqueado ? (
+            <>
+              <button
+                type="button"
+                className="dialogo-secundario"
+                onClick={() => setDialogoExclusao(null)}
+              >
+                Entendi
+              </button>
+              <button
+                type="button"
+                className="dialogo-principal"
+                onClick={verReservasAntesDeExcluir}
+              >
+                Ver minhas reservas
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                className="dialogo-secundario"
+                onClick={() => setDialogoExclusao(null)}
+                disabled={salvando}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="dialogo-principal"
+                onClick={confirmarExclusaoDaConta}
+                disabled={salvando}
+              >
+                {salvando ? "Excluindo..." : "Excluir conta"}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
   const modalDocumento = documentoAberto && (
     <ModalDocumento
       documento={documentoAberto}
@@ -2216,41 +2580,26 @@ function App() {
   );
 
   const modalAutenticacao = mostrarAutenticacao && (
-    <div className="modal">
-      <div className="modal-box">
-        <div className="modal-header">
-          <h3>{TITULOS_AUTENTICACAO[modoAutenticacao]}</h3>
-          <button type="button" onClick={fecharAutenticacao}>
-            ✕
-          </button>
+    <div className="modal modal-auth">
+      <div className="modal-box auth-box">
+        <div className="auth-conteudo">
+        <button
+          type="button"
+          className="auth-fechar"
+          onClick={fecharAutenticacao}
+          aria-label="Fechar"
+        >
+          ✕
+        </button>
+        <div className="auth-cabecalho">
+          <span className="auth-logo" aria-hidden="true">
+            Pallanthir
+          </span>
+          <h3 className="oculto-visualmente">
+            {TITULOS_AUTENTICACAO[modoAutenticacao]}
+          </h3>
+          <p className="modal-sub">{subtituloAutenticacao}</p>
         </div>
-
-        {(modoAutenticacao === "login" || modoAutenticacao === "cadastro") && (
-          <div className="abas-autenticacao">
-            <button
-              type="button"
-              className={
-                "aba-autenticacao" +
-                (modoAutenticacao === "login" ? " ativa" : "")
-              }
-              onClick={() => trocarModoAutenticacao("login")}
-            >
-              Entrar
-            </button>
-            <button
-              type="button"
-              className={
-                "aba-autenticacao" +
-                (modoAutenticacao === "cadastro" ? " ativa" : "")
-              }
-              onClick={() => trocarModoAutenticacao("cadastro")}
-            >
-              Criar conta
-            </button>
-          </div>
-        )}
-
-        <p className="modal-sub">{subtituloAutenticacao}</p>
 
         {avisoAutenticacao && (
           <p className="aviso-modal">{avisoAutenticacao}</p>
@@ -2275,6 +2624,19 @@ function App() {
               valor={formLogin.senha}
               aoMudar={(senha) => setFormLogin({ ...formLogin, senha })}
             />
+            <button
+              type="button"
+              className="link-button auth-esqueci"
+              onClick={() => {
+                setFormRecuperacao({
+                  ...FORM_RECUPERACAO_VAZIO,
+                  email: formLogin.email.trim(),
+                });
+                trocarModoAutenticacao("recuperar");
+              }}
+            >
+              Esqueci minha senha
+            </button>
 
             {erro && <p className="erro">{erro}</p>}
 
@@ -2283,21 +2645,16 @@ function App() {
                 {salvando ? "Enviando código..." : "Entrar"}
               </button>
             </div>
-            <div className="links-autenticacao">
+            <p className="auth-alternar">
+              Ainda não tem conta?{" "}
               <button
                 type="button"
                 className="link-button"
-                onClick={() => {
-                  setFormRecuperacao({
-                    ...FORM_RECUPERACAO_VAZIO,
-                    email: formLogin.email.trim(),
-                  });
-                  trocarModoAutenticacao("recuperar");
-                }}
+                onClick={() => trocarModoAutenticacao("cadastro")}
               >
-                Esqueci minha senha
+                Criar conta
               </button>
-            </div>
+            </p>
           </form>
         )}
 
@@ -2467,37 +2824,60 @@ function App() {
                 }
               />
             </label>
-            <CampoSenha
-              rotulo="Senha"
-              autoComplete="new-password"
-              valor={formUsuario.senha}
-              aoMudar={(senha) => setFormUsuario({ ...formUsuario, senha })}
-            />
-            <small className="dica-senha">{DICA_SENHA}</small>
-            <CampoSenha
-              rotulo="Confirmar senha"
-              autoComplete="new-password"
-              valor={formUsuario.confirmarSenha}
-              aoMudar={(confirmarSenha) =>
-                setFormUsuario({ ...formUsuario, confirmarSenha })
-              }
-            />
-            <label>
-              Tipo de conta
-              <select
-                value={formUsuario.tipo}
-                onChange={(e) =>
-                  setFormUsuario({
-                    ...formUsuario,
-                    tipo: e.target.value,
-                    codigoAcesso: "",
-                  })
+            <div className="auth-linha">
+              <CampoSenha
+                rotulo="Senha"
+                autoComplete="new-password"
+                valor={formUsuario.senha}
+                aoMudar={(senha) => setFormUsuario({ ...formUsuario, senha })}
+              />
+              <CampoSenha
+                rotulo="Confirmar senha"
+                autoComplete="new-password"
+                valor={formUsuario.confirmarSenha}
+                aoMudar={(confirmarSenha) =>
+                  setFormUsuario({ ...formUsuario, confirmarSenha })
                 }
+              />
+            </div>
+            <RegrasDaSenha
+              senha={formUsuario.senha}
+              confirmacao={formUsuario.confirmarSenha}
+            />
+            <div className="auth-campo">
+              <span className="auth-rotulo">Tipo de conta</span>
+              <div
+                className="tipo-conta"
+                role="radiogroup"
+                aria-label="Tipo de conta"
               >
-                <option value="ESTUDANTE">Estudante</option>
-                <option value="FUNCIONARIO">Funcionário</option>
-              </select>
-            </label>
+                {[
+                  ["ESTUDANTE", "Estudante", "Reserve, compre e avalie livros"],
+                  ["FUNCIONARIO", "Funcionário", "Gerencie o acervo da biblioteca"],
+                ].map(([valor, rotulo, descricao]) => (
+                  <button
+                    type="button"
+                    key={valor}
+                    role="radio"
+                    aria-checked={formUsuario.tipo === valor}
+                    className={
+                      "tipo-conta-opcao" +
+                      (formUsuario.tipo === valor ? " ativa" : "")
+                    }
+                    onClick={() =>
+                      setFormUsuario({
+                        ...formUsuario,
+                        tipo: valor,
+                        codigoAcesso: "",
+                      })
+                    }
+                  >
+                    <strong>{rotulo}</strong>
+                    <span>{descricao}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
             {formUsuario.tipo === "FUNCIONARIO" && (
               <CampoSenha
                 rotulo="Código de acesso de funcionário"
@@ -2513,14 +2893,14 @@ function App() {
               <div className="aceite-documentos">
                 <button
                   type="button"
-                  className="favoritar-button"
+                  className="aceite-link"
                   onClick={() => setDocumentoAberto("termos")}
                 >
                   Ler Termos de Uso
                 </button>
                 <button
                   type="button"
-                  className="favoritar-button"
+                  className="aceite-link"
                   onClick={() => setDocumentoAberto("privacidade")}
                 >
                   Ler Política de Privacidade
@@ -2550,11 +2930,22 @@ function App() {
                 type="submit"
                 disabled={salvando || !formUsuario.aceitouTermos}
               >
-                {salvando ? "Salvando..." : "Cadastrar"}
+                {salvando ? "Salvando..." : "Criar minha conta"}
               </button>
             </div>
+            <p className="auth-alternar">
+              Já tem conta?{" "}
+              <button
+                type="button"
+                className="link-button"
+                onClick={() => trocarModoAutenticacao("login")}
+              >
+                Entrar
+              </button>
+            </p>
           </form>
         )}
+        </div>
       </div>
       {modalDocumento}
     </div>
@@ -2565,6 +2956,200 @@ function App() {
       {aviso}
     </p>
   );
+
+  const modalDetalhesDoPedido = pedidoDetalhado && (
+    <div className="modal" onClick={() => setPedidoDetalhado(null)}>
+      <div
+        className="modal-box pedido-detalhes"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="pedido-detalhes-titulo"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="modal-header">
+          <div>
+            <span
+              className={
+                "reserva-status " + pedidoDetalhado.status.toLowerCase()
+              }
+            >
+              {ROTULO_STATUS_PEDIDO[pedidoDetalhado.status] ||
+                pedidoDetalhado.status}
+            </span>
+            <h3 id="pedido-detalhes-titulo">
+              Pedido #{numeroDoPedido(pedidoDetalhado.id)}
+            </h3>
+            <p className="modal-sub">
+              Feito em {formatarData(pedidoDetalhado.dataCriacao)}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setPedidoDetalhado(null)}
+            aria-label="Fechar detalhes do pedido"
+          >
+            ✕
+          </button>
+        </div>
+
+        <ul className="pedido-detalhes-itens">
+          {(pedidoDetalhado.itens || []).map((item) => (
+            <li key={item.livroId}>
+              <div className="pedido-detalhes-capa">
+                <CapaDoItem capaUrl={item.capaUrl} titulo={item.titulo} />
+              </div>
+              <div className="pedido-detalhes-livro">
+                <strong>{item.titulo}</strong>
+                <span>
+                  {item.quantidade}{" "}
+                  {item.quantidade === 1 ? "unidade" : "unidades"} ×{" "}
+                  {formatarPreco(item.precoUnitario)}
+                </span>
+                <button
+                  type="button"
+                  className="link-button"
+                  onClick={() => {
+                    const livroDoItem = livros.find(
+                      (livro) => livro.id === item.livroId
+                    );
+                    setPedidoDetalhado(null);
+                    if (livroDoItem) {
+                      abrirLivro(livroDoItem);
+                    }
+                  }}
+                  disabled={!livros.some((livro) => livro.id === item.livroId)}
+                >
+                  Ver livro →
+                </button>
+              </div>
+              <strong className="pedido-detalhes-subtotal">
+                {formatarPreco(
+                  Number(item.precoUnitario || 0) * Number(item.quantidade || 0)
+                )}
+              </strong>
+            </li>
+          ))}
+        </ul>
+
+        <div className="pedido-detalhes-resumo">
+          {pedidoDetalhado.status === "AGUARDANDO_PAGAMENTO" && (
+            <p>Pague até {formatarData(pedidoDetalhado.dataExpiracao)}.</p>
+          )}
+          {pedidoDetalhado.status === "APROVADO" && (
+            <p>Pagamento aprovado pelo Mercado Pago.</p>
+          )}
+          {pedidoDetalhado.status === "EXPIRADO" && (
+            <p>O prazo de pagamento terminou ou o pagamento foi cancelado.</p>
+          )}
+          <div>
+            <span>Total</span>
+            <strong>{formatarPreco(pedidoDetalhado.total)}</strong>
+          </div>
+        </div>
+
+        <div className="modal-actions">
+          {pedidoDetalhado.status === "AGUARDANDO_PAGAMENTO" &&
+            pedidoDetalhado.linkPagamento && (
+              <button
+                type="button"
+                onClick={() => irParaMercadoPago(pedidoDetalhado.linkPagamento)}
+              >
+                Pagar com Mercado Pago
+              </button>
+            )}
+          <button
+            type="button"
+            className="pedido-detalhes-fechar"
+            onClick={() => setPedidoDetalhado(null)}
+          >
+            Fechar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  const termosLiberados = termosLidos.termos && termosLidos.privacidade;
+
+  if (termosPendentes) {
+    return (
+      <div className="app">
+        {cabecalho}
+        <div className="modal">
+          <div
+            className="modal-box dialogo termos"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="termos-titulo"
+          >
+            <div className="dialogo-icone" aria-hidden="true">
+              §
+            </div>
+            <h3 id="termos-titulo">Os termos foram atualizados</h3>
+            <p>
+              Atualizamos os Termos de Uso e a Política de Privacidade. Para
+              continuar usando a Pallanthir, leia os dois documentos e aceite a
+              nova versão.
+            </p>
+            <div className="termos-documentos">
+              <button
+                type="button"
+                className={"termos-documento" + (termosLidos.termos ? " lido" : "")}
+                onClick={() => setDocumentoAberto("termos")}
+              >
+                {termosLidos.termos ? "✓ " : ""}Termos de Uso
+              </button>
+              <button
+                type="button"
+                className={
+                  "termos-documento" + (termosLidos.privacidade ? " lido" : "")
+                }
+                onClick={() => setDocumentoAberto("privacidade")}
+              >
+                {termosLidos.privacidade ? "✓ " : ""}Política de Privacidade
+              </button>
+            </div>
+            <label
+              className={"termos-aceite" + (termosLiberados ? "" : " bloqueado")}
+            >
+              <input
+                type="checkbox"
+                checked={aceiteTermos}
+                disabled={!termosLiberados}
+                onChange={(e) => setAceiteTermos(e.target.checked)}
+              />
+              Li e aceito os Termos de Uso e a Política de Privacidade
+            </label>
+            {!termosLiberados && (
+              <p className="termos-dica">
+                Abra os dois documentos para liberar o aceite.
+              </p>
+            )}
+            {erroTermos && <p className="erro">{erroTermos}</p>}
+            <div className="dialogo-acoes">
+              <button
+                type="button"
+                className="dialogo-secundario"
+                onClick={sair}
+                disabled={salvando}
+              >
+                Sair da conta
+              </button>
+              <button
+                type="button"
+                className="dialogo-principal"
+                onClick={aceitarTermosAtualizados}
+                disabled={!aceiteTermos || salvando}
+              >
+                {salvando ? "Salvando..." : "Aceitar e continuar"}
+              </button>
+            </div>
+          </div>
+        </div>
+        {modalDocumento}
+      </div>
+    );
+  }
 
   if (pagina === "conta") {
     return (
@@ -2585,124 +3170,158 @@ function App() {
           {avisoDaPagina}
           {erro && <p className="erro">{erro}</p>}
 
-          {!usuario && <p>Entre na sua conta para ver seus dados.</p>}
+          {!usuario && (
+            <p>
+              <button
+                type="button"
+                className="link-button"
+                onClick={() => abrirAutenticacao("login")}
+              >
+                Entre na sua conta
+              </button>{" "}
+              para ver seus dados.
+            </p>
+          )}
 
           {usuario && (
-            <div className="conta-grid">
-              <div className="livro-edicao">
-                <span className="section-label">DADOS PESSOAIS</span>
-                <h2>Atualizar informações</h2>
-
-                <form className="modal-form" onSubmit={atualizarConta}>
-                  <label>
-                    Nome
-                    <input
-                      type="text"
-                      required
-                      value={formConta.nome}
-                      onChange={(e) =>
-                        setFormConta({ ...formConta, nome: e.target.value })
-                      }
-                    />
-                  </label>
-                  <label>
-                    E-mail
-                    <input
-                      type="email"
-                      required
-                      value={formConta.email}
-                      onChange={(e) =>
-                        setFormConta({ ...formConta, email: e.target.value })
-                      }
-                    />
-                  </label>
-                  <small className="dica-senha">
-                    Se você alterar o e-mail, precisará entrar novamente.
-                  </small>
-
-                  <div className="modal-actions">
-                    <button type="submit" disabled={salvando}>
-                      {salvando ? "Salvando..." : "Salvar alterações"}
-                    </button>
-                  </div>
-                </form>
+            <>
+              <div className="conta-perfil">
+                <div className="conta-avatar" aria-hidden="true">
+                  {iniciaisDoNome(usuario.nome)}
+                </div>
+                <div className="conta-perfil-dados">
+                  <strong>{usuario.nome}</strong>
+                  <span>{usuario.email}</span>
+                </div>
+                <div className="conta-perfil-selos">
+                  <span className="conta-selo">
+                    {ROTULO_TIPO_USUARIO[usuario.tipo] || usuario.tipo}
+                  </span>
+                </div>
+                <button type="button" className="conta-sair" onClick={sair}>
+                  Sair da conta
+                </button>
               </div>
 
-              <div className="conta-lateral">
-                <div className="conta-card">
-                  <small>Tipo de conta</small>
-                  <strong>{ROTULO_TIPO_USUARIO[usuario.tipo] || usuario.tipo}</strong>
+              <div className="conta-grid">
+                <div className="conta-bloco conta-dados">
+                  <span className="section-label">DADOS PESSOAIS</span>
+                  <h3>Suas informações</h3>
+                  <p className="conta-bloco-sub">
+                    Mantenha seu nome e e-mail atualizados.
+                  </p>
+
+                  <form className="modal-form" onSubmit={atualizarConta}>
+                    <label>
+                      Nome
+                      <input
+                        type="text"
+                        required
+                        value={formConta.nome}
+                        onChange={(e) =>
+                          setFormConta({ ...formConta, nome: e.target.value })
+                        }
+                      />
+                    </label>
+                    <label>
+                      E-mail
+                      <input
+                        type="email"
+                        required
+                        value={formConta.email}
+                        onChange={(e) =>
+                          setFormConta({ ...formConta, email: e.target.value })
+                        }
+                      />
+                    </label>
+                    <small className="dica-senha">
+                      Se você alterar o e-mail, precisará entrar novamente.
+                    </small>
+
+                    <div className="modal-actions">
+                      <button type="submit" disabled={salvando}>
+                        {salvando ? "Salvando..." : "Salvar alterações"}
+                      </button>
+                    </div>
+                  </form>
                 </div>
 
-                <div className="conta-card">
-                  <small>Senha</small>
-                  <p>
-                    Para trocar sua senha, enviaremos um código de confirmação
-                    para o seu e-mail.
-                  </p>
-                  <button
-                    type="button"
-                    className="favoritar-button"
-                    onClick={iniciarTrocaDeSenha}
-                    disabled={salvando}
-                  >
-                    Alterar senha
-                  </button>
-                </div>
-
-                <div className="conta-card">
-                  <small>Documentos</small>
-                  <p>
-                    Consulte quando quiser os termos e a política que você
-                    aceitou ao criar a conta.
-                  </p>
-                  <div className="aceite-documentos">
+                <div className="conta-lateral">
+                  <div className="conta-bloco">
+                    <span className="section-label">SEGURANÇA</span>
+                    <h3>Senha</h3>
+                    <p className="conta-bloco-sub">
+                      Para trocar sua senha, enviaremos um código de
+                      confirmação para o seu e-mail.
+                    </p>
                     <button
                       type="button"
-                      className="favoritar-button"
-                      onClick={() => setDocumentoAberto("termos")}
+                      className="conta-botao"
+                      onClick={iniciarTrocaDeSenha}
+                      disabled={salvando}
                     >
-                      Termos de Uso
-                    </button>
-                    <button
-                      type="button"
-                      className="favoritar-button"
-                      onClick={() => setDocumentoAberto("privacidade")}
-                    >
-                      Política de Privacidade
+                      Alterar senha
                     </button>
                   </div>
-                </div>
 
-                <div className="conta-card perigo-card">
-                  <small>Excluir conta</small>
-                  <p>
+                  <div className="conta-bloco">
+                    <span className="section-label">DOCUMENTOS</span>
+                    <h3>Termos e privacidade</h3>
+                    <p className="conta-bloco-sub">
+                      Consulte quando quiser os documentos que você aceitou.
+                    </p>
+                    {dataAceiteTermos && (
+                      <p className="conta-aceite">
+                        <span aria-hidden="true">✓</span>
+                        Você aceitou a versão atual em{" "}
+                        {formatarData(dataAceiteTermos)}
+                      </p>
+                    )}
+                    <div className="conta-documentos">
+                      <button
+                        type="button"
+                        onClick={() => setDocumentoAberto("termos")}
+                      >
+                        <span>Termos de Uso</span>
+                        <span aria-hidden="true">→</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDocumentoAberto("privacidade")}
+                      >
+                        <span>Política de Privacidade</span>
+                        <span aria-hidden="true">→</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="conta-perigo">
+                <div>
+                  <span className="section-label">ZONA DE PERIGO</span>
+                  <h3>Excluir conta</h3>
+                  <p className="conta-bloco-sub">
                     Seus dados pessoais serão anonimizados e você perderá o
                     acesso aos seus favoritos e reservas.
                   </p>
-                  {reservasAtivas.length > 0 && (
-                    <p className="erro">
-                      Você possui livros reservados ou não devolvidos. Cancele
-                      as reservas ou devolva os livros na biblioteca antes de
-                      excluir a conta.
-                    </p>
-                  )}
-                  <button
-                    type="button"
-                    className="perigo"
-                    onClick={excluirConta}
-                    disabled={salvando || reservasAtivas.length > 0}
-                  >
-                    Excluir minha conta
-                  </button>
                 </div>
+                <button
+                  type="button"
+                  className="perigo"
+                  onClick={excluirConta}
+                  disabled={salvando}
+                >
+                  Excluir minha conta
+                </button>
               </div>
-            </div>
+            </>
           )}
         </section>
 
         {modalCadastroLivro}
         {modalAutenticacao}
+        {modalExclusaoConta}
         {!mostrarAutenticacao && modalDocumento}
       </div>
     );
@@ -2984,38 +3603,125 @@ function App() {
 
           {ehFuncionario && (
             <>
-              <div className="logs-filtros">
-                <select
-                  value={filtroLogs.usuarioId}
-                  onChange={(e) => {
-                    setFiltroLogs({ ...filtroLogs, usuarioId: e.target.value });
-                    carregarLogs(e.target.value);
-                  }}
-                >
-                  <option value="">Todos os usuários</option>
-                  {usuariosGestao.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.nome} ({item.email})
-                    </option>
-                  ))}
-                </select>
-                <input
-                  type="text"
-                  placeholder="Filtrar por ação, descrição ou e-mail"
-                  value={filtroLogs.texto}
-                  onChange={(e) =>
-                    setFiltroLogs({ ...filtroLogs, texto: e.target.value })
-                  }
-                />
-                <button
-                  type="button"
-                  className="favoritar-button"
-                  onClick={() => carregarLogs(filtroLogs.usuarioId)}
-                  disabled={carregandoPainel}
-                >
-                  {carregandoPainel ? "Carregando..." : "Atualizar"}
-                </button>
+              <div className="logs-painel">
+                <div className="logs-painel-topo">
+                  <div>
+                    <strong>Filtrar registros</strong>
+                    <span>
+                      Combine os filtros para encontrar uma ação específica.
+                    </span>
+                  </div>
+                  <div className="logs-painel-acoes">
+                    {filtrosDeLogsAtivos && (
+                      <button
+                        type="button"
+                        className="logs-limpar"
+                        onClick={() =>
+                          setFiltroLogs({
+                            ...FILTRO_LOGS_VAZIO,
+                            usuarioId: filtroLogs.usuarioId,
+                          })
+                        }
+                      >
+                        ✕ Limpar filtros
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="logs-atualizar"
+                      onClick={() => carregarLogs(filtroLogs.usuarioId)}
+                      disabled={carregandoPainel}
+                    >
+                      {carregandoPainel ? "Carregando..." : "↻ Atualizar"}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="logs-filtros">
+                  <label>
+                    Usuário
+                    <select
+                      value={filtroLogs.usuarioId}
+                      onChange={(e) => {
+                        setFiltroLogs({ ...filtroLogs, usuarioId: e.target.value });
+                        carregarLogs(e.target.value);
+                      }}
+                    >
+                      <option value="">Todos os usuários</option>
+                      {usuariosGestao.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.nome} ({item.email})
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Ação
+                    <select
+                      aria-label="Filtrar por ação"
+                      value={filtroLogs.acao}
+                      onChange={(e) =>
+                        setFiltroLogs({ ...filtroLogs, acao: e.target.value })
+                      }
+                    >
+                      <option value="">Todas as ações</option>
+                      {acoesDosLogs.map((acao) => (
+                        <option key={acao} value={acao}>
+                          {acao}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    De
+                    <input
+                      type="date"
+                      value={filtroLogs.de}
+                      max={filtroLogs.ate || undefined}
+                      onChange={(e) =>
+                        setFiltroLogs({ ...filtroLogs, de: e.target.value })
+                      }
+                    />
+                  </label>
+                  <label>
+                    Até
+                    <input
+                      type="date"
+                      value={filtroLogs.ate}
+                      min={filtroLogs.de || undefined}
+                      onChange={(e) =>
+                        setFiltroLogs({ ...filtroLogs, ate: e.target.value })
+                      }
+                    />
+                  </label>
+                  <label className="logs-busca">
+                    Buscar
+                    <input
+                      type="text"
+                      placeholder="Palavra da descrição ou e-mail do usuário"
+                      value={filtroLogs.texto}
+                      onChange={(e) =>
+                        setFiltroLogs({ ...filtroLogs, texto: e.target.value })
+                      }
+                    />
+                  </label>
+                </div>
               </div>
+
+              {periodoDosLogsInvalido && (
+                <p className="erro">
+                  A data inicial precisa ser igual ou anterior à data final.
+                </p>
+              )}
+
+              {!carregandoPainel && logs.length > 0 && (
+                <p className="logs-contagem">
+                  {(logsExibidos.length === 1
+                    ? "1 registro"
+                    : logsExibidos.length + " registros") +
+                    (filtrosDeLogsAtivos ? " com os filtros escolhidos" : "")}
+                </p>
+              )}
 
               {!carregandoPainel && logsExibidos.length === 0 && (
                 <p>Nenhum registro encontrado.</p>
@@ -3214,7 +3920,18 @@ function App() {
           )}
           {erro && <p className="erro">{erro}</p>}
 
-          {!usuario && <p>Entre na sua conta para ver suas reservas.</p>}
+          {!usuario && (
+            <p>
+              <button
+                type="button"
+                className="link-button"
+                onClick={() => abrirAutenticacao("login")}
+              >
+                Entre na sua conta
+              </button>{" "}
+              para ver suas reservas.
+            </p>
+          )}
           {usuario && reservas.length > 0 && (
             <p className="materias-sub">
               Retire o livro reservado na biblioteca. Depois da entrega, a
@@ -3521,6 +4238,13 @@ function App() {
                         cancelado.
                       </small>
                     )}
+                    <button
+                      type="button"
+                      className="link-button pedido-detalhes-link"
+                      onClick={() => setPedidoDetalhado(pedido)}
+                    >
+                      Ver detalhes →
+                    </button>
                   </div>
 
                   <div className="pedido-lateral">
@@ -3548,6 +4272,7 @@ function App() {
 
         {modalCadastroLivro}
         {modalAutenticacao}
+        {modalDetalhesDoPedido}
       </div>
     );
   }
@@ -3577,7 +4302,16 @@ function App() {
 
           <div className="books">
             {!usuario && (
-              <p>Entre na sua conta para ver os livros que você favoritou.</p>
+              <p>
+                <button
+                  type="button"
+                  className="link-button"
+                  onClick={() => abrirAutenticacao("login")}
+                >
+                  Entre na sua conta
+                </button>{" "}
+                para ver os livros que você favoritou.
+              </p>
             )}
             {usuario && favoritos.length === 0 && (
               <p>Você ainda não favoritou nenhum livro.</p>
@@ -3635,35 +4369,122 @@ function App() {
               ) : (
                 <CapaGenerica titulo={livroAberto.titulo} tamanho="grande" />
               )}
+              {!ehFuncionario && (
+                <button
+                  type="button"
+                  className={
+                    "favorite favorite-livro" + (favoritado ? " ativo" : "")
+                  }
+                  onClick={() => alternarFavorito(livroAberto)}
+                  disabled={favoritoEmEdicao === livroAberto.id}
+                  aria-label={
+                    favoritado ? "Remover dos favoritos" : "Adicionar aos favoritos"
+                  }
+                  title={
+                    favoritado ? "Remover dos favoritos" : "Adicionar aos favoritos"
+                  }
+                >
+                  {favoritado ? "♥" : "♡"}
+                </button>
+              )}
             </div>
 
-            <div className="livro-dados">
-              <span className="book-category">
-                {livroAberto.materia || "Sem matéria"}
-              </span>
-              <h1>{livroAberto.titulo}</h1>
+            <form
+              className={"livro-dados" + (editandoLivro ? " editando" : "")}
+              onSubmit={atualizarLivro}
+            >
+              {editandoLivro ? (
+                <input
+                  className="livro-titulo-input"
+                  aria-label="Título"
+                  required
+                  value={formEdicao.titulo || ""}
+                  onChange={(e) => alterarEdicao("titulo", e.target.value)}
+                />
+              ) : (
+                <h1>{livroAberto.titulo}</h1>
+              )}
               <p className="livro-autores">
                 {(livroAberto.autores || []).join(", ") || "Autor desconhecido"}
               </p>
 
+              {editandoLivro && (
+                <p className="edicao-aviso">
+                  <span className="edicao-aviso-icone" aria-hidden="true">
+                    ✎
+                  </span>
+                  <span>
+                    Modo de edição: altere os campos destacados e clique em{" "}
+                    <strong>Salvar alterações</strong>.
+                  </span>
+                </p>
+              )}
+
               <div className="livro-atributos">
-                <div>
+                <div className={editandoLivro ? "editavel" : undefined}>
                   <small>Ano de lançamento</small>
-                  <strong>{livroAberto.anoLancamento || "—"}</strong>
+                  {editandoLivro ? (
+                    <input
+                      aria-label="Ano de lançamento"
+                      value={formEdicao.anoLancamento || ""}
+                      onChange={(e) =>
+                        alterarEdicao("anoLancamento", e.target.value)
+                      }
+                    />
+                  ) : (
+                    <strong>{livroAberto.anoLancamento || "—"}</strong>
+                  )}
                 </div>
-                <div>
+                <div className={editandoLivro ? "editavel" : undefined}>
                   <small>Páginas</small>
-                  <strong>{livroAberto.numeroPagina || 0}</strong>
+                  {editandoLivro ? (
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      aria-label="Páginas"
+                      value={formEdicao.numeroPagina ?? ""}
+                      onChange={(e) =>
+                        alterarEdicao("numeroPagina", e.target.value)
+                      }
+                    />
+                  ) : (
+                    <strong>{livroAberto.numeroPagina || 0}</strong>
+                  )}
                 </div>
-                <div>
+                <div className={editandoLivro ? "editavel" : undefined}>
                   <small>Matéria</small>
-                  <strong>{livroAberto.materia || "Sem matéria"}</strong>
+                  {editandoLivro ? (
+                    <select
+                      aria-label="Matéria"
+                      value={nomeDaMateria(formEdicao.materia)}
+                      onChange={(e) => alterarEdicao("materia", e.target.value)}
+                    >
+                      <option value="">Sem matéria</option>
+                      {materias.map((materia) => (
+                        <option key={materia.nome} value={materia.nome}>
+                          {materia.rotulo}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <strong>{livroAberto.materia || "Sem matéria"}</strong>
+                  )}
                 </div>
-                <div>
-                  <small>Preço</small>
-                  <strong>{formatarPreco(livroAberto.preco)}</strong>
+                <div className={editandoLivro ? "editavel" : undefined}>
+                  <small>Preço (R$)</small>
+                  {editandoLivro ? (
+                    <input
+                      inputMode="decimal"
+                      aria-label="Preço"
+                      value={formEdicao.preco ?? ""}
+                      onChange={(e) => alterarEdicao("preco", e.target.value)}
+                    />
+                  ) : (
+                    <strong>{formatarPreco(livroAberto.preco)}</strong>
+                  )}
                 </div>
-                <div>
+                <div className={editandoLivro ? "somente-leitura" : undefined}>
                   <small>Avaliação</small>
                   <strong>
                     {resumoAvaliacoes.total > 0
@@ -3671,35 +4492,71 @@ function App() {
                       : "Sem avaliações"}
                   </strong>
                 </div>
-                <div>
+                <div className={editandoLivro ? "editavel" : undefined}>
                   <small>Para reserva</small>
-                  <strong>{formatarEstoque(livroAberto.estoqueReserva)}</strong>
+                  {editandoLivro ? (
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      aria-label="Estoque para reserva"
+                      value={formEdicao.estoqueReserva ?? 0}
+                      onChange={(e) =>
+                        alterarEdicao("estoqueReserva", e.target.value)
+                      }
+                    />
+                  ) : (
+                    <strong>{formatarEstoque(livroAberto.estoqueReserva)}</strong>
+                  )}
                 </div>
-                <div>
+                <div className={editandoLivro ? "editavel" : undefined}>
                   <small>Para compra</small>
-                  <strong>{formatarEstoque(livroAberto.estoqueCompra)}</strong>
+                  {editandoLivro ? (
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      aria-label="Estoque para compra"
+                      value={formEdicao.estoqueCompra ?? 0}
+                      onChange={(e) =>
+                        alterarEdicao("estoqueCompra", e.target.value)
+                      }
+                    />
+                  ) : (
+                    <strong>{formatarEstoque(livroAberto.estoqueCompra)}</strong>
+                  )}
                 </div>
-                <div>
+                <div className={editandoLivro ? "editavel" : undefined}>
                   <small>ISBN-10</small>
-                  <strong>{livroAberto.isbn10 || "—"}</strong>
+                  {editandoLivro ? (
+                    <input
+                      maxLength={13}
+                      placeholder="Ex.: 8595084742"
+                      aria-label="ISBN-10"
+                      value={formEdicao.isbn10 || ""}
+                      onChange={(e) => alterarEdicao("isbn10", e.target.value)}
+                    />
+                  ) : (
+                    <strong>{livroAberto.isbn10 || "—"}</strong>
+                  )}
                 </div>
-                <div>
+                <div className={editandoLivro ? "editavel" : undefined}>
                   <small>ISBN-13</small>
-                  <strong>{formatarIsbn13(livroAberto.isbn13)}</strong>
+                  {editandoLivro ? (
+                    <input
+                      maxLength={17}
+                      placeholder="Ex.: 978-8595084742"
+                      aria-label="ISBN-13"
+                      value={formEdicao.isbn13 || ""}
+                      onChange={(e) => alterarEdicao("isbn13", e.target.value)}
+                    />
+                  ) : (
+                    <strong>{formatarIsbn13(livroAberto.isbn13)}</strong>
+                  )}
                 </div>
               </div>
 
               <div className="livro-acoes">
-                {!ehFuncionario && (
-                  <button
-                    type="button"
-                    className={"favoritar-button" + (favoritado ? " ativo" : "")}
-                    onClick={() => alternarFavorito(livroAberto)}
-                    disabled={favoritoEmEdicao === livroAberto.id}
-                  >
-                    {favoritado ? "♥ Remover dos favoritos" : "♡ Favoritar"}
-                  </button>
-                )}
                 {ehFuncionario ? null : reservaAberta &&
                   reservaAberta.status === "ENTREGUE" ? (
                   <button type="button" className="reservar-button" disabled>
@@ -3744,18 +4601,46 @@ function App() {
                       : "Indisponível para compra"}
                   </button>
                 )}
-                {ehFuncionario && (
-                  <button
-                    type="button"
-                    className="perigo"
-                    onClick={() => deletarLivro(livroAberto)}
-                    disabled={salvando}
-                  >
-                    Excluir livro
-                  </button>
+                {ehFuncionario && !editandoLivro && (
+                  <>
+                    <button
+                      type="button"
+                      className="cadastro-button"
+                      onClick={() => iniciarEdicaoDoLivro(livroAberto)}
+                    >
+                      ✎ Atualizar livro
+                    </button>
+                    <button
+                      type="button"
+                      className="perigo"
+                      onClick={() => deletarLivro(livroAberto)}
+                      disabled={salvando}
+                    >
+                      Excluir livro
+                    </button>
+                  </>
+                )}
+                {ehFuncionario && editandoLivro && (
+                  <>
+                    <button
+                      type="submit"
+                      className="cadastro-button"
+                      disabled={salvando}
+                    >
+                      {salvando ? "Salvando..." : "Salvar alterações"}
+                    </button>
+                    <button
+                      type="button"
+                      className="botao-cancelar"
+                      onClick={() => cancelarEdicaoDoLivro(livroAberto)}
+                      disabled={salvando}
+                    >
+                      Cancelar
+                    </button>
+                  </>
                 )}
               </div>
-            </div>
+            </form>
           </div>
 
           <div className="avaliacoes">
@@ -3883,149 +4768,6 @@ function App() {
             </ul>
           </div>
 
-          {ehFuncionario && (
-            <div className="livro-edicao">
-              <span className="section-label">EDITAR</span>
-              <h2>Atualizar informações</h2>
-
-              <form className="modal-form" onSubmit={atualizarLivro}>
-                <label>
-                  Título
-                  <input
-                    type="text"
-                    value={formEdicao.titulo || ""}
-                    onChange={(e) =>
-                      setFormEdicao({ ...formEdicao, titulo: e.target.value })
-                    }
-                  />
-                </label>
-                <label>
-                  Matéria
-                  <select
-                    value={nomeDaMateria(formEdicao.materia)}
-                    onChange={(e) =>
-                      setFormEdicao({ ...formEdicao, materia: e.target.value })
-                    }
-                  >
-                    <option value="">Sem matéria</option>
-                    {materias.map((materia) => (
-                      <option key={materia.nome} value={materia.nome}>
-                        {materia.rotulo}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Ano de lançamento
-                  <input
-                    type="text"
-                    value={formEdicao.anoLancamento || ""}
-                    onChange={(e) =>
-                      setFormEdicao({
-                        ...formEdicao,
-                        anoLancamento: e.target.value,
-                      })
-                    }
-                  />
-                </label>
-                <label>
-                  Páginas
-                  <input
-                    type="number"
-                    min="0"
-                    value={formEdicao.numeroPagina || 0}
-                    onChange={(e) =>
-                      setFormEdicao({
-                        ...formEdicao,
-                        numeroPagina: e.target.value,
-                      })
-                    }
-                  />
-                </label>
-                <label>
-                  Preço
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={formEdicao.preco || 0}
-                    onChange={(e) =>
-                      setFormEdicao({ ...formEdicao, preco: e.target.value })
-                    }
-                  />
-                </label>
-                <label>
-                  Estoque para reserva
-                  <input
-                    type="number"
-                    min="0"
-                    step="1"
-                    value={
-                      formEdicao.estoqueReserva === undefined ||
-                      formEdicao.estoqueReserva === null
-                        ? 0
-                        : formEdicao.estoqueReserva
-                    }
-                    onChange={(e) =>
-                      setFormEdicao({
-                        ...formEdicao,
-                        estoqueReserva: e.target.value,
-                      })
-                    }
-                  />
-                </label>
-                <label>
-                  Estoque para compra
-                  <input
-                    type="number"
-                    min="0"
-                    step="1"
-                    value={
-                      formEdicao.estoqueCompra === undefined ||
-                      formEdicao.estoqueCompra === null
-                        ? 0
-                        : formEdicao.estoqueCompra
-                    }
-                    onChange={(e) =>
-                      setFormEdicao({
-                        ...formEdicao,
-                        estoqueCompra: e.target.value,
-                      })
-                    }
-                  />
-                </label>
-                <label>
-                  ISBN-10
-                  <input
-                    type="text"
-                    maxLength={13}
-                    placeholder="Ex.: 8595084742"
-                    value={formEdicao.isbn10 || ""}
-                    onChange={(e) =>
-                      setFormEdicao({ ...formEdicao, isbn10: e.target.value })
-                    }
-                  />
-                </label>
-                <label>
-                  ISBN-13
-                  <input
-                    type="text"
-                    maxLength={17}
-                    placeholder="Ex.: 978-8595084742"
-                    value={formEdicao.isbn13 || ""}
-                    onChange={(e) =>
-                      setFormEdicao({ ...formEdicao, isbn13: e.target.value })
-                    }
-                  />
-                </label>
-                <div className="modal-actions">
-                  <button type="submit" disabled={salvando}>
-                    {salvando ? "Salvando..." : "Atualizar livro"}
-                  </button>
-                </div>
-              </form>
-            </div>
-          )}
         </section>
 
         {capaAmpliada && (
@@ -4050,7 +4792,7 @@ function App() {
         <div className="hero-content">
           <div className="hero-tag">
             <span></span>
-            BIBLIOTECA VIRTUAL
+            UM OLHAR SOBRE O CONHECIMENTO
           </div>
           <h1>
             Encontre seu próximo
@@ -4062,7 +4804,6 @@ function App() {
           </p>
 
           <form className="search" onSubmit={pesquisar}>
-            <span className="search-icon">🔎</span>
             <input
               type="text"
               placeholder="Pesquise pelo título do livro..."
@@ -4117,8 +4858,70 @@ function App() {
             <p>{mensagemListaVazia}</p>
           )}
 
-          {!carregando && livrosExibidos.map(cartaoLivro)}
+          {!carregando && livrosDaPagina.map(cartaoLivro)}
         </div>
+
+        {!carregando && totalPaginasLivros > 1 && (
+          <nav className="paginacao" aria-label="Páginas de livros">
+            <button
+              type="button"
+              className="paginacao-seta"
+              onClick={() => irParaPaginaDeLivros(paginaLivrosAtual - 1)}
+              disabled={paginaLivrosAtual === 1}
+            >
+              ← Anterior
+            </button>
+            <div className="paginacao-numeros">
+              {paginasVisiveis(paginaLivrosAtual, totalPaginasLivros).map(
+                (numero, indice) =>
+                  numero === "…" ? (
+                    <span
+                      key={"reticencias-" + indice}
+                      className="paginacao-reticencias"
+                    >
+                      …
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      key={numero}
+                      className={
+                        "paginacao-numero" +
+                        (numero === paginaLivrosAtual ? " atual" : "")
+                      }
+                      aria-current={
+                        numero === paginaLivrosAtual ? "page" : undefined
+                      }
+                      aria-label={"Página " + numero}
+                      onClick={() => irParaPaginaDeLivros(numero)}
+                    >
+                      {numero}
+                    </button>
+                  )
+              )}
+            </div>
+            <button
+              type="button"
+              className="paginacao-seta"
+              onClick={() => irParaPaginaDeLivros(paginaLivrosAtual + 1)}
+              disabled={paginaLivrosAtual === totalPaginasLivros}
+            >
+              Próxima →
+            </button>
+            <p className="paginacao-resumo">
+              {"Mostrando " +
+                ((paginaLivrosAtual - 1) * LIVROS_POR_PAGINA + 1) +
+                "–" +
+                Math.min(
+                  paginaLivrosAtual * LIVROS_POR_PAGINA,
+                  livrosExibidos.length
+                ) +
+                " de " +
+                livrosExibidos.length +
+                " livros"}
+            </p>
+          </nav>
+        )}
       </section>
 
       {modalCadastroLivro}

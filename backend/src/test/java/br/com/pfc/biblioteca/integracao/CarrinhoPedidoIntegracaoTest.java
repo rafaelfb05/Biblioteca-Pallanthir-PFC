@@ -85,12 +85,17 @@ class CarrinhoPedidoIntegracaoTest extends TesteIntegracaoBase {
     void checkoutCriaPedidoSeparaEstoqueEMantemOCarrinho() {
         Usuario estudante = criarEstudante();
         Livro livro = criarLivro(50, 1, 5);
+        livro.setCapaUrl("https://covers.openlibrary.org/b/isbn/9788595084742-L.jpg");
+        livroRepository.save(livro);
         adicionarAoCarrinho(token(estudante), livro, 2);
 
         Resposta resposta = post("/pedidos/checkout", token(estudante), null);
 
         assertThat(resposta.status()).isEqualTo(200);
         assertThat(resposta.corpo().path("status").asText()).isEqualTo("AGUARDANDO_PAGAMENTO");
+        assertThat(resposta.corpo().path("itens").get(0).path("capaUrl").asText())
+                .isEqualTo("https://covers.openlibrary.org/b/isbn/9788595084742-L.jpg");
+        assertThat(resposta.corpo().path("itens").get(0).path("titulo").asText()).isEqualTo(livro.getTitulo());
         assertThat(resposta.corpo().path("linkPagamento").asText()).contains("mercadopago.com.br");
         assertThat(new BigDecimal(resposta.corpo().path("total").asText())).isEqualByComparingTo("100.00");
         assertThat(resposta.corpo().path("dataExpiracao").asText()).isNotBlank();
