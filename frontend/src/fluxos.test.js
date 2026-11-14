@@ -255,6 +255,64 @@ test("página do livro mostra os ISBNs e traço quando não há", async () => {
   expect(screen.getByText("978-8595084742")).toBeInTheDocument();
 });
 
+test("menu de navegação abre e fecha pelo botão da direita", async () => {
+  simularApi();
+  entrarComo("ESTUDANTE");
+  render(<App />);
+
+  const botao = await screen.findByRole("button", { name: "Abrir menu" });
+  expect(botao).toHaveAttribute("aria-expanded", "false");
+
+  fireEvent.click(botao);
+  expect(screen.getByRole("button", { name: "Fechar menu" })).toHaveAttribute("aria-expanded", "true");
+  expect(document.getElementById("menu-navegacao")).toHaveClass("aberto");
+
+  fireEvent.click(screen.getByRole("button", { name: /^Reservas/ }));
+  expect(await screen.findByRole("button", { name: "Abrir menu" })).toHaveAttribute("aria-expanded", "false");
+});
+
+test("exclusão de conta com reserva ativa mostra o aviso e não chama a API", async () => {
+  simularApi({
+    ["GET /reservas/usuario/" + ID_USUARIO]: () => [
+      200,
+      [{ id: "r1", livroId: ID_LIVRO, tituloLivro: "Clean Code", dataReserva: "2026-11-12T10:00:00", status: "RESERVADO" }],
+    ],
+  });
+  entrarComo("ESTUDANTE");
+  render(<App />);
+
+  fireEvent.click(await screen.findByTitle("Minha conta"));
+  await screen.findByRole("button", { name: /^Reservas \(1\)/ });
+  fireEvent.click(await screen.findByRole("button", { name: "Excluir minha conta" }));
+
+  expect(await screen.findByRole("alertdialog")).toHaveTextContent("Não é possível excluir sua conta");
+  expect(screen.getByRole("button", { name: "Ver minhas reservas" })).toBeInTheDocument();
+  expect(chamadasPara("DELETE", "/usuarios/deletar/" + ID_USUARIO)).toHaveLength(0);
+
+  fireEvent.click(screen.getByRole("button", { name: "Entendi" }));
+  expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+});
+
+test("exclusão de conta pede confirmação na janela e exclui ao confirmar", async () => {
+  simularApi({ ["DELETE /usuarios/deletar/" + ID_USUARIO]: () => [204, undefined] });
+  entrarComo("ESTUDANTE");
+  render(<App />);
+
+  fireEvent.click(await screen.findByTitle("Minha conta"));
+  fireEvent.click(await screen.findByRole("button", { name: "Excluir minha conta" }));
+
+  expect(await screen.findByRole("alertdialog")).toHaveTextContent("Excluir sua conta?");
+  fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+  expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+  expect(chamadasPara("DELETE", "/usuarios/deletar/" + ID_USUARIO)).toHaveLength(0);
+
+  fireEvent.click(screen.getByRole("button", { name: "Excluir minha conta" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Excluir conta" }));
+
+  expect(await screen.findByText("Sua conta foi excluída.")).toBeInTheDocument();
+  expect(chamadasPara("DELETE", "/usuarios/deletar/" + ID_USUARIO)).toHaveLength(1);
+});
+
 test("funcionário vê a dashboard e não vê carrinho nem pedidos", async () => {
   simularApi({
     "GET /dashboard": () => [

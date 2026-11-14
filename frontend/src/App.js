@@ -188,6 +188,9 @@ function GraficoMaterias({ titulo, descricao, itens, unidade }) {
   );
 }
 
+const MENSAGEM_EXCLUSAO_BLOQUEADA =
+  "Você possui livros reservados ou não devolvidos. Cancele as reservas ou devolva os livros na biblioteca antes de excluir a conta.";
+
 const mensagemDeErro = (erro, padrao) =>
   erro && erro.status && erro.message ? erro.message : padrao;
 
@@ -568,6 +571,9 @@ function App() {
   const [codigo2FA, setCodigo2FA] = useState("");
   const [avisoAutenticacao, setAvisoAutenticacao] = useState(null);
   const [salvando, setSalvando] = useState(false);
+  const [menuAberto, setMenuAberto] = useState(false);
+  const [dialogoExclusao, setDialogoExclusao] = useState(null);
+  const menuRef = useRef(null);
   const [documentoAberto, setDocumentoAberto] = useState(null);
 
   const [formConta, setFormConta] = useState(FORM_CONTA_VAZIO);
@@ -1250,33 +1256,41 @@ function App() {
     await enviarCodigoRecuperacao(usuario.email);
   };
 
-  const excluirConta = async () => {
-    if (reservasAtivas.length > 0) {
-      setErro(
-        "Não é possível excluir a conta enquanto houver livros reservados ou não devolvidos."
-      );
-      return;
-    }
+  const excluirConta = () => {
+    setErro(null);
+    setDialogoExclusao(
+      reservasAtivas.length > 0
+        ? { bloqueado: true, mensagem: MENSAGEM_EXCLUSAO_BLOQUEADA }
+        : { bloqueado: false }
+    );
+  };
 
-    if (
-      !window.confirm(
-        "Excluir sua conta? Seus dados pessoais serão anonimizados e esta ação não pode ser desfeita."
-      )
-    ) {
-      return;
-    }
-
+  const confirmarExclusaoDaConta = async () => {
     try {
       setSalvando(true);
       setErro(null);
       await usuariosApi.deletar(usuario.id);
+      setDialogoExclusao(null);
       encerrarSessao("Sua conta foi excluída.");
     } catch (e) {
-      setErro(mensagemDeErro(e, "Não foi possível excluir a conta."));
+      if (e && e.status === 409) {
+        setDialogoExclusao({
+          bloqueado: true,
+          mensagem: mensagemDeErro(e, MENSAGEM_EXCLUSAO_BLOQUEADA),
+        });
+      } else {
+        setDialogoExclusao(null);
+        setErro(mensagemDeErro(e, "Não foi possível excluir a conta."));
+      }
       console.error(e);
     } finally {
       setSalvando(false);
     }
+  };
+
+  const verReservasAntesDeExcluir = async () => {
+    setDialogoExclusao(null);
+    await irParaReservas();
   };
 
   const irParaRanking = async () => {
@@ -1949,104 +1963,46 @@ function App() {
     </div>
   );
 
+  useEffect(() => {
+    if (!menuAberto) {
+      return undefined;
+    }
+    const aoClicarFora = (evento) => {
+      if (menuRef.current && !menuRef.current.contains(evento.target)) {
+        setMenuAberto(false);
+      }
+    };
+    const aoTeclar = (evento) => {
+      if (evento.key === "Escape") {
+        setMenuAberto(false);
+      }
+    };
+    document.addEventListener("mousedown", aoClicarFora);
+    document.addEventListener("keydown", aoTeclar);
+    return () => {
+      document.removeEventListener("mousedown", aoClicarFora);
+      document.removeEventListener("keydown", aoTeclar);
+    };
+  }, [menuAberto]);
+
+  useEffect(() => {
+    if (!dialogoExclusao) {
+      return undefined;
+    }
+    const aoTeclar = (evento) => {
+      if (evento.key === "Escape" && !salvando) {
+        setDialogoExclusao(null);
+      }
+    };
+    document.addEventListener("keydown", aoTeclar);
+    return () => document.removeEventListener("keydown", aoTeclar);
+  }, [dialogoExclusao, salvando]);
+
   const cabecalho = (
     <header className="header">
       <button type="button" className="logo" onClick={irParaInicio}>
         Pallanthir
       </button>
-      <nav className="nav">
-        <button
-          type="button"
-          className={
-            "nav-link" +
-            (pagina === "inicio" && filtro.tipo === "todos" ? " active" : "")
-          }
-          onClick={irParaInicio}
-        >
-          Início
-        </button>
-        <button
-          type="button"
-          className={"nav-link" + (pagina === "materias" ? " active" : "")}
-          onClick={irParaMaterias}
-        >
-          Matérias
-        </button>
-        <button
-          type="button"
-          className={"nav-link" + (pagina === "ranking" ? " active" : "")}
-          onClick={irParaRanking}
-        >
-          Ranking ♛
-        </button>
-        {!ehFuncionario && (
-          <button
-            type="button"
-            className={
-              "nav-link" + (pagina === "favoritos" ? " active" : "")
-            }
-            onClick={irParaFavoritos}
-          >
-            Favoritos ♡ {favoritos.length > 0 && "(" + favoritos.length + ")"}
-          </button>
-        )}
-        {!ehFuncionario && (
-          <button
-            type="button"
-            className={"nav-link" + (pagina === "reservas" ? " active" : "")}
-            onClick={irParaReservas}
-          >
-            Reservas{" "}
-            {reservasAtivas.length > 0 && "(" + reservasAtivas.length + ")"}
-          </button>
-        )}
-        {!ehFuncionario && (
-          <button
-            type="button"
-            className={"nav-link" + (pagina === "carrinho" ? " active" : "")}
-            onClick={irParaCarrinho}
-          >
-            Carrinho{" "}
-            {quantidadeNoCarrinho > 0 && "(" + quantidadeNoCarrinho + ")"}
-          </button>
-        )}
-        {!ehFuncionario && (
-          <button
-            type="button"
-            className={"nav-link" + (pagina === "pedidos" ? " active" : "")}
-            onClick={irParaPedidos}
-          >
-            Pedidos
-          </button>
-        )}
-        {ehFuncionario && (
-          <button
-            type="button"
-            className={"nav-link" + (pagina === "dashboard" ? " active" : "")}
-            onClick={irParaDashboard}
-          >
-            Dashboard
-          </button>
-        )}
-        {ehFuncionario && (
-          <button
-            type="button"
-            className={"nav-link" + (pagina === "gestao" ? " active" : "")}
-            onClick={irParaGestao}
-          >
-            Gestão
-          </button>
-        )}
-        {ehFuncionario && (
-          <button
-            type="button"
-            className={"nav-link" + (pagina === "logs" ? " active" : "")}
-            onClick={irParaLogs}
-          >
-            Logs
-          </button>
-        )}
-      </nav>
       <div className="header-actions">
         {ehFuncionario && (
           <button
@@ -2094,6 +2050,117 @@ function App() {
             Entrar
           </button>
         )}
+        <div className="menu" ref={menuRef}>
+          <button
+            type="button"
+            className={"menu-botao" + (menuAberto ? " aberto" : "")}
+            onClick={() => setMenuAberto((aberto) => !aberto)}
+            aria-label={menuAberto ? "Fechar menu" : "Abrir menu"}
+            aria-expanded={menuAberto}
+            aria-controls="menu-navegacao"
+          >
+            <span />
+            <span />
+            <span />
+          </button>
+          <nav
+            id="menu-navegacao"
+            className={"menu-painel" + (menuAberto ? " aberto" : "")}
+            onClick={() => setMenuAberto(false)}
+          >
+            <button
+              type="button"
+              className={
+                "nav-link" +
+                (pagina === "inicio" && filtro.tipo === "todos" ? " active" : "")
+              }
+              onClick={irParaInicio}
+            >
+              Início
+            </button>
+            <button
+              type="button"
+              className={"nav-link" + (pagina === "materias" ? " active" : "")}
+              onClick={irParaMaterias}
+            >
+              Matérias
+            </button>
+            <button
+              type="button"
+              className={"nav-link" + (pagina === "ranking" ? " active" : "")}
+              onClick={irParaRanking}
+            >
+              Ranking ♛
+            </button>
+            {!ehFuncionario && (
+              <button
+                type="button"
+                className={
+                  "nav-link" + (pagina === "favoritos" ? " active" : "")
+                }
+                onClick={irParaFavoritos}
+              >
+                Favoritos ♡ {favoritos.length > 0 && "(" + favoritos.length + ")"}
+              </button>
+            )}
+            {!ehFuncionario && (
+              <button
+                type="button"
+                className={"nav-link" + (pagina === "reservas" ? " active" : "")}
+                onClick={irParaReservas}
+              >
+                Reservas{" "}
+                {reservasAtivas.length > 0 && "(" + reservasAtivas.length + ")"}
+              </button>
+            )}
+            {!ehFuncionario && (
+              <button
+                type="button"
+                className={"nav-link" + (pagina === "carrinho" ? " active" : "")}
+                onClick={irParaCarrinho}
+              >
+                Carrinho{" "}
+                {quantidadeNoCarrinho > 0 && "(" + quantidadeNoCarrinho + ")"}
+              </button>
+            )}
+            {!ehFuncionario && (
+              <button
+                type="button"
+                className={"nav-link" + (pagina === "pedidos" ? " active" : "")}
+                onClick={irParaPedidos}
+              >
+                Pedidos
+              </button>
+            )}
+            {ehFuncionario && (
+              <button
+                type="button"
+                className={"nav-link" + (pagina === "dashboard" ? " active" : "")}
+                onClick={irParaDashboard}
+              >
+                Dashboard
+              </button>
+            )}
+            {ehFuncionario && (
+              <button
+                type="button"
+                className={"nav-link" + (pagina === "gestao" ? " active" : "")}
+                onClick={irParaGestao}
+              >
+                Gestão
+              </button>
+            )}
+            {ehFuncionario && (
+              <button
+                type="button"
+                className={"nav-link" + (pagina === "logs" ? " active" : "")}
+                onClick={irParaLogs}
+              >
+                Logs
+              </button>
+            )}
+          </nav>
+        </div>
       </div>
     </header>
   );
@@ -2206,6 +2273,82 @@ function App() {
       formRecuperacao.email +
       " e escolha uma nova senha. O código vale por 15 minutos.",
   }[modoAutenticacao];
+
+  const modalExclusaoConta = dialogoExclusao && (
+    <div
+      className="modal"
+      onClick={() => !salvando && setDialogoExclusao(null)}
+    >
+      <div
+        className={
+          "modal-box dialogo" + (dialogoExclusao.bloqueado ? " bloqueado" : " perigo")
+        }
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="dialogo-exclusao-titulo"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="dialogo-icone" aria-hidden="true">
+          {dialogoExclusao.bloqueado ? "!" : "✕"}
+        </div>
+        <h3 id="dialogo-exclusao-titulo">
+          {dialogoExclusao.bloqueado
+            ? "Não é possível excluir sua conta"
+            : "Excluir sua conta?"}
+        </h3>
+        {dialogoExclusao.bloqueado ? (
+          <p>{dialogoExclusao.mensagem}</p>
+        ) : (
+          <>
+            <p>
+              Seus dados pessoais serão anonimizados e você perderá o acesso aos
+              seus favoritos, reservas e pedidos.
+            </p>
+            <p className="dialogo-alerta">Esta ação não pode ser desfeita.</p>
+          </>
+        )}
+        <div className="dialogo-acoes">
+          {dialogoExclusao.bloqueado ? (
+            <>
+              <button
+                type="button"
+                className="dialogo-secundario"
+                onClick={() => setDialogoExclusao(null)}
+              >
+                Entendi
+              </button>
+              <button
+                type="button"
+                className="dialogo-principal"
+                onClick={verReservasAntesDeExcluir}
+              >
+                Ver minhas reservas
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                className="dialogo-secundario"
+                onClick={() => setDialogoExclusao(null)}
+                disabled={salvando}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="dialogo-principal"
+                onClick={confirmarExclusaoDaConta}
+                disabled={salvando}
+              >
+                {salvando ? "Excluindo..." : "Excluir conta"}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 
   const modalDocumento = documentoAberto && (
     <ModalDocumento
@@ -2680,18 +2823,11 @@ function App() {
                     Seus dados pessoais serão anonimizados e você perderá o
                     acesso aos seus favoritos e reservas.
                   </p>
-                  {reservasAtivas.length > 0 && (
-                    <p className="erro">
-                      Você possui livros reservados ou não devolvidos. Cancele
-                      as reservas ou devolva os livros na biblioteca antes de
-                      excluir a conta.
-                    </p>
-                  )}
                   <button
                     type="button"
                     className="perigo"
                     onClick={excluirConta}
-                    disabled={salvando || reservasAtivas.length > 0}
+                    disabled={salvando}
                   >
                     Excluir minha conta
                   </button>
@@ -2703,6 +2839,7 @@ function App() {
 
         {modalCadastroLivro}
         {modalAutenticacao}
+        {modalExclusaoConta}
         {!mostrarAutenticacao && modalDocumento}
       </div>
     );
