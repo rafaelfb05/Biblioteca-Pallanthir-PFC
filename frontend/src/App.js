@@ -373,7 +373,21 @@ function CampoSenha({ rotulo, valor, aoMudar, autoComplete }) {
           aria-label={visivel ? "Ocultar senha" : "Mostrar senha"}
           title={visivel ? "Ocultar senha" : "Mostrar senha"}
         >
-          <span aria-hidden="true">{visivel ? "🙈" : "👁️"}</span>
+          <svg
+            viewBox="0 0 24 24"
+            width="18"
+            height="18"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" />
+            <circle cx="12" cy="12" r="3" />
+            {visivel && <path d="M4 4l16 16" />}
+          </svg>
         </button>
       </div>
     </label>
@@ -2569,39 +2583,21 @@ function App() {
     <div className="modal modal-auth">
       <div className="modal-box auth-box">
         <div className="auth-conteudo">
-        <div className="modal-header">
+        <button
+          type="button"
+          className="auth-fechar"
+          onClick={fecharAutenticacao}
+          aria-label="Fechar"
+        >
+          ✕
+        </button>
+        <div className="auth-cabecalho">
+          <span className="auth-logo" aria-hidden="true">
+            Pallanthir
+          </span>
           <h3>{TITULOS_AUTENTICACAO[modoAutenticacao]}</h3>
-          <button type="button" onClick={fecharAutenticacao}>
-            ✕
-          </button>
+          <p className="modal-sub">{subtituloAutenticacao}</p>
         </div>
-
-        {(modoAutenticacao === "login" || modoAutenticacao === "cadastro") && (
-          <div className="abas-autenticacao">
-            <button
-              type="button"
-              className={
-                "aba-autenticacao" +
-                (modoAutenticacao === "login" ? " ativa" : "")
-              }
-              onClick={() => trocarModoAutenticacao("login")}
-            >
-              Entrar
-            </button>
-            <button
-              type="button"
-              className={
-                "aba-autenticacao" +
-                (modoAutenticacao === "cadastro" ? " ativa" : "")
-              }
-              onClick={() => trocarModoAutenticacao("cadastro")}
-            >
-              Criar conta
-            </button>
-          </div>
-        )}
-
-        <p className="modal-sub">{subtituloAutenticacao}</p>
 
         {avisoAutenticacao && (
           <p className="aviso-modal">{avisoAutenticacao}</p>
@@ -2647,6 +2643,16 @@ function App() {
                 {salvando ? "Enviando código..." : "Entrar"}
               </button>
             </div>
+            <p className="auth-alternar">
+              Ainda não tem conta?{" "}
+              <button
+                type="button"
+                className="link-button"
+                onClick={() => trocarModoAutenticacao("cadastro")}
+              >
+                Criar conta
+              </button>
+            </p>
           </form>
         )}
 
@@ -2925,6 +2931,16 @@ function App() {
                 {salvando ? "Salvando..." : "Criar minha conta"}
               </button>
             </div>
+            <p className="auth-alternar">
+              Já tem conta?{" "}
+              <button
+                type="button"
+                className="link-button"
+                onClick={() => trocarModoAutenticacao("login")}
+              >
+                Entrar
+              </button>
+            </p>
           </form>
         )}
         </div>

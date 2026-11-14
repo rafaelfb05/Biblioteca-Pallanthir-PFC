@@ -3215,45 +3215,12 @@ html {
   scrollbar-color: #3a3a42 transparent;
 }
 
-.auth-box .modal-header h3 {
-  font-size: 24px;
-}
 
-.auth-box .modal-header button {
-  width: 34px;
-  height: 34px;
-  border: 1px solid #2f2f36;
-  border-radius: 8px;
-  cursor: pointer;
-}
 
-.auth-box .modal-header button:hover {
-  border-color: #e51d2a;
-}
 
-.auth-box .abas-autenticacao {
-  margin: 20px 0 6px;
-  padding: 5px;
-  border: 1px solid #24242a;
-  border-radius: 10px;
-  background: #0d0d10;
-}
 
-.auth-box .aba-autenticacao {
-  padding: 11px 0;
-  border-radius: 7px;
-  font-size: 14px;
-  cursor: pointer;
-}
 
-.auth-box .aba-autenticacao.ativa {
-  box-shadow: 0 6px 18px rgba(229, 29, 42, 0.3);
-}
 
-.auth-box .modal-sub {
-  margin-top: 12px;
-  font-size: 13px;
-}
 
 .auth-box .modal-form {
   gap: 16px;
@@ -3435,9 +3402,6 @@ html {
   border-color: #e51d2a;
 }
 
-.auth-box .campo-senha .mostrar-senha {
-  height: 30px;
-}
 
 @media (max-width: 520px) {
   .auth-conteudo {
@@ -3607,25 +3571,7 @@ html {
   padding-right: 52px;
 }
 
-.auth-box .campo-senha .mostrar-senha {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  padding: 0;
-  border: none;
-  border-radius: 7px;
-  background: transparent;
-  font-size: 17px;
-  line-height: 1;
-  opacity: 0.75;
-}
 
-.auth-box .campo-senha .mostrar-senha:hover {
-  background: #1d1d23;
-  opacity: 1;
-}
 
 .auth-linha label,
 .auth-linha .campo-senha,
@@ -3653,4 +3599,88 @@ html {
 .pedido-detalhes-link {
   align-self: flex-start;
   margin-top: 4px;
+}
+
+.auth-conteudo {
+  position: relative;
+}
+
+.auth-fechar {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #77777f;
+  font-size: 16px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.auth-fechar:hover {
+  background: #1d1d23;
+  color: #ffffff;
+}
+
+.auth-cabecalho {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 6px;
+  text-align: center;
+}
+
+.auth-logo {
+  color: #e51d2a;
+  font-family: "Cinzel", Georgia, serif;
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  line-height: 1;
+  text-shadow: 0 0 22px rgba(229, 29, 42, 0.35);
+}
+
+.auth-cabecalho h3 {
+  margin-top: 18px;
+  font-size: 22px;
+}
+
+.auth-cabecalho .modal-sub {
+  max-width: 360px;
+  margin-top: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.auth-alternar {
+  margin-top: 2px;
+  color: #96969d;
+  font-size: 13px;
+  text-align: center;
+}
+
+.auth-alternar .link-button {
+  font-weight: 700;
+}
+
+.campo-senha .mostrar-senha {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: #6f6f77;
+  transition: 0.2s;
+}
+
+.campo-senha .mostrar-senha:hover {
+  background: #1d1d23;
+  color: #ffffff;
 }
