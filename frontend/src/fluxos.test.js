@@ -3,6 +3,7 @@ import App from "./App";
 import { versaoDosTermos } from "./services/termos";
 
 jest.mock("./Componentes/ModalDocumento", () => () => null);
+jest.mock("./Componentes/ModalPoliticaReserva", () => () => null);
 
 const API = "http://localhost:8080";
 const ID_USUARIO = "11111111-1111-4111-8111-111111111111";

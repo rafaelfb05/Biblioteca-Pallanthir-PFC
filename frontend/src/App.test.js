@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import App from './App';
 
 jest.mock('./Componentes/ModalDocumento', () => () => null);
+jest.mock('./Componentes/ModalPoliticaReserva', () => () => null);
 
 test('exibe o nome da biblioteca', () => {
   render(<App />);
