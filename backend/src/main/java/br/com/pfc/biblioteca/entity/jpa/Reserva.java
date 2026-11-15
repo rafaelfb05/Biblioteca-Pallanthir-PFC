@@ -15,6 +15,8 @@ public class Reserva {
     private Usuario usuario;
     @ManyToOne
     private Livro livro;
+    public static final int DIAS_PARA_RETIRADA = 3;
+
     private LocalDateTime dataReserva;
     @Enumerated(EnumType.STRING)
     private StatusReserva status;
@@ -74,5 +76,12 @@ public class Reserva {
                 ", livro =" + livro +
                 ", dataReserva = " + dataReserva +
                 ", status = " + status;
+    }
+
+    public LocalDateTime getPrazoRetirada() {
+        if (status != StatusReserva.RESERVADO || dataReserva == null) {
+            return null;
+        }
+        return dataReserva.plusDays(DIAS_PARA_RETIRADA);
     }
 }

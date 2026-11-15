@@ -10,6 +10,10 @@ import org.springframework.data.jpa.repository.Query;
 import java.awt.print.Pageable;
 import java.util.List;
 import java.util.Objects;
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.Lock;
+import java.time.LocalDateTime;
+import java.util.Optional;
 
 public interface ReservaRepository extends JpaRepository<Reserva, UUID> {
     List<Reserva> findByUsuarioId(UUID usuarioId);
@@ -17,6 +21,12 @@ public interface ReservaRepository extends JpaRepository<Reserva, UUID> {
     List<Reserva> findByLivroId(UUID livroId);
 
     List<Reserva> findByStatusInOrderByDataReservaAsc(List<StatusReserva> status);
+
+    List<Reserva> findByStatusAndDataReservaBefore(StatusReserva status, LocalDateTime limite);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT r FROM Reserva r WHERE r.id = :id")
+    Optional<Reserva> buscarComLock(UUID id);
 
     boolean existsByUsuarioIdAndStatusIn(UUID usuarioId, List<StatusReserva> status);
 

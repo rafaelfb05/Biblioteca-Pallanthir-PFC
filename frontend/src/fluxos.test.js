@@ -719,6 +719,33 @@ test("filtro por aluno mostra só as compras do aluno escolhido", async () => {
   expect(screen.getByRole("button", { name: "Aluno Ana" })).toBeInTheDocument();
 });
 
+test("reservas e pedidos mostram o prazo para retirada", async () => {
+  const daqui = (horas) => {
+    const data = new Date(Date.now() + horas * 60 * 60 * 1000);
+    const doisDigitos = (n) => String(n).padStart(2, "0");
+    return data.getFullYear() + "-" + doisDigitos(data.getMonth() + 1) + "-" + doisDigitos(data.getDate()) +
+      "T" + doisDigitos(data.getHours()) + ":" + doisDigitos(data.getMinutes()) + ":00";
+  };
+  simularApi({
+    ["GET /reservas/usuario/" + ID_USUARIO]: () => [
+      200,
+      [{ id: "r1", livroId: ID_LIVRO, tituloLivro: "Clean Code", dataReserva: daqui(-20), status: "RESERVADO", prazoRetirada: daqui(52) }],
+    ],
+    "GET /pedidos": () => [200, [{ ...pedidoPendente, status: "APROVADO", prazoRetirada: daqui(5) }]],
+  });
+  entrarComo("ESTUDANTE");
+  render(<App />);
+
+  fireEvent.click(await screen.findByRole("button", { name: /^Reservas/ }));
+  expect(await screen.findByText(/faltam 2 dias e [34] h/)).toBeInTheDocument();
+  expect(screen.getByText("Se o livro não for retirado até lá, a reserva é cancelada automaticamente.")).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: "Pedidos" }));
+  expect(await screen.findByText(/faltam [45] h/)).toBeInTheDocument();
+  expect(screen.getByText("Se a compra não for retirada até lá, ela é reembolsada automaticamente.")).toBeInTheDocument();
+  expect(document.querySelector(".prazo-retirada.urgente")).not.toBeNull();
+});
+
 test("funcionário vê a dashboard e não vê carrinho nem pedidos", async () => {
   simularApi({
     "GET /dashboard": () => [

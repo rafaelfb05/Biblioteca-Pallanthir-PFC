@@ -4116,3 +4116,56 @@ html {
     flex-basis: 100%;
   }
 }
+
+.prazo-retirada {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(70, 140, 255, 0.3);
+  border-radius: 8px;
+  background: rgba(70, 140, 255, 0.08);
+  color: #c9d9ff;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.prazo-retirada svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: #7aa7ff;
+}
+
+.prazo-retirada strong {
+  color: #ffffff;
+}
+
+.prazo-retirada small {
+  display: block;
+  margin-top: 2px;
+  color: #8f9bb8;
+  font-size: 12px;
+}
+
+.prazo-retirada.urgente {
+  border-color: rgba(240, 170, 40, 0.4);
+  background: rgba(240, 170, 40, 0.08);
+  color: #f3d7a0;
+}
+
+.prazo-retirada.urgente svg {
+  color: #f0aa28;
+}
+
+.prazo-retirada.urgente small {
+  color: #b9a37c;
+}
+
+.retirada-card .prazo-retirada {
+  margin-top: 0;
+}
+
+.pedido-detalhes-resumo .prazo-retirada {
+  margin: 0 0 12px;
+}

@@ -13,6 +13,8 @@ import java.util.List;
 @Table(name = "pedidos")
 public class Pedido {
 
+    public static final int DIAS_PARA_RETIRADA = 15;
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
@@ -27,6 +29,7 @@ public class Pedido {
     private LocalDateTime dataCriacao = LocalDateTime.now();
     private LocalDateTime dataExpiracao;
     private LocalDateTime dataEntrega;
+    private LocalDateTime dataPagamento;
     private String linkPagamento;
     private String mpOrderId;
     private UUID entreguePorId;
@@ -136,5 +139,21 @@ public class Pedido {
 
     public void setDataReembolso(LocalDateTime dataReembolso) {
         this.dataReembolso = dataReembolso;
+    }
+
+    public LocalDateTime getDataPagamento() {
+        return dataPagamento;
+    }
+
+    public void setDataPagamento(LocalDateTime dataPagamento) {
+        this.dataPagamento = dataPagamento;
+    }
+
+    public LocalDateTime getPrazoRetirada() {
+        if (status != StatusPedido.APROVADO) {
+            return null;
+        }
+        LocalDateTime pagamento = dataPagamento != null ? dataPagamento : dataCriacao;
+        return pagamento == null ? null : pagamento.plusDays(DIAS_PARA_RETIRADA);
     }
 }

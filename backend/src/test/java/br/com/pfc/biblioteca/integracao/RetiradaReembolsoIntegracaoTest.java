@@ -1,17 +1,23 @@
 package br.com.pfc.biblioteca.integracao;
 
 import br.com.pfc.biblioteca.entity.jpa.Livro;
+import br.com.pfc.biblioteca.entity.jpa.Pedido;
 import br.com.pfc.biblioteca.entity.jpa.Usuario;
 import br.com.pfc.biblioteca.enums.StatusPedido;
 import br.com.pfc.biblioteca.infra.exception.ConflitoException;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import br.com.pfc.biblioteca.schedule.PrazosDeRetiradaJob;
+import org.springframework.beans.factory.annotation.Autowired;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
@@ -19,6 +25,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 class RetiradaReembolsoIntegracaoTest extends TesteIntegracaoBase {
+
+    @Autowired
+    private PrazosDeRetiradaJob prazosDeRetiradaJob;
 
     private record Compra(Usuario estudante, Livro livro, UUID pedidoId, String orderId) {
     }
@@ -141,5 +150,39 @@ class RetiradaReembolsoIntegracaoTest extends TesteIntegracaoBase {
         assertThat(exclusao.status()).isEqualTo(409);
         assertThat(exclusao.mensagem()).contains("pedidos em andamento");
         assertThat(usuarioRepository.findById(compra.estudante().getId()).orElseThrow().isAtivo()).isTrue();
+    }
+
+    @Test
+    void compraPagaNaoRetiradaEmQuinzeDiasEReembolsadaAutomaticamente() {
+        Compra vencida = compraAprovada(5, 2);
+        Compra noPrazo = compraAprovada(5, 1);
+        Pedido pedido = pedidoRepository.findById(vencida.pedidoId()).orElseThrow();
+        assertThat(pedido.getDataPagamento()).isNotNull();
+        pedido.setDataPagamento(LocalDateTime.now().minusDays(15).minusMinutes(5));
+        pedidoRepository.save(pedido);
+
+        assertThat(get("/pedidos", token(noPrazo.estudante())).corpo().get(0).path("prazoRetirada").asText()).isNotBlank();
+
+        prazosDeRetiradaJob.verificarPrazos();
+
+        assertThat(status(vencida)).isEqualTo(StatusPedido.REEMBOLSADO);
+        assertThat(recarregar(vencida.livro()).getEstoqueCompra()).isEqualTo(5);
+        verify(mercadoPagoService).reembolsarOrder(eq(vencida.orderId()));
+        verify(logService).registrarLog(any(UUID.class), anyString(), eq("PEDIDO_REEMBOLSADO_AUTOMATICO"), contains(vencida.pedidoId().toString()));
+        assertThat(status(noPrazo)).isEqualTo(StatusPedido.APROVADO);
+    }
+
+    @Test
+    void falhaNoReembolsoAutomaticoMantemACompraParaTentarDeNovo() {
+        Compra vencida = compraAprovada(5, 1);
+        Pedido pedido = pedidoRepository.findById(vencida.pedidoId()).orElseThrow();
+        pedido.setDataPagamento(LocalDateTime.now().minusDays(20));
+        pedidoRepository.save(pedido);
+        doThrow(new RuntimeException("Falha ao solicitar o reembolso")).when(mercadoPagoService).reembolsarOrder(anyString());
+
+        prazosDeRetiradaJob.verificarPrazos();
+
+        assertThat(status(vencida)).isEqualTo(StatusPedido.APROVADO);
+        assertThat(recarregar(vencida.livro()).getEstoqueCompra()).isEqualTo(4);
     }
 }
