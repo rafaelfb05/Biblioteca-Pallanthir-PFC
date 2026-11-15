@@ -189,13 +189,7 @@ public class PedidoService {
     }
 
     private void expirar(Pedido pedido) {
-        for (ItemPedido item : pedido.getItens()) {
-            Livro livro = livroRepository.buscarComLock(item.getLivro().getId()).orElse(null);
-            if (livro == null) continue;
-            int atual = livro.getEstoqueCompra() == null ? 0 : livro.getEstoqueCompra();
-            livro.setEstoqueCompra(atual + item.getQuantidade());
-            livroRepository.save(livro);
-        }
+        devolverEstoque(pedido);
         pedido.setStatus(StatusPedido.EXPIRADO);
         repository.save(pedido);
         removerDoCarrinho(pedido);
@@ -230,6 +224,49 @@ public class PedidoService {
 
         logService.registrarLog(funcionario.getId(), funcionario.getEmail(), "PEDIDO_ENTREGUE",
                 "Pedido " + pedido.getId() + ", aluno id " + pedido.getUsuario().getId());
+        return new PedidoDTO(pedido);
+    }
+
+    private void devolverEstoque(Pedido pedido) {
+        List<ItemPedido> itens = new ArrayList<>(pedido.getItens());
+        itens.sort(Comparator.comparing(i -> i.getLivro().getId()));
+
+        for (ItemPedido item : itens) {
+            Livro livro = livroRepository.buscarComLock(item.getLivro().getId()).orElse(null);
+            if (livro == null) continue;
+            int atual = livro.getEstoqueCompra() == null ? 0 : livro.getEstoqueCompra();
+            livro.setEstoqueCompra(atual + item.getQuantidade());
+            livroRepository.save(livro);
+        }
+    }
+
+    @Transactional
+    public PedidoDTO solicitarReembolso(UUID pedidoId) {
+        Usuario usuario = usuarioLogado();
+
+        Pedido pedido = repository.buscarComLock(pedidoId)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Pedido não encontrado"));
+
+        if (!pedido.getUsuario().getId().equals(usuario.getId())) {
+            throw new RegraDeNegocioException("Você só pode cancelar os seus próprios pedidos");
+        }
+
+        switch (pedido.getStatus()) {
+            case APROVADO -> { }
+            case ENTREGUE -> throw new ConflitoException("Pedido já retirado: não é possível reembolsar");
+            case REEMBOLSADO -> throw new ConflitoException("Este pedido já foi reembolsado");
+            default -> throw new ConflitoException("Só é possível reembolsar pedidos com pagamento aprovado");
+        }
+
+        devolverEstoque(pedido);
+        pedido.setStatus(StatusPedido.REEMBOLSADO);
+        pedido.setDataReembolso(LocalDateTime.now());
+        repository.save(pedido);
+
+        mercadoPagoService.reembolsarOrder(pedido.getMpOrderId());
+
+        logService.registrarLog(usuario.getId(), usuario.getEmail(), "PEDIDO_REEMBOLSADO",
+                "Pedido " + pedido.getId() + ", order " + pedido.getMpOrderId());
         return new PedidoDTO(pedido);
     }
 

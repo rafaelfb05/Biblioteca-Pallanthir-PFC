@@ -2,6 +2,8 @@ package br.com.pfc.biblioteca.service;
 
 import br.com.pfc.biblioteca.entity.jpa.ItemPedido;
 import br.com.pfc.biblioteca.entity.jpa.Pedido;
+import br.com.pfc.biblioteca.infra.exception.ConflitoException;
+import br.com.pfc.biblioteca.infra.exception.RegraDeNegocioException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -123,6 +125,34 @@ public class MercadoPagoService {
                 json.path("external_reference").asText(null),
                 json.path("status").asText(),
                 json.path("status_detail").asText());
+    }
+
+    public void reembolsarOrder(String orderId) {
+        if (orderId == null || !orderId.matches("[A-Za-z0-9]+")) {
+            throw new RegraDeNegocioException("Pedido sem pagamento associado");
+        }
+
+        HttpResponse<String> resposta = chamar(HttpRequest.newBuilder()
+                .uri(URI.create(API + "/" + orderId + "/refund"))
+                .header("Content-Type", "application/json")
+                .header("Authorization", "Bearer " + accessToken)
+                .header("X-Idempotency-Key", UUID.randomUUID().toString())
+                .POST(HttpRequest.BodyPublishers.noBody())
+                .build());
+
+        int status = resposta.statusCode();
+        if (status >= 200 && status < 300) return;
+
+        String corpo = resposta.body();
+        log.error("Reembolso recusado pelo Mercado Pago ({}): {}", status, corpo);
+
+        if (status == 409) {
+            if (corpo.contains("order_already_refunded") || corpo.contains("order_refund_already_in_process")) {
+                return;
+            }
+            throw new ConflitoException("O Mercado Pago não permitiu o reembolso deste pedido");
+        }
+        throw new RuntimeException("Falha ao solicitar o reembolso");
     }
 
     public boolean assinaturaValida(String assinatura, String requestId, String dataId) {

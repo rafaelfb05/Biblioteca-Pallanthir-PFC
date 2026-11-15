@@ -30,6 +30,7 @@ public class Pedido {
     private String linkPagamento;
     private String mpOrderId;
     private UUID entreguePorId;
+    private LocalDateTime dataReembolso;
 
     public Pedido(){}
 
@@ -127,5 +128,13 @@ public class Pedido {
 
     public void setEntreguePorId(UUID entreguePorId) {
         this.entreguePorId = entreguePorId;
+    }
+
+    public LocalDateTime getDataReembolso() {
+        return dataReembolso;
+    }
+
+    public void setDataReembolso(LocalDateTime dataReembolso) {
+        this.dataReembolso = dataReembolso;
     }
 }

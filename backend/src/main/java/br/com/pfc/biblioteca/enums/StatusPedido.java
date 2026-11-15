@@ -4,5 +4,6 @@ public enum StatusPedido {
     AGUARDANDO_PAGAMENTO,
     APROVADO,
     ENTREGUE,
-    EXPIRADO
+    EXPIRADO,
+    REEMBOLSADO
 }
