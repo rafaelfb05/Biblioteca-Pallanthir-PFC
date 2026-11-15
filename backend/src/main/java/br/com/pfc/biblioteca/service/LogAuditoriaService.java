@@ -9,8 +9,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
@@ -19,12 +24,17 @@ public class LogAuditoriaService {
 
     private static final Logger logger = LoggerFactory.getLogger(LogAuditoriaService.class);
 
+    public static final int LIMITE_PADRAO = 500;
+    public static final int LIMITE_MAXIMO = 1000;
+
     private final LogAuditoriaRepository repository;
     private final UsuarioRepository usuarioRepository;
+    private final MongoTemplate mongoTemplate;
 
-    public LogAuditoriaService(LogAuditoriaRepository repository, UsuarioRepository usuarioRepository) {
+    public LogAuditoriaService(LogAuditoriaRepository repository, UsuarioRepository usuarioRepository, MongoTemplate mongoTemplate) {
         this.repository = repository;
         this.usuarioRepository = usuarioRepository;
+        this.mongoTemplate = mongoTemplate;
     }
 
     public void registrarLog(UUID usuarioId, String usuarioEmail, String acao, String descricao){
@@ -46,10 +56,41 @@ public class LogAuditoriaService {
     }
 
     public List<LogAuditoria> listarTodos(){
-        return repository.findAllByOrderByDataHoraDesc();
+        return buscar(null, null, null, null, LIMITE_PADRAO);
+    }
+
+    public List<LogAuditoria> buscar(UUID usuarioId, String acao, LocalDate de, LocalDate ate, Integer limite) {
+        Query consulta = new Query();
+        if (usuarioId != null) {
+            consulta.addCriteria(Criteria.where("usuarioId").is(usuarioId.toString()));
+        }
+        if (acao != null && !acao.isBlank()) {
+            consulta.addCriteria(Criteria.where("acao").is(acao.trim()));
+        }
+        if (de != null || ate != null) {
+            Criteria periodo = Criteria.where("dataHora");
+            if (de != null) {
+                periodo = periodo.gte(de.atStartOfDay());
+            }
+            if (ate != null) {
+                periodo = periodo.lt(ate.plusDays(1).atStartOfDay());
+            }
+            consulta.addCriteria(periodo);
+        }
+        int quantidade = limite == null ? LIMITE_PADRAO : Math.max(1, Math.min(limite, LIMITE_MAXIMO));
+        consulta.with(Sort.by(Sort.Direction.DESC, "dataHora")).limit(quantidade);
+        return mongoTemplate.find(consulta, LogAuditoria.class);
+    }
+
+    public List<String> listarAcoes() {
+        return mongoTemplate.findDistinct(new Query(), "acao", LogAuditoria.class, String.class)
+                .stream()
+                .filter(acao -> acao != null && !acao.isBlank())
+                .sorted()
+                .toList();
     }
 
     public List<LogAuditoria> listarPorUsuario(UUID usuarioId){
-        return repository.findByUsuarioIdOrderByDataHoraDesc(usuarioId.toString());
+        return buscar(usuarioId, null, null, null, LIMITE_PADRAO);
     }
 }

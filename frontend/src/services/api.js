@@ -155,6 +155,7 @@ export const usuariosApi = {
 };
 
 export const reservasApi = {
+  listarEmAberto: () => request("/reservas/em-aberto"),
   listarPorUsuario: (usuarioId) => request(`/reservas/usuario/${usuarioId}`),
   reservar: (usuarioId, livroId) =>
     request(`/reservas/${usuarioId}/${livroId}`, { method: "POST" }),
@@ -206,7 +207,17 @@ export const dashboardApi = {
 };
 
 export const logsApi = {
-  listar: () => request("/logs"),
+  listar: (filtros = {}) => {
+    const parametros = new URLSearchParams();
+    ["usuarioId", "acao", "de", "ate"].forEach((campo) => {
+      if (filtros[campo]) {
+        parametros.set(campo, filtros[campo]);
+      }
+    });
+    const consulta = parametros.toString();
+    return request("/logs" + (consulta ? "?" + consulta : ""));
+  },
+  acoes: () => request("/logs/acoes"),
   listarPorUsuario: (usuarioId) => request(`/logs/usuarios/${usuarioId}`),
 };
 

@@ -2,6 +2,7 @@ package br.com.pfc.biblioteca.controller;
 
 import java.util.UUID;
 import br.com.pfc.biblioteca.dto.reserva.ReservaDTO;
+import br.com.pfc.biblioteca.dto.reserva.ReservaGestaoDTO;
 import br.com.pfc.biblioteca.service.ReservaService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -40,6 +41,11 @@ public class ReservaController {
     public ResponseEntity<Void> devolver(@PathVariable UUID reservaId){
         service.devolverLivro(reservaId);
         return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/em-aberto")
+    public List<ReservaGestaoDTO> listarEmAberto(){
+        return service.listarReservasEmAberto();
     }
 
     @GetMapping("/usuario/{usuarioId}")

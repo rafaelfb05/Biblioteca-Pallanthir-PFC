@@ -43,6 +43,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/usuarios/*/favoritar/*").hasRole("ESTUDANTE")
                         .requestMatchers(HttpMethod.POST, "/reservas/*/*").hasRole("ESTUDANTE")
                         .requestMatchers(HttpMethod.PUT, "/reservas/*/cancelar").hasRole("ESTUDANTE")
+                        .requestMatchers(HttpMethod.GET, "/reservas/em-aberto").hasRole("FUNCIONARIO")
                         .requestMatchers(HttpMethod.GET, "/reservas/**").authenticated()
                         .requestMatchers(HttpMethod.DELETE, "/usuarios/deletar/*").authenticated()
                         .requestMatchers(HttpMethod.GET, "/avaliacoes/**").permitAll()

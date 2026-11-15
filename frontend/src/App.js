@@ -58,6 +58,7 @@ const RESUMO_AVALIACOES_VAZIO = { media: 0, total: 0, avaliacoes: [] };
 const LIMITE_COMENTARIO = 500;
 const NOTAS = [1, 2, 3, 4, 5];
 const FILTRO_LOGS_VAZIO = { usuarioId: "", texto: "", acao: "", de: "", ate: "" };
+const LIMITE_DE_LOGS = 500;
 const LIVROS_POR_PAGINA = 18;
 
 const paginasVisiveis = (atual, total) => {
@@ -441,6 +442,109 @@ function CapaDoItem({ capaUrl, titulo }) {
   );
 }
 
+const alunosDaLista = (itens, campoId, campoNome) => {
+  const porId = new Map();
+  itens.forEach((item) => {
+    const id = item[campoId];
+    if (!id) {
+      return;
+    }
+    const atual = porId.get(id) || { id, nome: item[campoNome] || "Sem nome", quantidade: 0 };
+    atual.quantidade += 1;
+    porId.set(id, atual);
+  });
+  return [...porId.values()].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+};
+
+function FiltroPorAluno({ alunos, total, selecionado, aoSelecionar }) {
+  const [aberto, setAberto] = useState(false);
+  const area = useRef(null);
+
+  useEffect(() => {
+    if (!aberto) {
+      return undefined;
+    }
+    const aoClicarFora = (evento) => {
+      if (area.current && !area.current.contains(evento.target)) {
+        setAberto(false);
+      }
+    };
+    const aoTeclar = (evento) => {
+      if (evento.key === "Escape") {
+        setAberto(false);
+      }
+    };
+    document.addEventListener("mousedown", aoClicarFora);
+    document.addEventListener("keydown", aoTeclar);
+    return () => {
+      document.removeEventListener("mousedown", aoClicarFora);
+      document.removeEventListener("keydown", aoTeclar);
+    };
+  }, [aberto]);
+
+  const atual = alunos.find((aluno) => aluno.id === selecionado);
+
+  return (
+    <div className="filtro-aluno" ref={area}>
+      <button
+        type="button"
+        className={
+          "ranking-filtro-botao" + (aberto || atual ? " ativo" : "")
+        }
+        onClick={() => setAberto((valor) => !valor)}
+        aria-expanded={aberto}
+      >
+        <svg
+          viewBox="0 0 24 24"
+          width="16"
+          height="16"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <circle cx="12" cy="8" r="4" />
+          <path d="M4 21c0-4 3.6-7 8-7s8 3 8 7" />
+        </svg>
+        Aluno
+        {atual && <span className="ranking-filtro-selecionado">{atual.nome}</span>}
+      </button>
+      <div
+        className={"ranking-filtro-painel filtro-aluno-painel" + (aberto ? " aberto" : "")}
+        role="group"
+        aria-label="Filtrar por aluno"
+      >
+        <span className="ranking-filtro-titulo">Aluno</span>
+        {[{ id: "", nome: "Todos os alunos", quantidade: total }, ...alunos].map(
+          (aluno) => (
+            <button
+              type="button"
+              key={aluno.id || "todos"}
+              className={
+                "ranking-filtro-opcao" +
+                (selecionado === aluno.id ? " ativo" : "")
+              }
+              aria-pressed={selecionado === aluno.id}
+              onClick={() => {
+                aoSelecionar(aluno.id);
+                setAberto(false);
+              }}
+            >
+              <span className="filtro-aluno-nome">{aluno.nome}</span>
+              <span className="filtro-aluno-quantidade">{aluno.quantidade}</span>
+            </button>
+          )
+        )}
+        {alunos.length === 0 && (
+          <span className="filtro-aluno-vazio">Nenhum aluno na lista.</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function CapaGenerica({ titulo, tamanho }) {
   return (
     <div
@@ -688,10 +792,12 @@ function App() {
 
   const [formConta, setFormConta] = useState(FORM_CONTA_VAZIO);
   const [usuariosGestao, setUsuariosGestao] = useState([]);
-  const [filtroUsuarios, setFiltroUsuarios] = useState("");
-  const [usuarioGestao, setUsuarioGestao] = useState(null);
-  const [reservasGestao, setReservasGestao] = useState([]);
+  const [reservasAbertas, setReservasAbertas] = useState([]);
+  const [buscaReservasAbertas, setBuscaReservasAbertas] = useState("");
+  const [alunoReservas, setAlunoReservas] = useState("");
+  const [alunoCompras, setAlunoCompras] = useState("");
   const [logs, setLogs] = useState([]);
+  const [acoesRegistradas, setAcoesRegistradas] = useState([]);
   const [dashboard, setDashboard] = useState(null);
   const [filtroLogs, setFiltroLogs] = useState(FILTRO_LOGS_VAZIO);
   const [carregandoPainel, setCarregandoPainel] = useState(false);
@@ -864,8 +970,7 @@ function App() {
     setErroPedidos(null);
     setRetornoPagamento(null);
     setUsuariosGestao([]);
-    setUsuarioGestao(null);
-    setReservasGestao([]);
+    setReservasAbertas([]);
     setLogs([]);
     setDashboard(null);
     setRetiradas([]);
@@ -1282,21 +1387,11 @@ function App() {
     }
   };
 
-  const irParaGestao = async () => {
-    abrirPagina("gestao");
-    setFiltroUsuarios("");
-    setAbaGestao("reservas");
-    setBuscaRetiradas("");
-    await Promise.all([carregarUsuariosGestao(), carregarRetiradas()]);
-  };
-
-  const selecionarUsuarioGestao = async (selecionado) => {
-    setUsuarioGestao(selecionado);
-    setReservasGestao([]);
+  const carregarReservasAbertas = async () => {
     try {
       setCarregandoPainel(true);
       setErro(null);
-      setReservasGestao(await reservasApi.listarPorUsuario(selecionado.id));
+      setReservasAbertas((await reservasApi.listarEmAberto()) || []);
     } catch (e) {
       setErro(mensagemDeErro(e, "Não foi possível carregar as reservas."));
       console.error(e);
@@ -1305,14 +1400,30 @@ function App() {
     }
   };
 
-  const carregarLogs = async (idDoUsuario) => {
+  const irParaGestao = async () => {
+    abrirPagina("gestao");
+    setAbaGestao("reservas");
+    setBuscaRetiradas("");
+    setBuscaReservasAbertas("");
+    setAlunoReservas("");
+    setAlunoCompras("");
+    await Promise.all([carregarReservasAbertas(), carregarRetiradas()]);
+  };
+
+  const carregarLogs = async (filtro) => {
+    if (filtro.de && filtro.ate && filtro.de > filtro.ate) {
+      return;
+    }
     try {
       setCarregandoPainel(true);
       setErro(null);
       setLogs(
-        idDoUsuario
-          ? await logsApi.listarPorUsuario(idDoUsuario)
-          : await logsApi.listar()
+        (await logsApi.listar({
+          usuarioId: filtro.usuarioId,
+          acao: filtro.acao,
+          de: filtro.de,
+          ate: filtro.ate,
+        })) || []
       );
     } catch (e) {
       setErro(mensagemDeErro(e, "Não foi possível carregar os logs."));
@@ -1322,10 +1433,28 @@ function App() {
     }
   };
 
+  const carregarAcoesRegistradas = async () => {
+    try {
+      setAcoesRegistradas((await logsApi.acoes()) || []);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const aplicarFiltroLogs = (alteracao) => {
+    const novo = { ...filtroLogs, ...alteracao };
+    setFiltroLogs(novo);
+    carregarLogs(novo);
+  };
+
   const irParaLogs = async () => {
     abrirPagina("logs");
     setFiltroLogs(FILTRO_LOGS_VAZIO);
-    await Promise.all([carregarLogs(""), carregarUsuariosGestao()]);
+    await Promise.all([
+      carregarLogs(FILTRO_LOGS_VAZIO),
+      carregarUsuariosGestao(),
+      carregarAcoesRegistradas(),
+    ]);
   };
 
   const carregarDashboard = async () => {
@@ -1440,8 +1569,9 @@ function App() {
     setAbaGestao(aba);
     setErro(null);
     if (aba === "compras") {
-      setBuscaRetiradas("");
       await carregarRetiradas();
+    } else {
+      await carregarReservasAbertas();
     }
   };
 
@@ -1771,40 +1901,49 @@ function App() {
     }
   };
 
-  const atualizarReservaNaGestao = async (reserva, acao, sucesso, falha) => {
+  const registrarEntregaDaReserva = async (reserva) => {
     try {
       setReservaEmEdicao(reserva.id);
       setErro(null);
-      await acao(reserva.id);
-      setAviso("\"" + reserva.tituloLivro + "\" " + sucesso);
-      const [, atualizadas] = await Promise.all([
-        carregarLivros(),
-        reservasApi.listarPorUsuario(usuarioGestao.id),
-      ]);
-      setReservasGestao(atualizadas);
+      await reservasApi.entregar(reserva.id);
+      setReservasAbertas((atuais) =>
+        atuais.map((item) =>
+          item.id === reserva.id ? { ...item, status: "ENTREGUE" } : item
+        )
+      );
+      setAviso(
+        '"' + reserva.tituloLivro + '" foi entregue para ' + reserva.nomeEstudante + "."
+      );
+      await carregarLivros();
     } catch (e) {
-      setErro(mensagemDeErro(e, falha));
+      setErro(mensagemDeErro(e, "Não foi possível registrar a entrega."));
       console.error(e);
+      await carregarReservasAbertas();
     } finally {
       setReservaEmEdicao(null);
     }
   };
 
-  const entregarLivro = (reserva) =>
-    atualizarReservaNaGestao(
-      reserva,
-      reservasApi.entregar,
-      "foi entregue.",
-      "Não foi possível registrar a entrega."
-    );
-
-  const devolverLivro = (reserva) =>
-    atualizarReservaNaGestao(
-      reserva,
-      reservasApi.devolver,
-      "foi devolvido.",
-      "Não foi possível registrar a devolução."
-    );
+  const registrarDevolucaoDaReserva = async (reserva) => {
+    try {
+      setReservaEmEdicao(reserva.id);
+      setErro(null);
+      await reservasApi.devolver(reserva.id);
+      setReservasAbertas((atuais) =>
+        atuais.filter((item) => item.id !== reserva.id)
+      );
+      setAviso(
+        '"' + reserva.tituloLivro + '" foi devolvido por ' + reserva.nomeEstudante + "."
+      );
+      await carregarLivros();
+    } catch (e) {
+      setErro(mensagemDeErro(e, "Não foi possível registrar a devolução."));
+      console.error(e);
+      await carregarReservasAbertas();
+    } finally {
+      setReservaEmEdicao(null);
+    }
+  };
 
   const pesquisar = async (evento) => {
     evento.preventDefault();
@@ -2068,21 +2207,15 @@ function App() {
     [ranking, livros]
   );
 
-  const usuariosFiltrados = useMemo(() => {
-    const termo = filtroUsuarios.trim().toLowerCase();
-    return usuariosGestao
-      .filter((item) => item.tipo === "ESTUDANTE")
-      .filter(
-        (item) =>
-          !termo ||
-          String(item.nome || "").toLowerCase().includes(termo) ||
-          String(item.email || "").toLowerCase().includes(termo)
-      );
-  }, [usuariosGestao, filtroUsuarios]);
 
   const acoesDosLogs = useMemo(
-    () => [...new Set(logs.map((log) => log.acao).filter(Boolean))].sort(),
-    [logs]
+    () =>
+      [
+        ...new Set(
+          [...acoesRegistradas, ...logs.map((log) => log.acao)].filter(Boolean)
+        ),
+      ].sort(),
+    [logs, acoesRegistradas]
   );
 
   const periodoDosLogsInvalido = Boolean(
@@ -3284,13 +3417,28 @@ function App() {
   );
 
   const termoDaBuscaDeRetiradas = buscaRetiradas.trim().toLowerCase();
+  const alunosDasCompras = alunosDaLista(retiradas, "usuarioId", "nomeEstudante");
+  const alunosDasReservas = alunosDaLista(reservasAbertas, "usuarioId", "nomeEstudante");
+  const reservasParaEntregar = reservasAbertas.filter(
+    (reserva) => reserva.status === "RESERVADO"
+  ).length;
+  const termoDaBuscaDeReservas = buscaReservasAbertas.trim().toLowerCase();
+  const reservasAbertasExibidas = reservasAbertas.filter(
+    (reserva) =>
+      (!alunoReservas || reserva.usuarioId === alunoReservas) &&
+      (!termoDaBuscaDeReservas ||
+        [reserva.nomeEstudante, reserva.emailEstudante, reserva.tituloLivro]
+          .map((valor) => String(valor || "").toLowerCase())
+          .some((valor) => valor.includes(termoDaBuscaDeReservas)))
+  );
   const retiradasExibidas = retiradas.filter(
     (pedido) =>
-      !termoDaBuscaDeRetiradas ||
+      (!alunoCompras || pedido.usuarioId === alunoCompras) &&
+      (!termoDaBuscaDeRetiradas ||
       String(pedido.nomeEstudante || "")
         .toLowerCase()
         .includes(termoDaBuscaDeRetiradas) ||
-      numeroDoPedido(pedido.id).toLowerCase().includes(termoDaBuscaDeRetiradas)
+      numeroDoPedido(pedido.id).toLowerCase().includes(termoDaBuscaDeRetiradas))
   );
 
   const termosLiberados = termosLidos.termos && termosLidos.privacidade;
@@ -3577,6 +3725,9 @@ function App() {
                 onClick={() => trocarAbaGestao("reservas")}
               >
                 Reservas
+                {reservasParaEntregar > 0 && (
+                  <span className="gestao-aba-contador">{reservasParaEntregar}</span>
+                )}
               </button>
               <button
                 type="button"
@@ -3596,7 +3747,7 @@ function App() {
           <p className="materias-sub">
             {abaGestao === "compras"
               ? "Pedidos pagos que aguardam a retirada dos livros na biblioteca, dos mais antigos para os mais recentes."
-              : "Selecione um estudante para ver as reservas dele e registrar as entregas e devoluções."}
+              : "Reservas em aberto de todos os estudantes. Registre a entrega quando o livro sair da biblioteca e a devolução quando ele voltar."}
           </p>
 
           {avisoDaPagina}
@@ -3614,6 +3765,12 @@ function App() {
                   value={buscaRetiradas}
                   onChange={(e) => setBuscaRetiradas(e.target.value)}
                 />
+                <FiltroPorAluno
+                  alunos={alunosDasCompras}
+                  total={retiradas.length}
+                  selecionado={alunoCompras}
+                  aoSelecionar={setAlunoCompras}
+                />
                 <button
                   type="button"
                   className="logs-atualizar"
@@ -3629,8 +3786,8 @@ function App() {
               )}
               {!carregandoPainel && retiradasExibidas.length === 0 && (
                 <p>
-                  {termoDaBuscaDeRetiradas
-                    ? "Nenhum pedido encontrado para essa busca."
+                  {termoDaBuscaDeRetiradas || alunoCompras
+                    ? "Nenhum pedido encontrado com esses filtros."
                     : "Nenhum pedido aguardando retirada."}
                 </p>
               )}
@@ -3690,101 +3847,105 @@ function App() {
           )}
 
           {ehFuncionario && abaGestao === "reservas" && (
-            <div className="gestao">
-              <aside className="gestao-usuarios">
+            <>
+              <div className="retiradas-topo">
                 <input
                   type="text"
                   className="gestao-busca"
-                  placeholder="Filtrar por nome ou e-mail"
-                  value={filtroUsuarios}
-                  onChange={(e) => setFiltroUsuarios(e.target.value)}
+                  placeholder="Buscar por estudante, e-mail ou livro"
+                  value={buscaReservasAbertas}
+                  onChange={(e) => setBuscaReservasAbertas(e.target.value)}
                 />
-                {usuariosFiltrados.length === 0 && (
-                  <p className="best-subtitle">Nenhum estudante encontrado.</p>
-                )}
-                {usuariosFiltrados.map((item) => (
-                  <button
-                    type="button"
-                    key={item.id}
-                    className={
-                      "gestao-usuario" +
-                      (usuarioGestao && usuarioGestao.id === item.id
-                        ? " ativo"
-                        : "")
-                    }
-                    onClick={() => selecionarUsuarioGestao(item)}
-                  >
-                    <strong>{item.nome}</strong>
-                    <small>{item.email}</small>
-                  </button>
-                ))}
-              </aside>
-
-              <div className="gestao-reservas">
-                {!usuarioGestao && (
-                  <p>Nenhum estudante selecionado.</p>
-                )}
-                {usuarioGestao && (
-                  <h3 className="gestao-titulo">
-                    Reservas de {usuarioGestao.nome}
-                  </h3>
-                )}
-                {usuarioGestao && carregandoPainel && <p>Carregando reservas...</p>}
-                {usuarioGestao &&
-                  !carregandoPainel &&
-                  reservasGestao.length === 0 && (
-                    <p>Este estudante ainda não fez reservas.</p>
-                  )}
-
-                {usuarioGestao && reservasGestao.length > 0 && (
-                  <div className="reservas">
-                    {reservasGestao.map((reserva) => (
-                      <div className="reserva-card" key={reserva.id}>
-                        <div className="reserva-info">
-                          <span
-                            className={
-                              "reserva-status " + reserva.status.toLowerCase()
-                            }
-                          >
-                            {ROTULO_STATUS_RESERVA[reserva.status] ||
-                              reserva.status}
-                          </span>
-                          <h3>{reserva.tituloLivro}</h3>
-                          <small>
-                            Reservado em {formatarData(reserva.dataReserva)}
-                          </small>
-                        </div>
-
-                        {reserva.status === "RESERVADO" && (
-                          <div className="reserva-acoes">
-                            <button
-                              type="button"
-                              className="reservar-button"
-                              onClick={() => entregarLivro(reserva)}
-                              disabled={reservaEmEdicao === reserva.id}
-                            >
-                              Registrar entrega
-                            </button>
-                          </div>
-                        )}
-                        {reserva.status === "ENTREGUE" && (
-                          <div className="reserva-acoes">
-                            <button
-                              type="button"
-                              className="reservar-button"
-                              onClick={() => devolverLivro(reserva)}
-                              disabled={reservaEmEdicao === reserva.id}
-                            >
-                              Registrar devolução
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
+                <FiltroPorAluno
+                  alunos={alunosDasReservas}
+                  total={reservasAbertas.length}
+                  selecionado={alunoReservas}
+                  aoSelecionar={setAlunoReservas}
+                />
+                <button
+                  type="button"
+                  className="logs-atualizar"
+                  onClick={carregarReservasAbertas}
+                  disabled={carregandoPainel}
+                >
+                  {carregandoPainel ? "Carregando..." : "↻ Atualizar"}
+                </button>
               </div>
-            </div>
+
+              {carregandoPainel && reservasAbertas.length === 0 && (
+                <p>Carregando reservas...</p>
+              )}
+              {!carregandoPainel && reservasAbertasExibidas.length === 0 && (
+                <p>
+                  {termoDaBuscaDeReservas || alunoReservas
+                    ? "Nenhuma reserva encontrada com esses filtros."
+                    : "Nenhuma reserva em aberto."}
+                </p>
+              )}
+
+              <div className="retiradas-lista">
+                {reservasAbertasExibidas.map((reserva) => (
+                  <div className="retirada-card" key={reserva.id}>
+                    <div className="retirada-cabecalho">
+                      <div>
+                        <strong>{reserva.nomeEstudante}</strong>
+                        <span>{reserva.emailEstudante}</span>
+                      </div>
+                      <span
+                        className={
+                          "reserva-status " + String(reserva.status).toLowerCase()
+                        }
+                      >
+                        {reserva.status === "ENTREGUE"
+                          ? "Com o estudante"
+                          : "Aguardando retirada"}
+                      </span>
+                    </div>
+
+                    <ul className="retirada-itens">
+                      <li>
+                        <div className="pedido-detalhes-capa">
+                          <CapaDoItem
+                            capaUrl={reserva.capaUrl}
+                            titulo={reserva.tituloLivro}
+                          />
+                        </div>
+                        <div>
+                          <strong>{reserva.tituloLivro}</strong>
+                          <span>Reservado em {formatarData(reserva.dataReserva)}</span>
+                        </div>
+                      </li>
+                    </ul>
+
+                    <div className="retirada-acoes">
+                      {reserva.status === "RESERVADO" ? (
+                        <button
+                          type="button"
+                          className="cadastro-button"
+                          onClick={() => registrarEntregaDaReserva(reserva)}
+                          disabled={reservaEmEdicao === reserva.id}
+                        >
+                          {reservaEmEdicao === reserva.id
+                            ? "Registrando..."
+                            : "Registrar entrega"}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="botao-devolucao"
+                          onClick={() => registrarDevolucaoDaReserva(reserva)}
+                          disabled={reservaEmEdicao === reserva.id}
+                        >
+                          {reservaEmEdicao === reserva.id
+                            ? "Registrando..."
+                            : "Registrar devolução"}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
           )}
         </section>
 
@@ -3953,7 +4114,7 @@ function App() {
                         type="button"
                         className="logs-limpar"
                         onClick={() =>
-                          setFiltroLogs({
+                          aplicarFiltroLogs({
                             ...FILTRO_LOGS_VAZIO,
                             usuarioId: filtroLogs.usuarioId,
                           })
@@ -3965,7 +4126,7 @@ function App() {
                     <button
                       type="button"
                       className="logs-atualizar"
-                      onClick={() => carregarLogs(filtroLogs.usuarioId)}
+                      onClick={() => carregarLogs(filtroLogs)}
                       disabled={carregandoPainel}
                     >
                       {carregandoPainel ? "Carregando..." : "↻ Atualizar"}
@@ -3978,10 +4139,9 @@ function App() {
                     Usuário
                     <select
                       value={filtroLogs.usuarioId}
-                      onChange={(e) => {
-                        setFiltroLogs({ ...filtroLogs, usuarioId: e.target.value });
-                        carregarLogs(e.target.value);
-                      }}
+                      onChange={(e) =>
+                        aplicarFiltroLogs({ usuarioId: e.target.value })
+                      }
                     >
                       <option value="">Todos os usuários</option>
                       {usuariosGestao.map((item) => (
@@ -3996,9 +4156,7 @@ function App() {
                     <select
                       aria-label="Filtrar por ação"
                       value={filtroLogs.acao}
-                      onChange={(e) =>
-                        setFiltroLogs({ ...filtroLogs, acao: e.target.value })
-                      }
+                      onChange={(e) => aplicarFiltroLogs({ acao: e.target.value })}
                     >
                       <option value="">Todas as ações</option>
                       {acoesDosLogs.map((acao) => (
@@ -4014,9 +4172,7 @@ function App() {
                       type="date"
                       value={filtroLogs.de}
                       max={filtroLogs.ate || undefined}
-                      onChange={(e) =>
-                        setFiltroLogs({ ...filtroLogs, de: e.target.value })
-                      }
+                      onChange={(e) => aplicarFiltroLogs({ de: e.target.value })}
                     />
                   </label>
                   <label>
@@ -4025,9 +4181,7 @@ function App() {
                       type="date"
                       value={filtroLogs.ate}
                       min={filtroLogs.de || undefined}
-                      onChange={(e) =>
-                        setFiltroLogs({ ...filtroLogs, ate: e.target.value })
-                      }
+                      onChange={(e) => aplicarFiltroLogs({ ate: e.target.value })}
                     />
                   </label>
                   <label className="logs-busca">
@@ -4055,7 +4209,12 @@ function App() {
                   {(logsExibidos.length === 1
                     ? "1 registro"
                     : logsExibidos.length + " registros") +
-                    (filtrosDeLogsAtivos ? " com os filtros escolhidos" : "")}
+                    (filtrosDeLogsAtivos ? " com os filtros escolhidos" : "") +
+                    (logs.length >= LIMITE_DE_LOGS
+                      ? " · mostrando os " +
+                        LIMITE_DE_LOGS +
+                        " mais recentes, use os filtros para ver registros mais antigos"
+                      : "")}
                 </p>
               )}
 
