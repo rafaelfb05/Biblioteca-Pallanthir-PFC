@@ -1,5 +1,6 @@
 package br.com.pfc.biblioteca.repository;
 
+import java.util.Collection;
 import java.util.UUID;
 import br.com.pfc.biblioteca.entity.jpa.Pedido;
 import br.com.pfc.biblioteca.enums.StatusPedido;
@@ -23,6 +24,10 @@ public interface PedidoRepository extends JpaRepository<Pedido, UUID> {
     boolean existsByUsuarioIdAndStatus(UUID usuarioId, StatusPedido status);
 
     List<Pedido> findByStatusAndDataExpiracaoBefore(StatusPedido status, LocalDateTime limite);
+
+    List<Pedido> findByStatusOrderByDataCriacaoAsc(StatusPedido status);
+
+    boolean existsByUsuarioIdAndStatusIn(UUID usuarioId, Collection<StatusPedido> status);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT p FROM Pedido p WHERE p.id = :id")

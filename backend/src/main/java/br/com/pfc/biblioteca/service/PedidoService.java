@@ -2,6 +2,7 @@ package br.com.pfc.biblioteca.service;
 
 import java.util.UUID;
 import br.com.pfc.biblioteca.dto.pedido.PedidoDTO;
+import br.com.pfc.biblioteca.dto.pedido.PedidoRetiradaDTO;
 import br.com.pfc.biblioteca.entity.jpa.*;
 import br.com.pfc.biblioteca.enums.StatusPedido;
 import br.com.pfc.biblioteca.infra.exception.ConflitoException;
@@ -188,19 +189,87 @@ public class PedidoService {
     }
 
     private void expirar(Pedido pedido) {
-        for (ItemPedido item : pedido.getItens()) {
-            Livro livro = livroRepository.buscarComLock(item.getLivro().getId()).orElse(null);
-            if (livro == null) continue;
-            int atual = livro.getEstoqueCompra() == null ? 0 : livro.getEstoqueCompra();
-            livro.setEstoqueCompra(atual + item.getQuantidade());
-            livroRepository.save(livro);
-        }
+        devolverEstoque(pedido);
         pedido.setStatus(StatusPedido.EXPIRADO);
         repository.save(pedido);
         removerDoCarrinho(pedido);
         logService.registrarLog(pedido.getUsuario().getId(), pedido.getUsuario().getEmail(),
                 "PEDIDO_EXPIRADO", "Pedido " + pedido.getId());
     }
+
+    @Transactional(readOnly = true)
+    public List<PedidoRetiradaDTO> pendentesDeRetirada() {
+        return repository.findByStatusOrderByDataCriacaoAsc(StatusPedido.APROVADO)
+                .stream().map(PedidoRetiradaDTO::new).collect(Collectors.toList());
+    }
+
+    @Transactional
+    public PedidoDTO registrarEntrega(UUID pedidoId) {
+        Usuario funcionario = usuarioLogado();
+
+        Pedido pedido = repository.buscarComLock(pedidoId)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Pedido não encontrado"));
+
+        if (pedido.getStatus() == StatusPedido.ENTREGUE) {
+            throw new ConflitoException("Este pedido já foi entregue");
+        }
+        if (pedido.getStatus() != StatusPedido.APROVADO) {
+            throw new ConflitoException("Pagamento ainda não confirmado, ou pedido expirado");
+        }
+
+        pedido.setStatus(StatusPedido.ENTREGUE);
+        pedido.setDataEntrega(LocalDateTime.now());
+        pedido.setEntreguePorId(funcionario.getId());
+        repository.save(pedido);
+
+        logService.registrarLog(funcionario.getId(), funcionario.getEmail(), "PEDIDO_ENTREGUE",
+                "Pedido " + pedido.getId() + ", aluno id " + pedido.getUsuario().getId());
+        return new PedidoDTO(pedido);
+    }
+
+    private void devolverEstoque(Pedido pedido) {
+        List<ItemPedido> itens = new ArrayList<>(pedido.getItens());
+        itens.sort(Comparator.comparing(i -> i.getLivro().getId()));
+
+        for (ItemPedido item : itens) {
+            Livro livro = livroRepository.buscarComLock(item.getLivro().getId()).orElse(null);
+            if (livro == null) continue;
+            int atual = livro.getEstoqueCompra() == null ? 0 : livro.getEstoqueCompra();
+            livro.setEstoqueCompra(atual + item.getQuantidade());
+            livroRepository.save(livro);
+        }
+    }
+
+    @Transactional
+    public PedidoDTO solicitarReembolso(UUID pedidoId) {
+        Usuario usuario = usuarioLogado();
+
+        Pedido pedido = repository.buscarComLock(pedidoId)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Pedido não encontrado"));
+
+        if (!pedido.getUsuario().getId().equals(usuario.getId())) {
+            throw new RegraDeNegocioException("Você só pode cancelar os seus próprios pedidos");
+        }
+
+        switch (pedido.getStatus()) {
+            case APROVADO -> { }
+            case ENTREGUE -> throw new ConflitoException("Pedido já retirado: não é possível reembolsar");
+            case REEMBOLSADO -> throw new ConflitoException("Este pedido já foi reembolsado");
+            default -> throw new ConflitoException("Só é possível reembolsar pedidos com pagamento aprovado");
+        }
+
+        devolverEstoque(pedido);
+        pedido.setStatus(StatusPedido.REEMBOLSADO);
+        pedido.setDataReembolso(LocalDateTime.now());
+        repository.save(pedido);
+
+        mercadoPagoService.reembolsarOrder(pedido.getMpOrderId());
+
+        logService.registrarLog(usuario.getId(), usuario.getEmail(), "PEDIDO_REEMBOLSADO",
+                "Pedido " + pedido.getId() + ", order " + pedido.getMpOrderId());
+        return new PedidoDTO(pedido);
+    }
+
 
     private void removerDoCarrinho(Pedido pedido) {
         Set<UUID> livrosDoPedido = pedido.getItens().stream()
