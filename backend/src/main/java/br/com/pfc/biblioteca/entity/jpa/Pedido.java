@@ -26,8 +26,10 @@ public class Pedido {
     private BigDecimal total;
     private LocalDateTime dataCriacao = LocalDateTime.now();
     private LocalDateTime dataExpiracao;
+    private LocalDateTime dataEntrega;
     private String linkPagamento;
     private String mpOrderId;
+    private UUID entreguePorId;
 
     public Pedido(){}
 
@@ -109,5 +111,21 @@ public class Pedido {
 
     public void setMpOrderId(String mpOrderId) {
         this.mpOrderId = mpOrderId;
+    }
+
+    public LocalDateTime getDataEntrega() {
+        return dataEntrega;
+    }
+
+    public void setDataEntrega(LocalDateTime dataEntrega) {
+        this.dataEntrega = dataEntrega;
+    }
+
+    public UUID getEntreguePorId() {
+        return entreguePorId;
+    }
+
+    public void setEntreguePorId(UUID entreguePorId) {
+        this.entreguePorId = entreguePorId;
     }
 }

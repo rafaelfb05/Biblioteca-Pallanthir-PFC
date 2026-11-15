@@ -2,6 +2,7 @@ package br.com.pfc.biblioteca.service;
 
 import java.util.UUID;
 import br.com.pfc.biblioteca.dto.pedido.PedidoDTO;
+import br.com.pfc.biblioteca.dto.pedido.PedidoRetiradaDTO;
 import br.com.pfc.biblioteca.entity.jpa.*;
 import br.com.pfc.biblioteca.enums.StatusPedido;
 import br.com.pfc.biblioteca.infra.exception.ConflitoException;
@@ -201,6 +202,37 @@ public class PedidoService {
         logService.registrarLog(pedido.getUsuario().getId(), pedido.getUsuario().getEmail(),
                 "PEDIDO_EXPIRADO", "Pedido " + pedido.getId());
     }
+
+    @Transactional(readOnly = true)
+    public List<PedidoRetiradaDTO> pendentesDeRetirada() {
+        return repository.findByStatusOrderByDataCriacaoAsc(StatusPedido.APROVADO)
+                .stream().map(PedidoRetiradaDTO::new).collect(Collectors.toList());
+    }
+
+    @Transactional
+    public PedidoDTO registrarEntrega(UUID pedidoId) {
+        Usuario funcionario = usuarioLogado();
+
+        Pedido pedido = repository.buscarComLock(pedidoId)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Pedido não encontrado"));
+
+        if (pedido.getStatus() == StatusPedido.ENTREGUE) {
+            throw new ConflitoException("Este pedido já foi entregue");
+        }
+        if (pedido.getStatus() != StatusPedido.APROVADO) {
+            throw new ConflitoException("Pagamento ainda não confirmado, ou pedido expirado");
+        }
+
+        pedido.setStatus(StatusPedido.ENTREGUE);
+        pedido.setDataEntrega(LocalDateTime.now());
+        pedido.setEntreguePorId(funcionario.getId());
+        repository.save(pedido);
+
+        logService.registrarLog(funcionario.getId(), funcionario.getEmail(), "PEDIDO_ENTREGUE",
+                "Pedido " + pedido.getId() + ", aluno id " + pedido.getUsuario().getId());
+        return new PedidoDTO(pedido);
+    }
+
 
     private void removerDoCarrinho(Pedido pedido) {
         Set<UUID> livrosDoPedido = pedido.getItens().stream()

@@ -2,6 +2,7 @@ package br.com.pfc.biblioteca.controller;
 
 import java.util.UUID;
 import br.com.pfc.biblioteca.dto.pedido.PedidoDTO;
+import br.com.pfc.biblioteca.dto.pedido.PedidoRetiradaDTO;
 import br.com.pfc.biblioteca.service.PedidoService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -31,5 +32,15 @@ public class PedidoController {
     @GetMapping("/{id}")
     public PedidoDTO obter(@PathVariable UUID id){
         return service.obterPedido(id);
+    }
+
+    @GetMapping("/pendentes-retirada")
+    public List<PedidoRetiradaDTO> pendentesDeRetirada() {
+        return service.pendentesDeRetirada();
+    }
+
+    @PutMapping("/{id}/entregar")
+    public PedidoDTO entregar(@PathVariable UUID id) {
+        return service.registrarEntrega(id);
     }
 }
