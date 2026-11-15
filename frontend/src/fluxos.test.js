@@ -580,7 +580,9 @@ test("estudante solicita reembolso de um pedido pago e ainda não retirado", asy
 
   fireEvent.click(await screen.findByRole("button", { name: "Pedidos" }));
   expect(await screen.findByText("Pago · aguardando retirada")).toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", { name: "Solicitar reembolso" }));
+  expect(screen.queryByRole("button", { name: "Solicitar reembolso" })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Ver detalhes →" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Solicitar reembolso" }));
 
   const dialogo = await screen.findByRole("alertdialog");
   expect(dialogo).toHaveTextContent("Solicitar reembolso?");

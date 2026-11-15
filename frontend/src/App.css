@@ -2088,55 +2088,11 @@
   color: #ffffff;
 }
 
-.pagina-copiar-codigo {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-}
 
-.copiar-codigo-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 14px;
-  width: 100%;
-  max-width: 420px;
-  padding: 35px 28px;
-  background: #121216;
-  border: 1px solid #2f2f36;
-  border-radius: 12px;
-  text-align: center;
-}
 
-.copiar-codigo-card small {
-  color: #77777f;
-  font-size: 11px;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-}
 
-.copiar-codigo-valor {
-  padding: 14px 24px;
-  background: #09090b;
-  border: 1px dashed #e51d2a;
-  border-radius: 10px;
-  font-family: "Courier New", monospace;
-  font-size: 34px;
-  letter-spacing: 8px;
-  user-select: all;
-}
 
-.copiar-codigo-card .reservar-button {
-  padding: 12px 0;
-  font-size: 14px;
-}
 
-.copiar-codigo-card p {
-  color: #96969d;
-  font-size: 13px;
-  line-height: 1.5;
-}
 
 .dashboard-topo {
   display: flex;
@@ -3836,22 +3792,7 @@ html {
   color: #c9c9cf;
 }
 
-.pedido-reembolso-botao {
-  padding: 9px 16px;
-  border: 1px solid #3a3a42;
-  border-radius: 7px;
-  background: transparent;
-  color: #c9c9cf;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: 0.2s;
-}
 
-.pedido-reembolso-botao:hover {
-  border-color: #e51d2a;
-  color: #ffffff;
-}
 
 .modal-reembolso {
   z-index: 70;

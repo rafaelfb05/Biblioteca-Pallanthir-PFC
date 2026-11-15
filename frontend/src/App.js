@@ -4923,18 +4923,6 @@ function App() {
                           Pagar com Mercado Pago
                         </button>
                       )}
-                    {pedido.status === "APROVADO" && (
-                      <button
-                        type="button"
-                        className="pedido-reembolso-botao"
-                        onClick={() => {
-                          setErroReembolso(null);
-                          setPedidoParaReembolso(pedido);
-                        }}
-                      >
-                        Solicitar reembolso
-                      </button>
-                    )}
                   </div>
                 </div>
               ))}
