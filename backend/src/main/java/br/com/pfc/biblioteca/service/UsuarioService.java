@@ -6,6 +6,7 @@ import br.com.pfc.biblioteca.dto.usuario.AceiteTermosRequest;
 import br.com.pfc.biblioteca.dto.usuario.TermosDTO;
 import br.com.pfc.biblioteca.dto.usuario.UsuarioDTO;
 import br.com.pfc.biblioteca.dto.usuario.UsuarioRequest;
+import br.com.pfc.biblioteca.enums.StatusPedido;
 import br.com.pfc.biblioteca.enums.StatusReserva;
 import br.com.pfc.biblioteca.enums.TipoUsuario;
 import br.com.pfc.biblioteca.infra.exception.ConflitoException;
@@ -16,6 +17,7 @@ import br.com.pfc.biblioteca.infra.security.JwtService;
 import br.com.pfc.biblioteca.entity.jpa.Livro;
 import br.com.pfc.biblioteca.entity.jpa.Usuario;
 import br.com.pfc.biblioteca.repository.LivroRepository;
+import br.com.pfc.biblioteca.repository.PedidoRepository;
 import br.com.pfc.biblioteca.repository.ReservaRepository;
 import br.com.pfc.biblioteca.repository.UsuarioRepository;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -38,8 +40,11 @@ public class UsuarioService {
     private final JwtService jwtService;
     private final EmailService emailService;
     private final LogAuditoriaService logService;
+    private final PedidoRepository pedidoRepository;
 
-    public UsuarioService(UsuarioRepository repository, LivroRepository livroRepository, ReservaRepository reservaRepository, PasswordEncoder passwordEncoder, JwtService jwtService, EmailService emailService, LogAuditoriaService logService) {
+    public UsuarioService(UsuarioRepository repository, LivroRepository livroRepository, ReservaRepository reservaRepository,
+                          PasswordEncoder passwordEncoder, JwtService jwtService, EmailService emailService,
+                          LogAuditoriaService logService, PedidoRepository pedidoRepository) {
         this.repository = repository;
         this.livroRepository = livroRepository;
         this.reservaRepository = reservaRepository;
@@ -47,6 +52,7 @@ public class UsuarioService {
         this.jwtService = jwtService;
         this.emailService = emailService;
         this.logService = logService;
+        this.pedidoRepository = pedidoRepository;
     }
 
 
@@ -172,6 +178,16 @@ public class UsuarioService {
         if(reservaRepository.existsByUsuarioIdAndStatusIn(id, List.of(StatusReserva.RESERVADO, StatusReserva.ENTREGUE))){
             logService.registrarLog(usuario.getId(), usuario.getEmail(), "FALHA_EXCLUSAO_USUARIO", "Conta possui reservas em aberto ou livros não devolvidos");
             throw new ConflitoException("Não é possível excluir a conta enquanto houver livros reservados ou não devolvidos. Cancele as reservas ou devolva os livros na biblioteca.");
+        }
+
+        boolean temPedidoEmAberto = pedidoRepository.existsByUsuarioIdAndStatusIn(
+                usuario.getId(),
+                List.of(StatusPedido.AGUARDANDO_PAGAMENTO, StatusPedido.APROVADO));
+
+        if (temPedidoEmAberto) {
+            throw new ConflitoException(
+                    "Você tem pedidos em andamento (aguardando pagamento ou retirada). "
+                            + "Conclua a retirada antes de excluir a conta.");
         }
 
         usuario.setNome("Usuário removido");
