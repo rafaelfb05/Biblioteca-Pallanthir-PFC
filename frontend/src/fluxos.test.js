@@ -520,7 +520,7 @@ test("detalhes do pedido mostram os livros com capa e o total", async () => {
   expect(within(janela).getByAltText("Capa de Clean Code")).toHaveAttribute("src", "https://covers.openlibrary.org/b/isbn/1-L.jpg");
   expect(within(janela).getByRole("img", { name: "Capa genérica de Sem Venda" })).toBeInTheDocument();
   expect(within(janela).getByText("2 unidades ×", { exact: false })).toBeInTheDocument();
-  expect(within(janela).getByText("Pagamento aprovado pelo Mercado Pago.")).toBeInTheDocument();
+  expect(within(janela).getByText("Pagamento aprovado. Retire os livros no balcão da biblioteca.")).toBeInTheDocument();
   expect(within(janela).getByText("R$ 120,00")).toBeInTheDocument();
 
   fireEvent.click(within(janela).getByRole("button", { name: "Fechar" }));
@@ -561,6 +561,102 @@ test("ranking pode ser filtrado por matéria", async () => {
   expect(screen.getByRole("button", { name: "Filtrar Direito" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Direito" })).toHaveAttribute("aria-pressed", "true");
   expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith("/avaliacoes/ranking?materia=DIREITO"))).toBe(true);
+});
+
+test("estudante solicita reembolso de um pedido pago e ainda não retirado", async () => {
+  let reembolsado = false;
+  const pago = { ...pedidoPendente, status: "APROVADO", total: 40 };
+  simularApi({
+    "GET /pedidos": () => [200, [reembolsado ? { ...pago, status: "REEMBOLSADO", dataReembolso: "2026-11-15T10:00:00" } : pago]],
+    ["POST /pedidos/" + ID_PEDIDO + "/reembolso"]: () => {
+      reembolsado = true;
+      return [200, { ...pago, status: "REEMBOLSADO" }];
+    },
+  });
+  entrarComo("ESTUDANTE");
+  render(<App />);
+
+  fireEvent.click(await screen.findByRole("button", { name: "Pedidos" }));
+  expect(await screen.findByText("Pago · aguardando retirada")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Solicitar reembolso" }));
+
+  const dialogo = await screen.findByRole("alertdialog");
+  expect(dialogo).toHaveTextContent("Solicitar reembolso?");
+  fireEvent.click(within(dialogo).getByRole("button", { name: "Confirmar reembolso" }));
+
+  expect(await screen.findByText(/Reembolso do pedido #44444444 solicitado/)).toBeInTheDocument();
+  expect(await screen.findByText("Reembolsado")).toBeInTheDocument();
+  expect(chamadasPara("POST", "/pedidos/" + ID_PEDIDO + "/reembolso")).toHaveLength(1);
+  expect(screen.queryByRole("button", { name: "Solicitar reembolso" })).not.toBeInTheDocument();
+});
+
+test("funcionário registra a retirada de uma compra na gestão", async () => {
+  simularApi({
+    "GET /pedidos/pendentes-retirada": () => [
+      200,
+      [{ id: ID_PEDIDO, nomeEstudante: "Ana Souza", total: 80, dataCriacao: "2026-11-15T09:00:00", itens: [{ livroId: ID_LIVRO, titulo: "Clean Code", quantidade: 2, precoUnitario: 40, capaUrl: null }] }],
+    ],
+    ["PUT /pedidos/" + ID_PEDIDO + "/entregar"]: () => [200, { ...pedidoPendente, status: "ENTREGUE" }],
+  });
+  entrarComo("FUNCIONARIO");
+  render(<App />);
+
+  simularApi({
+    "GET /usuarios": () => [200, []],
+    "GET /pedidos/pendentes-retirada": () => [
+      200,
+      [{ id: ID_PEDIDO, nomeEstudante: "Ana Souza", total: 80, dataCriacao: "2026-11-15T09:00:00", itens: [{ livroId: ID_LIVRO, titulo: "Clean Code", quantidade: 2, precoUnitario: 40, capaUrl: null }] }],
+    ],
+    ["PUT /pedidos/" + ID_PEDIDO + "/entregar"]: () => [200, { ...pedidoPendente, status: "ENTREGUE" }],
+  });
+  fireEvent.click(await screen.findByRole("button", { name: "Gestão" }));
+  const abaCompras = await screen.findByRole("tab", { name: /^Compras para retirar/ });
+  expect(screen.getByRole("tab", { name: "Reservas" })).toHaveAttribute("aria-selected", "true");
+  fireEvent.click(abaCompras);
+  expect(abaCompras).toHaveAttribute("aria-selected", "true");
+  expect(await screen.findByText("Ana Souza")).toBeInTheDocument();
+  expect(screen.getByText("2 unidades")).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: "Registrar retirada" }));
+
+  expect(await screen.findByText("Retirada do pedido #44444444 registrada para Ana Souza.")).toBeInTheDocument();
+  expect(screen.getByText("Nenhum pedido aguardando retirada.")).toBeInTheDocument();
+  expect(chamadasPara("PUT", "/pedidos/" + ID_PEDIDO + "/entregar")).toHaveLength(1);
+});
+
+test("conta com pedido aguardando retirada não pode ser excluída", async () => {
+  simularApi({ "GET /pedidos": () => [200, [{ ...pedidoPendente, status: "APROVADO" }]] });
+  entrarComo("ESTUDANTE");
+  render(<App />);
+
+  await screen.findByRole("heading", { name: "Clean Code" });
+  await waitFor(() => expect(chamadasPara("GET", "/pedidos").length).toBeGreaterThan(0));
+  fireEvent.click(screen.getByTitle("Minha conta"));
+  fireEvent.click(await screen.findByRole("button", { name: "Excluir minha conta" }));
+
+  expect(await screen.findByRole("alertdialog")).toHaveTextContent("Você tem pedidos em andamento");
+  expect(chamadasPara("DELETE", "/usuarios/deletar/" + ID_USUARIO)).toHaveLength(0);
+});
+
+test("requisitos da senha só aparecem quando a senha está errada", async () => {
+  simularApi();
+  render(<App />);
+
+  fireEvent.click(await screen.findByRole("button", { name: "Entrar" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Criar conta" }));
+  expect(screen.queryByRole("list", { name: "Requisitos da senha" })).not.toBeInTheDocument();
+
+  const [senha, confirmacao] = document.querySelectorAll(".campo-senha input");
+  fireEvent.change(screen.getByLabelText("Nome"), { target: { value: "Ana" } });
+  fireEvent.change(screen.getByLabelText("E-mail"), { target: { value: "ana@teste.com" } });
+  fireEvent.change(senha, { target: { value: "fraca" } });
+  fireEvent.change(confirmacao, { target: { value: "fraca" } });
+  fireEvent.click(screen.getByRole("checkbox"));
+  fireEvent.click(screen.getByRole("button", { name: "Criar minha conta" }));
+
+  expect(await screen.findByRole("list", { name: "Requisitos da senha" })).toBeInTheDocument();
+  expect(screen.getByText("A senha não atende a todos os requisitos.")).toBeInTheDocument();
+  expect(chamadasPara("POST", "/usuarios/cadastro")).toHaveLength(0);
 });
 
 test("funcionário vê a dashboard e não vê carrinho nem pedidos", async () => {

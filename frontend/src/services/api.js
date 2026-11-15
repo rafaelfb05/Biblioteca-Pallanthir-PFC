@@ -196,6 +196,9 @@ export const carrinhoApi = {
 export const pedidosApi = {
   finalizarCompra: () => request("/pedidos/checkout", { method: "POST" }),
   listar: () => request("/pedidos"),
+  reembolsar: (id) => request(`/pedidos/${id}/reembolso`, { method: "POST" }),
+  pendentesDeRetirada: () => request("/pedidos/pendentes-retirada"),
+  registrarEntrega: (id) => request(`/pedidos/${id}/entregar`, { method: "PUT" }),
 };
 
 export const dashboardApi = {

@@ -3804,3 +3804,206 @@ html {
 .ranking-filtro-opcao span {
   color: #e51d2a;
 }
+
+.pagina-pedidos .reserva-status.entregue,
+.pedido-detalhes .reserva-status.entregue {
+  background: rgba(70, 140, 255, 0.15);
+  color: #7aa7ff;
+}
+
+.reserva-status.reembolsado {
+  background: #26262d;
+  color: #c9c9cf;
+}
+
+.pedido-reembolso-botao {
+  padding: 9px 16px;
+  border: 1px solid #3a3a42;
+  border-radius: 7px;
+  background: transparent;
+  color: #c9c9cf;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.pedido-reembolso-botao:hover {
+  border-color: #e51d2a;
+  color: #ffffff;
+}
+
+.modal-reembolso {
+  z-index: 70;
+}
+
+.retiradas-topo {
+  display: flex;
+  gap: 12px;
+  margin: 25px 0 20px;
+}
+
+.retiradas-topo .gestao-busca {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.retiradas-lista {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.retirada-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 22px;
+  background: #121216;
+  border: 1px solid #27272c;
+  border-radius: 12px;
+}
+
+.retirada-cabecalho {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.retirada-cabecalho strong {
+  display: block;
+  font-size: 17px;
+}
+
+.retirada-cabecalho span {
+  display: block;
+  margin-top: 4px;
+  color: #77777f;
+  font-size: 12px;
+}
+
+.retirada-total {
+  white-space: nowrap;
+}
+
+.retirada-itens {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.retirada-itens li {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px;
+  background: #0d0d10;
+  border: 1px solid #24242a;
+  border-radius: 9px;
+}
+
+.retirada-itens .pedido-detalhes-capa {
+  flex-shrink: 0;
+  width: 46px;
+  height: 68px;
+}
+
+.retirada-itens strong {
+  display: block;
+  font-size: 14px;
+  line-height: 1.3;
+}
+
+.retirada-itens span {
+  display: block;
+  margin-top: 3px;
+  color: #96969d;
+  font-size: 12px;
+}
+
+.retirada-acoes {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: auto;
+}
+
+.retirada-acoes .cadastro-button {
+  cursor: pointer;
+}
+
+.retirada-acoes .cadastro-button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+@media (max-width: 1000px) {
+  .retiradas-lista {
+    grid-template-columns: 1fr;
+  }
+}
+
+.pagina-pedidos .reserva-info small {
+  display: block;
+}
+
+.pedido-detalhes-link {
+  display: block;
+  margin-top: 10px;
+}
+
+.gestao-abas {
+  display: inline-flex;
+  gap: 4px;
+  margin-top: 22px;
+  padding: 4px;
+  border: 1px solid #27272c;
+  border-radius: 10px;
+  background: #0d0d10;
+}
+
+.gestao-aba {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: #96969d;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.gestao-aba:hover {
+  color: #ffffff;
+}
+
+.gestao-aba.ativa {
+  background: #e51d2a;
+  color: #ffffff;
+}
+
+.gestao-aba-contador {
+  min-width: 20px;
+  padding: 1px 7px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.18);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.gestao-aba:not(.ativa) .gestao-aba-contador {
+  background: #e51d2a;
+  color: #ffffff;
+}
+
+.pagina-gestao .materias-sub {
+  margin-top: 16px;
+}

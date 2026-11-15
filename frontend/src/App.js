@@ -219,6 +219,9 @@ function GraficoMaterias({ titulo, descricao, itens, unidade }) {
   );
 }
 
+const MENSAGEM_EXCLUSAO_COM_PEDIDOS =
+  "Você tem pedidos em andamento (aguardando pagamento ou retirada). Retire os livros na biblioteca ou solicite o reembolso antes de excluir a conta.";
+
 const MENSAGEM_EXCLUSAO_BLOQUEADA =
   "Você possui livros reservados ou não devolvidos. Cancele as reservas ou devolva os livros na biblioteca antes de excluir a conta.";
 
@@ -260,8 +263,10 @@ const MAXIMO_ATUALIZACOES_PEDIDOS = 24;
 
 const ROTULO_STATUS_PEDIDO = {
   AGUARDANDO_PAGAMENTO: "Aguardando pagamento",
-  APROVADO: "Aprovado",
+  APROVADO: "Pago · aguardando retirada",
+  ENTREGUE: "Retirado",
   EXPIRADO: "Expirado",
+  REEMBOLSADO: "Reembolsado",
 };
 
 const RETORNOS_DE_PAGAMENTO = {
@@ -642,6 +647,12 @@ function App() {
   const [finalizandoCompra, setFinalizandoCompra] = useState(false);
   const [pedidos, setPedidos] = useState([]);
   const [pedidoDetalhado, setPedidoDetalhado] = useState(null);
+  const [pedidoParaReembolso, setPedidoParaReembolso] = useState(null);
+  const [erroReembolso, setErroReembolso] = useState(null);
+  const [retiradas, setRetiradas] = useState([]);
+  const [buscaRetiradas, setBuscaRetiradas] = useState("");
+  const [entregaEmAndamento, setEntregaEmAndamento] = useState(null);
+  const [abaGestao, setAbaGestao] = useState("reservas");
   const [carregandoPedidos, setCarregandoPedidos] = useState(true);
   const [erroPedidos, setErroPedidos] = useState(null);
   const [retornoPagamento, setRetornoPagamento] = useState(
@@ -663,6 +674,7 @@ function App() {
   const [avisoAutenticacao, setAvisoAutenticacao] = useState(null);
   const [salvando, setSalvando] = useState(false);
   const [menuAberto, setMenuAberto] = useState(false);
+  const [mostrarRegrasSenha, setMostrarRegrasSenha] = useState(false);
   const [paginaLivros, setPaginaLivros] = useState(1);
   const [editandoLivro, setEditandoLivro] = useState(false);
   const [dataAceiteTermos, setDataAceiteTermos] = useState(null);
@@ -856,6 +868,8 @@ function App() {
     setReservasGestao([]);
     setLogs([]);
     setDashboard(null);
+    setRetiradas([]);
+    setPedidoParaReembolso(null);
     setPagina((atual) => (PAGINAS_PRIVADAS.includes(atual) ? "inicio" : atual));
     setAviso(mensagem);
   }, []);
@@ -1057,6 +1071,7 @@ function App() {
 
   const trocarModoAutenticacao = (modo) => {
     setModoAutenticacao(modo);
+    setMostrarRegrasSenha(false);
     setErro(null);
     setAvisoAutenticacao(null);
   };
@@ -1270,7 +1285,9 @@ function App() {
   const irParaGestao = async () => {
     abrirPagina("gestao");
     setFiltroUsuarios("");
-    await carregarUsuariosGestao();
+    setAbaGestao("reservas");
+    setBuscaRetiradas("");
+    await Promise.all([carregarUsuariosGestao(), carregarRetiradas()]);
   };
 
   const selecionarUsuarioGestao = async (selecionado) => {
@@ -1370,11 +1387,84 @@ function App() {
 
   const excluirConta = () => {
     setErro(null);
+    const pedidosEmAndamento = pedidos.some((pedido) =>
+      ["AGUARDANDO_PAGAMENTO", "APROVADO"].includes(pedido.status)
+    );
     setDialogoExclusao(
       reservasAtivas.length > 0
         ? { bloqueado: true, mensagem: MENSAGEM_EXCLUSAO_BLOQUEADA }
+        : pedidosEmAndamento
+        ? { bloqueado: true, mensagem: MENSAGEM_EXCLUSAO_COM_PEDIDOS }
         : { bloqueado: false }
     );
+  };
+
+  const confirmarReembolso = async () => {
+    const pedido = pedidoParaReembolso;
+    try {
+      setSalvando(true);
+      setErroReembolso(null);
+      await pedidosApi.reembolsar(pedido.id);
+      setPedidoParaReembolso(null);
+      setPedidoDetalhado(null);
+      setAviso(
+        "Reembolso do pedido #" +
+          numeroDoPedido(pedido.id) +
+          " solicitado. O valor volta pela forma de pagamento usada no Mercado Pago."
+      );
+      await carregarPedidos();
+    } catch (e) {
+      setErroReembolso(
+        mensagemDeErro(e, "Não foi possível solicitar o reembolso. Tente novamente.")
+      );
+      console.error(e);
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  const carregarRetiradas = async () => {
+    try {
+      setCarregandoPainel(true);
+      setErro(null);
+      setRetiradas((await pedidosApi.pendentesDeRetirada()) || []);
+    } catch (e) {
+      setErro(mensagemDeErro(e, "Não foi possível carregar as retiradas."));
+      console.error(e);
+    } finally {
+      setCarregandoPainel(false);
+    }
+  };
+
+  const trocarAbaGestao = async (aba) => {
+    setAbaGestao(aba);
+    setErro(null);
+    if (aba === "compras") {
+      setBuscaRetiradas("");
+      await carregarRetiradas();
+    }
+  };
+
+  const registrarEntregaDoPedido = async (pedido) => {
+    try {
+      setEntregaEmAndamento(pedido.id);
+      setErro(null);
+      await pedidosApi.registrarEntrega(pedido.id);
+      setRetiradas((atuais) => atuais.filter((item) => item.id !== pedido.id));
+      setAviso(
+        "Retirada do pedido #" +
+          numeroDoPedido(pedido.id) +
+          " registrada para " +
+          pedido.nomeEstudante +
+          "."
+      );
+    } catch (e) {
+      setErro(mensagemDeErro(e, "Não foi possível registrar a retirada."));
+      console.error(e);
+      await carregarRetiradas();
+    } finally {
+      setEntregaEmAndamento(null);
+    }
   };
 
   const confirmarExclusaoDaConta = async () => {
@@ -1887,10 +1977,12 @@ function App() {
     const email = formUsuario.email.trim();
 
     if (!REGRA_SENHA.test(formUsuario.senha)) {
-      setErro(DICA_SENHA);
+      setMostrarRegrasSenha(true);
+      setErro("A senha não atende a todos os requisitos.");
       return;
     }
     if (formUsuario.senha !== formUsuario.confirmarSenha) {
+      setMostrarRegrasSenha(true);
       setErro("As senhas não conferem.");
       return;
     }
@@ -2407,6 +2499,7 @@ function App() {
                 Dashboard
               </button>
             )}
+
             {ehFuncionario && (
               <button
                 type="button"
@@ -2885,10 +2978,12 @@ function App() {
                 }
               />
             </div>
-            <RegrasDaSenha
-              senha={formUsuario.senha}
-              confirmacao={formUsuario.confirmarSenha}
-            />
+            {mostrarRegrasSenha && (
+              <RegrasDaSenha
+                senha={formUsuario.senha}
+                confirmacao={formUsuario.confirmarSenha}
+              />
+            )}
             <div className="auth-campo">
               <span className="auth-rotulo">Tipo de conta</span>
               <div
@@ -3081,7 +3176,21 @@ function App() {
             <p>Pague até {formatarData(pedidoDetalhado.dataExpiracao)}.</p>
           )}
           {pedidoDetalhado.status === "APROVADO" && (
-            <p>Pagamento aprovado pelo Mercado Pago.</p>
+            <p>
+              Pagamento aprovado. Retire os livros no balcão da biblioteca.
+            </p>
+          )}
+          {pedidoDetalhado.status === "ENTREGUE" && (
+            <p>
+              Livros retirados na biblioteca em{" "}
+              {formatarData(pedidoDetalhado.dataEntrega)}.
+            </p>
+          )}
+          {pedidoDetalhado.status === "REEMBOLSADO" && (
+            <p>
+              Reembolso solicitado em {formatarData(pedidoDetalhado.dataReembolso)}.
+              O valor volta pela forma de pagamento usada no Mercado Pago.
+            </p>
           )}
           {pedidoDetalhado.status === "EXPIRADO" && (
             <p>O prazo de pagamento terminou ou o pagamento foi cancelado.</p>
@@ -3102,6 +3211,18 @@ function App() {
                 Pagar com Mercado Pago
               </button>
             )}
+          {pedidoDetalhado.status === "APROVADO" && (
+            <button
+              type="button"
+              className="pedido-detalhes-fechar"
+              onClick={() => {
+                setErroReembolso(null);
+                setPedidoParaReembolso(pedidoDetalhado);
+              }}
+            >
+              Solicitar reembolso
+            </button>
+          )}
           <button
             type="button"
             className="pedido-detalhes-fechar"
@@ -3112,6 +3233,64 @@ function App() {
         </div>
       </div>
     </div>
+  );
+
+  const modalReembolso = pedidoParaReembolso && (
+    <div
+      className="modal modal-reembolso"
+      onClick={() => !salvando && setPedidoParaReembolso(null)}
+    >
+      <div
+        className="modal-box dialogo perigo"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="reembolso-titulo"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="dialogo-icone" aria-hidden="true">
+          ↺
+        </div>
+        <h3 id="reembolso-titulo">Solicitar reembolso?</h3>
+        <p>
+          O valor de <strong>{formatarPreco(pedidoParaReembolso.total)}</strong>{" "}
+          do pedido #{numeroDoPedido(pedidoParaReembolso.id)} será devolvido
+          pelo Mercado Pago na mesma forma de pagamento, e os livros voltam ao
+          acervo.
+        </p>
+        <p className="dialogo-alerta">
+          Depois de confirmado, o pedido não poderá mais ser retirado.
+        </p>
+        {erroReembolso && <p className="erro">{erroReembolso}</p>}
+        <div className="dialogo-acoes">
+          <button
+            type="button"
+            className="dialogo-secundario"
+            onClick={() => setPedidoParaReembolso(null)}
+            disabled={salvando}
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            className="dialogo-principal"
+            onClick={confirmarReembolso}
+            disabled={salvando}
+          >
+            {salvando ? "Solicitando..." : "Confirmar reembolso"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  const termoDaBuscaDeRetiradas = buscaRetiradas.trim().toLowerCase();
+  const retiradasExibidas = retiradas.filter(
+    (pedido) =>
+      !termoDaBuscaDeRetiradas ||
+      String(pedido.nomeEstudante || "")
+        .toLowerCase()
+        .includes(termoDaBuscaDeRetiradas) ||
+      numeroDoPedido(pedido.id).toLowerCase().includes(termoDaBuscaDeRetiradas)
   );
 
   const termosLiberados = termosLidos.termos && termosLidos.privacidade;
@@ -3381,16 +3560,43 @@ function App() {
           <div className="section-header">
             <div>
               <span className="section-label">FUNCIONÁRIO</span>
-              <h2>Gestão de reservas</h2>
+              <h2>Gestão</h2>
             </div>
             <button type="button" className="link-button" onClick={irParaInicio}>
               Voltar ao acervo →
             </button>
           </div>
 
+          {ehFuncionario && (
+            <div className="gestao-abas" role="tablist" aria-label="Tipo de gestão">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={abaGestao === "reservas"}
+                className={"gestao-aba" + (abaGestao === "reservas" ? " ativa" : "")}
+                onClick={() => trocarAbaGestao("reservas")}
+              >
+                Reservas
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={abaGestao === "compras"}
+                className={"gestao-aba" + (abaGestao === "compras" ? " ativa" : "")}
+                onClick={() => trocarAbaGestao("compras")}
+              >
+                Compras para retirar
+                {retiradas.length > 0 && (
+                  <span className="gestao-aba-contador">{retiradas.length}</span>
+                )}
+              </button>
+            </div>
+          )}
+
           <p className="materias-sub">
-            Selecione um estudante para ver as reservas dele e registrar as
-            entregas e devoluções.
+            {abaGestao === "compras"
+              ? "Pedidos pagos que aguardam a retirada dos livros na biblioteca, dos mais antigos para os mais recentes."
+              : "Selecione um estudante para ver as reservas dele e registrar as entregas e devoluções."}
           </p>
 
           {avisoDaPagina}
@@ -3398,7 +3604,92 @@ function App() {
 
           {!ehFuncionario && <p>Área restrita a funcionários.</p>}
 
-          {ehFuncionario && (
+          {ehFuncionario && abaGestao === "compras" && (
+            <>
+              <div className="retiradas-topo">
+                <input
+                  type="text"
+                  className="gestao-busca"
+                  placeholder="Buscar por estudante ou número do pedido"
+                  value={buscaRetiradas}
+                  onChange={(e) => setBuscaRetiradas(e.target.value)}
+                />
+                <button
+                  type="button"
+                  className="logs-atualizar"
+                  onClick={carregarRetiradas}
+                  disabled={carregandoPainel}
+                >
+                  {carregandoPainel ? "Carregando..." : "↻ Atualizar"}
+                </button>
+              </div>
+
+              {carregandoPainel && retiradas.length === 0 && (
+                <p>Carregando retiradas...</p>
+              )}
+              {!carregandoPainel && retiradasExibidas.length === 0 && (
+                <p>
+                  {termoDaBuscaDeRetiradas
+                    ? "Nenhum pedido encontrado para essa busca."
+                    : "Nenhum pedido aguardando retirada."}
+                </p>
+              )}
+
+              <div className="retiradas-lista">
+                {retiradasExibidas.map((pedido) => (
+                  <div className="retirada-card" key={pedido.id}>
+                    <div className="retirada-cabecalho">
+                      <div>
+                        <strong>{pedido.nomeEstudante}</strong>
+                        <span>
+                          Pedido #{numeroDoPedido(pedido.id)} · feito em{" "}
+                          {formatarData(pedido.dataCriacao)}
+                        </span>
+                      </div>
+                      <strong className="retirada-total">
+                        {formatarPreco(pedido.total)}
+                      </strong>
+                    </div>
+
+                    <ul className="retirada-itens">
+                      {(pedido.itens || []).map((item) => (
+                        <li key={item.livroId}>
+                          <div className="pedido-detalhes-capa">
+                            <CapaDoItem
+                              capaUrl={item.capaUrl}
+                              titulo={item.titulo}
+                            />
+                          </div>
+                          <div>
+                            <strong>{item.titulo}</strong>
+                            <span>
+                              {item.quantidade}{" "}
+                              {item.quantidade === 1 ? "unidade" : "unidades"}
+                            </span>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+
+                    <div className="retirada-acoes">
+                      <button
+                        type="button"
+                        className="cadastro-button"
+                        onClick={() => registrarEntregaDoPedido(pedido)}
+                        disabled={entregaEmAndamento === pedido.id}
+                      >
+                        {entregaEmAndamento === pedido.id
+                          ? "Registrando..."
+                          : "Registrar retirada"}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
+          {ehFuncionario && abaGestao === "reservas" && (
             <div className="gestao">
               <aside className="gestao-usuarios">
                 <input
@@ -4275,7 +4566,7 @@ function App() {
       <div className="app">
         {cabecalho}
 
-        <section className="section pagina-reservas">
+        <section className="section pagina-reservas pagina-pedidos">
           <div className="section-header">
             <div>
               <span className="section-label">SUAS COMPRAS</span>
@@ -4357,6 +4648,17 @@ function App() {
                         cancelado.
                       </small>
                     )}
+                    {pedido.status === "APROVADO" && (
+                      <small>Retire os livros no balcão da biblioteca.</small>
+                    )}
+                    {pedido.status === "ENTREGUE" && (
+                      <small>Retirado em {formatarData(pedido.dataEntrega)}</small>
+                    )}
+                    {pedido.status === "REEMBOLSADO" && (
+                      <small>
+                        Reembolsado em {formatarData(pedido.dataReembolso)}
+                      </small>
+                    )}
                     <button
                       type="button"
                       className="link-button pedido-detalhes-link"
@@ -4382,6 +4684,18 @@ function App() {
                           Pagar com Mercado Pago
                         </button>
                       )}
+                    {pedido.status === "APROVADO" && (
+                      <button
+                        type="button"
+                        className="pedido-reembolso-botao"
+                        onClick={() => {
+                          setErroReembolso(null);
+                          setPedidoParaReembolso(pedido);
+                        }}
+                      >
+                        Solicitar reembolso
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -4392,6 +4706,7 @@ function App() {
         {modalCadastroLivro}
         {modalAutenticacao}
         {modalDetalhesDoPedido}
+        {modalReembolso}
       </div>
     );
   }
