@@ -2,6 +2,7 @@ package br.com.pfc.biblioteca.service;
 
 import java.util.UUID;
 import br.com.pfc.biblioteca.dto.reserva.ReservaDTO;
+import br.com.pfc.biblioteca.dto.reserva.ReservaGestaoDTO;
 import br.com.pfc.biblioteca.enums.StatusReserva;
 import br.com.pfc.biblioteca.infra.exception.ConflitoException;
 import br.com.pfc.biblioteca.infra.exception.RecursoNaoEncontradoException;
@@ -116,6 +117,13 @@ public class ReservaService {
         reserva.setStatus(StatusReserva.DEVOLVIDO);
         repository.save(reserva);
         logService.registrarLogUsuarioLogado("DEVOLUCAO_LIVRO", "Reserva " + reservaId + " do usuário " + reserva.getUsuario().getId() + " devolvida");
+    }
+
+    public List<ReservaGestaoDTO> listarReservasEmAberto() {
+        return repository.findByStatusInOrderByDataReservaAsc(List.of(StatusReserva.RESERVADO, StatusReserva.ENTREGUE))
+                .stream()
+                .map(ReservaGestaoDTO::new)
+                .collect(Collectors.toList());
     }
 
     public List<ReservaDTO> listarReservasPorUsuario(UUID usuarioId) {

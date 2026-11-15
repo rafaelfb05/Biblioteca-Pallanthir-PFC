@@ -379,17 +379,19 @@ test("logs podem ser filtrados por ação e por período", async () => {
 
   fireEvent.change(screen.getByRole("combobox", { name: "Filtrar por ação" }), { target: { value: "SUCESSO_LOGIN" } });
   expect(screen.queryByText("Aceitou os termos")).not.toBeInTheDocument();
-  expect(screen.getByText("2 registros com os filtros escolhidos")).toBeInTheDocument();
+  expect(await screen.findByText("2 registros com os filtros escolhidos")).toBeInTheDocument();
+  expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith("/logs?acao=SUCESSO_LOGIN"))).toBe(true);
 
   fireEvent.change(screen.getByLabelText("De"), { target: { value: "2026-11-05" } });
-  expect(screen.getByText("Login feito")).toBeInTheDocument();
+  expect(await screen.findByText("Login feito")).toBeInTheDocument();
+  expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith("/logs?acao=SUCESSO_LOGIN&de=2026-11-05"))).toBe(true);
   expect(screen.queryByText("Login antigo")).not.toBeInTheDocument();
 
   fireEvent.change(screen.getByLabelText("Até"), { target: { value: "2026-11-09" } });
-  expect(screen.getByText("Nenhum registro encontrado.")).toBeInTheDocument();
+  expect(await screen.findByText("Nenhum registro encontrado.")).toBeInTheDocument();
 
   fireEvent.click(screen.getByRole("button", { name: /Limpar filtros/ }));
-  expect(screen.getByText("3 registros")).toBeInTheDocument();
+  expect(await screen.findByText("3 registros")).toBeInTheDocument();
 });
 
 test("usuário precisa ler e aceitar os termos quando eles mudam", async () => {
@@ -657,6 +659,64 @@ test("requisitos da senha só aparecem quando a senha está errada", async () =>
   expect(await screen.findByRole("list", { name: "Requisitos da senha" })).toBeInTheDocument();
   expect(screen.getByText("A senha não atende a todos os requisitos.")).toBeInTheDocument();
   expect(chamadasPara("POST", "/usuarios/cadastro")).toHaveLength(0);
+});
+
+test("aba de reservas da gestão registra entrega e devolução", async () => {
+  const aberta = (id, status, titulo, aluno, usuarioId) => ({
+    id, livroId: ID_LIVRO, tituloLivro: titulo, capaUrl: null, dataReserva: "2026-11-15T09:00:00",
+    status, usuarioId, nomeEstudante: aluno, emailEstudante: aluno.toLowerCase() + "@teste.com",
+  });
+  simularApi({
+    "GET /reservas/em-aberto": () => [200, [aberta("r1", "RESERVADO", "Clean Code", "Ana", "u1"), aberta("r2", "ENTREGUE", "Sem Venda", "Bruno", "u2")]],
+    "PUT /reservas/r1/entregar": () => [200, undefined],
+    "PUT /reservas/r2/devolver": () => [200, undefined],
+  });
+  entrarComo("FUNCIONARIO");
+  render(<App />);
+
+  fireEvent.click(await screen.findByRole("button", { name: "Gestão" }));
+  const abaReservas = await screen.findByRole("tab", { name: /^Reservas/ });
+  expect(abaReservas).toHaveAttribute("aria-selected", "true");
+  expect(await screen.findByText("Aguardando retirada")).toBeInTheDocument();
+  expect(screen.getByText("Com o estudante")).toBeInTheDocument();
+  expect(within(abaReservas).getByText("1")).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: "Registrar entrega" }));
+  expect(await screen.findByText('"Clean Code" foi entregue para Ana.')).toBeInTheDocument();
+  expect(screen.getAllByText("Com o estudante")).toHaveLength(2);
+
+  fireEvent.click(screen.getAllByRole("button", { name: "Registrar devolução" })[1]);
+  expect(await screen.findByText('"Sem Venda" foi devolvido por Bruno.')).toBeInTheDocument();
+  expect(screen.queryByText("Bruno", { selector: ".retirada-cabecalho strong" })).not.toBeInTheDocument();
+  expect(chamadasPara("PUT", "/reservas/r1/entregar")).toHaveLength(1);
+  expect(chamadasPara("PUT", "/reservas/r2/devolver")).toHaveLength(1);
+});
+
+test("filtro por aluno mostra só as compras do aluno escolhido", async () => {
+  const compra = (id, aluno, usuarioId) => ({
+    id, nomeEstudante: aluno, usuarioId, emailEstudante: aluno + "@teste.com", total: 40,
+    dataCriacao: "2026-11-15T09:00:00", itens: [{ livroId: ID_LIVRO, titulo: "Clean Code", quantidade: 1, precoUnitario: 40, capaUrl: null }],
+  });
+  simularApi({
+    "GET /pedidos/pendentes-retirada": () => [200, [
+      compra("11111111-aaaa-4aaa-8aaa-000000000001", "Ana", "u1"),
+      compra("22222222-aaaa-4aaa-8aaa-000000000002", "Bruno", "u2"),
+      compra("33333333-aaaa-4aaa-8aaa-000000000003", "Ana", "u1"),
+    ]],
+  });
+  entrarComo("FUNCIONARIO");
+  render(<App />);
+
+  fireEvent.click(await screen.findByRole("button", { name: "Gestão" }));
+  fireEvent.click(await screen.findByRole("tab", { name: /^Compras para retirar/ }));
+  expect(await screen.findByText("Bruno", { selector: ".retirada-cabecalho strong" })).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: /^Aluno/ }));
+  fireEvent.click(within(screen.getByRole("group", { name: "Filtrar por aluno" })).getByRole("button", { name: "Ana 2" }));
+
+  expect(screen.queryByText("Bruno", { selector: ".retirada-cabecalho strong" })).not.toBeInTheDocument();
+  expect(screen.getAllByText("Ana", { selector: ".retirada-cabecalho strong" })).toHaveLength(2);
+  expect(screen.getByRole("button", { name: "Aluno Ana" })).toBeInTheDocument();
 });
 
 test("funcionário vê a dashboard e não vê carrinho nem pedidos", async () => {

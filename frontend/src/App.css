@@ -3252,7 +3252,27 @@ html {
 }
 
 .auth-box .modal-form .campo-codigo {
-  height: 56px;
+  height: 72px;
+  padding: 0 0 0 16px;
+  border-radius: 12px;
+  background: #0d0d10;
+  color: #ffffff;
+  font-family: "Cinzel", Georgia, serif;
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: 16px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  caret-color: #e51d2a;
+}
+
+.auth-box .modal-form .campo-codigo::placeholder {
+  color: #2f2f36;
+}
+
+.auth-box .modal-form .campo-codigo:focus {
+  border-color: #e51d2a;
+  box-shadow: 0 0 0 4px rgba(229, 29, 42, 0.15);
 }
 
 .auth-box .modal-form .aceite-checkbox {
@@ -4004,6 +4024,95 @@ html {
   color: #ffffff;
 }
 
+.gestao-aba.ativa .gestao-aba-contador {
+  background: #ffffff;
+  color: #e51d2a;
+}
+
 .pagina-gestao .materias-sub {
   margin-top: 16px;
+}
+
+.filtro-aluno {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.filtro-aluno .ranking-filtro-botao {
+  height: 100%;
+  min-height: 42px;
+}
+
+.filtro-aluno-painel {
+  right: 0;
+  left: auto;
+  min-width: 260px;
+}
+
+.filtro-aluno-painel .ranking-filtro-opcao {
+  gap: 12px;
+}
+
+.filtro-aluno-painel .ranking-filtro-opcao .filtro-aluno-nome {
+  overflow: hidden;
+  color: inherit;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.filtro-aluno-painel .ranking-filtro-opcao .filtro-aluno-quantidade {
+  min-width: 22px;
+  padding: 1px 7px;
+  border-radius: 20px;
+  background: #1d1d23;
+  color: #96969d;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.filtro-aluno-painel .ranking-filtro-opcao.ativo .filtro-aluno-quantidade {
+  background: #e51d2a;
+  color: #ffffff;
+}
+
+.filtro-aluno-vazio {
+  padding: 8px 12px;
+  color: #6f6f77;
+  font-size: 13px;
+}
+
+.retirada-cabecalho .reserva-status {
+  flex-shrink: 0;
+}
+
+.botao-devolucao {
+  padding: 11px 18px;
+  border: 1px solid #e51d2a;
+  border-radius: 7px;
+  background: transparent;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.botao-devolucao:hover:not(:disabled) {
+  background: #e51d2a;
+}
+
+.botao-devolucao:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+@media (max-width: 600px) {
+  .retiradas-topo {
+    flex-wrap: wrap;
+  }
+
+  .retiradas-topo .gestao-busca {
+    flex-basis: 100%;
+  }
 }

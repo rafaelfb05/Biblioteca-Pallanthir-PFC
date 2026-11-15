@@ -9,9 +9,11 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 public record PedidoRetiradaDTO(UUID id, String nomeEstudante, BigDecimal total,
-                                LocalDateTime dataCriacao, List<ItemPedidoDTO> itens) {
+                                LocalDateTime dataCriacao, List<ItemPedidoDTO> itens,
+                                UUID usuarioId, String emailEstudante) {
     public PedidoRetiradaDTO(Pedido p) {
         this(p.getId(), p.getUsuario().getNome(), p.getTotal(), p.getDataCriacao(),
-                p.getItens().stream().map(ItemPedidoDTO::new).collect(Collectors.toList()));
+                p.getItens().stream().map(ItemPedidoDTO::new).collect(Collectors.toList()),
+                p.getUsuario().getId(), p.getUsuario().getEmail());
     }
 }

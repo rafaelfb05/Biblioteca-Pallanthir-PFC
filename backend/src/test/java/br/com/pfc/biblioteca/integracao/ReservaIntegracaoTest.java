@@ -177,4 +177,44 @@ class ReservaIntegracaoTest extends TesteIntegracaoBase {
         assertThat(status).containsExactly(200, 409);
         assertThat(recarregar(livro).getEstoqueReserva()).isZero();
     }
+
+    private JsonNode reservaEmAberto(String tokenFuncionario, String reservaId) {
+        for (JsonNode reserva : get("/reservas/em-aberto", tokenFuncionario).corpo()) {
+            if (reserva.path("id").asText().equals(reservaId)) {
+                return reserva;
+            }
+        }
+        return null;
+    }
+
+    @Test
+    void funcionarioVeTodasAsReservasEmAbertoComONomeDoEstudante() {
+        Usuario estudante = criarEstudante();
+        Usuario funcionario = criarFuncionario();
+        String tokenFuncionario = token(funcionario);
+        Livro reservado = criarLivro(30, 1, 0);
+        Livro entregue = criarLivro(30, 1, 0);
+        Livro cancelado = criarLivro(30, 1, 0);
+        reservar(estudante, reservado);
+        reservar(estudante, entregue);
+        reservar(estudante, cancelado);
+        String idReservado = reservaDoLivro(estudante, reservado).path("id").asText();
+        String idEntregue = reservaDoLivro(estudante, entregue).path("id").asText();
+        String idCancelado = reservaDoLivro(estudante, cancelado).path("id").asText();
+        put("/reservas/" + idEntregue + "/entregar", tokenFuncionario, null);
+        put("/reservas/" + idCancelado + "/cancelar", token(estudante), null);
+
+        JsonNode aberta = reservaEmAberto(tokenFuncionario, idReservado);
+        assertThat(aberta).isNotNull();
+        assertThat(aberta.path("status").asText()).isEqualTo("RESERVADO");
+        assertThat(aberta.path("nomeEstudante").asText()).isEqualTo(estudante.getNome());
+        assertThat(aberta.path("usuarioId").asText()).isEqualTo(estudante.getId().toString());
+        assertThat(aberta.path("tituloLivro").asText()).isEqualTo(reservado.getTitulo());
+        assertThat(reservaEmAberto(tokenFuncionario, idEntregue).path("status").asText()).isEqualTo("ENTREGUE");
+        assertThat(reservaEmAberto(tokenFuncionario, idCancelado)).isNull();
+
+        put("/reservas/" + idEntregue + "/devolver", tokenFuncionario, null);
+        assertThat(reservaEmAberto(tokenFuncionario, idEntregue)).isNull();
+        assertThat(get("/reservas/em-aberto", token(estudante)).status()).isEqualTo(403);
+    }
 }
