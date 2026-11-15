@@ -157,8 +157,11 @@ export const usuariosApi = {
 export const reservasApi = {
   listarEmAberto: () => request("/reservas/em-aberto"),
   listarPorUsuario: (usuarioId) => request(`/reservas/usuario/${usuarioId}`),
-  reservar: (usuarioId, livroId) =>
-    request(`/reservas/${usuarioId}/${livroId}`, { method: "POST" }),
+reservar: (usuarioId, livroId, politicaVersao) =>
+  request(
+    `/reservas/${usuarioId}/${livroId}?politicaVersao=${encodeURIComponent(politicaVersao)}`,
+    { method: "POST" }
+  ),
   cancelar: (reservaId) =>
     request(`/reservas/${reservaId}/cancelar`, { method: "PUT" }),
   entregar: (reservaId) =>

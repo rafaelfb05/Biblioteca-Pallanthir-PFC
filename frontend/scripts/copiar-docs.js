@@ -3,7 +3,7 @@ const path = require("path");
 
 const origem = path.resolve(__dirname, "..", "..", "docs");
 const destino = path.resolve(__dirname, "..", "public", "docs");
-const documentos = ["TERMOS_DE_USO.md", "POLITICA_DE_PRIVACIDADE.md"];
+const documentos = ["TERMOS_DE_USO.md", "POLITICA_DE_PRIVACIDADE.md", "POLITICA_DE_RESERVAS.md"];
 
 fs.mkdirSync(destino, { recursive: true });
 

@@ -402,3 +402,17 @@ a {
     grid-template-columns: 1fr;
   }
 }
+.politica-aviso { 
+    margin: 12px 0 0; padding: 12px 14px; border: 1px solid rgba(225, 29, 46, 0.45); background: rgba(225, 29, 46, 0.08); border-radius: 10px; font-size: 0.9rem; 
+  }
+.politica-rodape {
+   gap: 16px; }
+.politica-ciente {
+   display: flex; gap: 10px; align-items: flex-start; font-size: 0.9rem; cursor: pointer; }
+.politica-ciente.desabilitado { 
+  opacity: 0.5; cursor: not-allowed; }
+.politica-ciente input {
+   margin-top: 3px; accent-color: #e11d2e; }
+.documento-ok:disabled, .documento-topo-botao:disabled { 
+  
+  opacity: 0.5; cursor: not-allowed; }

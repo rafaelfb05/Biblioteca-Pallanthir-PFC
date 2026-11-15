@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 import ModalDocumento from "./Componentes/ModalDocumento";
+import ModalPoliticaReserva from "./Componentes/ModalPoliticaReserva";
 import { carregarVersaoDosTermos } from "./services/termos";
 import {
   avaliacoesApi,
@@ -746,6 +747,7 @@ function App() {
   const [favoritoEmEdicao, setFavoritoEmEdicao] = useState(null);
   const [reservas, setReservas] = useState([]);
   const [reservaEmEdicao, setReservaEmEdicao] = useState(null);
+  const [livroParaReservar, setLivroParaReservar] = useState(null);
   const [carrinho, setCarrinho] = useState(CARRINHO_VAZIO);
   const [itemCarrinhoEmEdicao, setItemCarrinhoEmEdicao] = useState(null);
   const [finalizandoCompra, setFinalizandoCompra] = useState(false);
@@ -1859,7 +1861,7 @@ function App() {
     [reservas]
   );
 
-  const reservarLivro = async (livro) => {
+    const reservarLivro = (livro) => {
     if (!usuarioId) {
       setErro("Entre na sua conta para reservar livros.");
       abrirAutenticacao("login");
@@ -1869,11 +1871,15 @@ function App() {
       setErro("Este livro está sem estoque no momento.");
       return;
     }
+    setErro(null);
+    setLivroParaReservar(livro);
+  };
 
+  const confirmarReserva = async (livro, politicaVersao) => {
     try {
       setReservaEmEdicao(livro.id);
       setErro(null);
-      await reservasApi.reservar(usuarioId, livro.id);
+      await reservasApi.reservar(usuarioId, livro.id, politicaVersao);
       setAviso('"' + livro.titulo + '" foi reservado.');
       await Promise.all([carregarLivros(), carregarReservas(usuarioId)]);
     } catch (e) {
@@ -1883,6 +1889,7 @@ function App() {
       console.error(e);
     } finally {
       setReservaEmEdicao(null);
+      setLivroParaReservar(null);
     }
   };
 
@@ -2849,6 +2856,15 @@ function App() {
       aoTrocar={setDocumentoAberto}
     />
   );
+
+        {livroParaReservar && (
+        <ModalPoliticaReserva
+          livro={livroParaReservar}
+          enviando={reservaEmEdicao === livroParaReservar.id}
+          aoFechar={() => setLivroParaReservar(null)}
+          aoConfirmar={(versao) => confirmarReserva(livroParaReservar, versao)}
+        />
+      )}
 
   const modalAutenticacao = mostrarAutenticacao && (
     <div className="modal modal-auth">
