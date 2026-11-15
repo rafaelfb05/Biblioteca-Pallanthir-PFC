@@ -545,6 +545,62 @@ function FiltroPorAluno({ alunos, total, selecionado, aoSelecionar }) {
   );
 }
 
+const tempoRestante = (prazo) => {
+  const fim = prazo ? new Date(prazo).getTime() : NaN;
+  if (Number.isNaN(fim)) {
+    return null;
+  }
+  const diferenca = fim - Date.now();
+  if (diferenca <= 0) {
+    return { texto: "prazo encerrado", urgente: true };
+  }
+  const minutos = Math.floor(diferenca / 60000);
+  const dias = Math.floor(minutos / 1440);
+  const horas = Math.floor((minutos % 1440) / 60);
+  let texto;
+  if (dias >= 1) {
+    texto =
+      (dias === 1 ? "falta 1 dia" : "faltam " + dias + " dias") +
+      (horas > 0 ? " e " + horas + " h" : "");
+  } else if (horas >= 1) {
+    texto = horas === 1 ? "falta 1 h" : "faltam " + horas + " h";
+  } else {
+    texto = "faltam " + Math.max(1, minutos) + " min";
+  }
+  return { texto, urgente: diferenca < 24 * 60 * 60 * 1000 };
+};
+
+function PrazoDeRetirada({ prazo, aviso }) {
+  const restante = tempoRestante(prazo);
+  if (!restante) {
+    return null;
+  }
+  return (
+    <div className={"prazo-retirada" + (restante.urgente ? " urgente" : "")}>
+      <svg
+        viewBox="0 0 24 24"
+        width="15"
+        height="15"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 7v5l3 2" />
+      </svg>
+      <div>
+        <span>
+          Retire até <strong>{formatarData(prazo)}</strong> · {restante.texto}
+        </span>
+        {aviso && <small>{aviso}</small>}
+      </div>
+    </div>
+  );
+}
+
 function CapaGenerica({ titulo, tamanho }) {
   return (
     <div
@@ -3313,6 +3369,12 @@ function App() {
               Pagamento aprovado. Retire os livros no balcão da biblioteca.
             </p>
           )}
+          {pedidoDetalhado.status === "APROVADO" && (
+            <PrazoDeRetirada
+              prazo={pedidoDetalhado.prazoRetirada}
+              aviso="Se a compra não for retirada até lá, ela é reembolsada automaticamente."
+            />
+          )}
           {pedidoDetalhado.status === "ENTREGUE" && (
             <p>
               Livros retirados na biblioteca em{" "}
@@ -3808,6 +3870,8 @@ function App() {
                       </strong>
                     </div>
 
+                    <PrazoDeRetirada prazo={pedido.prazoRetirada} />
+
                     <ul className="retirada-itens">
                       {(pedido.itens || []).map((item) => (
                         <li key={item.livroId}>
@@ -3916,6 +3980,10 @@ function App() {
                         </div>
                       </li>
                     </ul>
+
+                    {reserva.status === "RESERVADO" && (
+                      <PrazoDeRetirada prazo={reserva.prazoRetirada} />
+                    )}
 
                     <div className="retirada-acoes">
                       {reserva.status === "RESERVADO" ? (
@@ -4526,6 +4594,12 @@ function App() {
                     </span>
                     <h3>{reserva.tituloLivro}</h3>
                     <small>Reservado em {formatarData(reserva.dataReserva)}</small>
+                    {reserva.status === "RESERVADO" && (
+                      <PrazoDeRetirada
+                        prazo={reserva.prazoRetirada}
+                        aviso="Se o livro não for retirado até lá, a reserva é cancelada automaticamente."
+                      />
+                    )}
                   </div>
 
                   {reserva.status === "RESERVADO" && (
@@ -4810,6 +4884,12 @@ function App() {
                     {pedido.status === "APROVADO" && (
                       <small>Retire os livros no balcão da biblioteca.</small>
                     )}
+                    {pedido.status === "APROVADO" && (
+                      <PrazoDeRetirada
+                        prazo={pedido.prazoRetirada}
+                        aviso="Se a compra não for retirada até lá, ela é reembolsada automaticamente."
+                      />
+                    )}
                     {pedido.status === "ENTREGUE" && (
                       <small>Retirado em {formatarData(pedido.dataEntrega)}</small>
                     )}
@@ -4843,18 +4923,6 @@ function App() {
                           Pagar com Mercado Pago
                         </button>
                       )}
-                    {pedido.status === "APROVADO" && (
-                      <button
-                        type="button"
-                        className="pedido-reembolso-botao"
-                        onClick={() => {
-                          setErroReembolso(null);
-                          setPedidoParaReembolso(pedido);
-                        }}
-                      >
-                        Solicitar reembolso
-                      </button>
-                    )}
                   </div>
                 </div>
               ))}

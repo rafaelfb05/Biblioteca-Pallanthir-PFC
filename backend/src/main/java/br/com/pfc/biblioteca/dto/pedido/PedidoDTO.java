@@ -12,11 +12,12 @@ import java.util.stream.Collectors;
 public record PedidoDTO(UUID id, StatusPedido status, BigDecimal total,
                         LocalDateTime dataCriacao, LocalDateTime dataExpiracao,
                         String linkPagamento, List<ItemPedidoDTO> itens,
-                        LocalDateTime dataEntrega, LocalDateTime dataReembolso) {
+                        LocalDateTime dataEntrega, LocalDateTime dataReembolso,
+                        LocalDateTime prazoRetirada) {
 
     public PedidoDTO(Pedido p){
         this(p.getId(), p.getStatus(), p.getTotal(), p.getDataCriacao(), p.getDataExpiracao(),
                 p.getLinkPagamento(), p.getItens().stream().map(ItemPedidoDTO::new).collect(Collectors.toList()),
-                p.getDataEntrega(), p.getDataReembolso());
+                p.getDataEntrega(), p.getDataReembolso(), p.getPrazoRetirada());
     }
 }

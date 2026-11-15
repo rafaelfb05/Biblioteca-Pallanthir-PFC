@@ -1,16 +1,28 @@
 package br.com.pfc.biblioteca.integracao;
 
 import br.com.pfc.biblioteca.entity.jpa.Livro;
+import br.com.pfc.biblioteca.entity.jpa.Reserva;
 import br.com.pfc.biblioteca.entity.jpa.Usuario;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.junit.jupiter.api.Test;
+import br.com.pfc.biblioteca.schedule.PrazosDeRetiradaJob;
+import br.com.pfc.biblioteca.service.ReservaService;
+import org.springframework.beans.factory.annotation.Autowired;
 
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class ReservaIntegracaoTest extends TesteIntegracaoBase {
+
+    @Autowired
+    private PrazosDeRetiradaJob prazosDeRetiradaJob;
+
+    @Autowired
+    private ReservaService reservaService;
 
     private Resposta reservar(Usuario usuario, Livro livro) {
         return post("/reservas/" + usuario.getId() + "/" + livro.getId(), token(usuario), null);
@@ -216,5 +228,45 @@ class ReservaIntegracaoTest extends TesteIntegracaoBase {
         put("/reservas/" + idEntregue + "/devolver", tokenFuncionario, null);
         assertThat(reservaEmAberto(tokenFuncionario, idEntregue)).isNull();
         assertThat(get("/reservas/em-aberto", token(estudante)).status()).isEqualTo(403);
+    }
+
+    @Test
+    void reservaNaoRetiradaEmTresDiasECanceladaAutomaticamente() {
+        Usuario estudante = criarEstudante();
+        Livro vencido = criarLivro(30, 1, 0);
+        Livro noPrazo = criarLivro(30, 1, 0);
+        reservar(estudante, vencido);
+        reservar(estudante, noPrazo);
+        UUID idVencida = UUID.fromString(reservaDoLivro(estudante, vencido).path("id").asText());
+        Reserva antiga = reservaRepository.findById(idVencida).orElseThrow();
+        antiga.setDataReserva(LocalDateTime.now().minusDays(3).minusMinutes(5));
+        reservaRepository.save(antiga);
+
+        assertThat(reservaDoLivro(estudante, noPrazo).path("prazoRetirada").asText()).isNotBlank();
+        assertThat(reservaService.reservasComPrazoVencido()).contains(idVencida);
+
+        prazosDeRetiradaJob.verificarPrazos();
+
+        assertThat(reservaDoLivro(estudante, vencido).path("status").asText()).isEqualTo("CANCELADO");
+        assertThat(reservaDoLivro(estudante, vencido).path("prazoRetirada").isNull()).isTrue();
+        assertThat(recarregar(vencido).getEstoqueReserva()).isEqualTo(1);
+        assertThat(reservaDoLivro(estudante, noPrazo).path("status").asText()).isEqualTo("RESERVADO");
+        assertThat(recarregar(noPrazo).getEstoqueReserva()).isZero();
+    }
+
+    @Test
+    void reservaJaEntregueNaoECanceladaPeloPrazo() {
+        Usuario estudante = criarEstudante();
+        Livro livro = criarLivro(30, 1, 0);
+        reservar(estudante, livro);
+        String id = reservaDoLivro(estudante, livro).path("id").asText();
+        put("/reservas/" + id + "/entregar", token(criarFuncionario()), null);
+        Reserva entregue = reservaRepository.findById(UUID.fromString(id)).orElseThrow();
+        entregue.setDataReserva(LocalDateTime.now().minusDays(10));
+        reservaRepository.save(entregue);
+
+        prazosDeRetiradaJob.verificarPrazos();
+
+        assertThat(reservaDoLivro(estudante, livro).path("status").asText()).isEqualTo("ENTREGUE");
     }
 }

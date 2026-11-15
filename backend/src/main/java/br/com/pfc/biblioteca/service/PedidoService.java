@@ -166,6 +166,7 @@ public class PedidoService {
 
         if (pago) {
             pedido.setStatus(StatusPedido.APROVADO);
+            pedido.setDataPagamento(LocalDateTime.now());
             repository.save(pedido);
             removerDoCarrinho(pedido);
             logService.registrarLog(pedido.getUsuario().getId(), pedido.getUsuario().getEmail(),
@@ -238,6 +239,35 @@ public class PedidoService {
             livro.setEstoqueCompra(atual + item.getQuantidade());
             livroRepository.save(livro);
         }
+    }
+
+    @Transactional(readOnly = true)
+    public List<UUID> comprasComPrazoVencido() {
+        LocalDateTime agora = LocalDateTime.now();
+        return repository.findByStatusOrderByDataCriacaoAsc(StatusPedido.APROVADO).stream()
+                .filter(pedido -> pedido.getPrazoRetirada() != null && pedido.getPrazoRetirada().isBefore(agora))
+                .map(Pedido::getId)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public void reembolsarPorPrazo(UUID pedidoId) {
+        Pedido pedido = repository.buscarComLock(pedidoId).orElse(null);
+        if (pedido == null || pedido.getStatus() != StatusPedido.APROVADO
+                || pedido.getPrazoRetirada() == null || pedido.getPrazoRetirada().isAfter(LocalDateTime.now())) {
+            return;
+        }
+
+        devolverEstoque(pedido);
+        pedido.setStatus(StatusPedido.REEMBOLSADO);
+        pedido.setDataReembolso(LocalDateTime.now());
+        repository.save(pedido);
+
+        mercadoPagoService.reembolsarOrder(pedido.getMpOrderId());
+
+        logService.registrarLog(pedido.getUsuario().getId(), pedido.getUsuario().getEmail(), "PEDIDO_REEMBOLSADO_AUTOMATICO",
+                "Pedido " + pedido.getId() + " reembolsado automaticamente: não foi retirado em "
+                        + Pedido.DIAS_PARA_RETIRADA + " dias, order " + pedido.getMpOrderId());
     }
 
     @Transactional
