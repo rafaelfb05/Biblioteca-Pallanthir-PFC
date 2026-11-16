@@ -46,7 +46,7 @@ public class DashboardService {
         PageRequest top5 = PageRequest.of(0, 5);
         return new DashboardDTO(estoque, reservas,
                 paraDTO(reservaRepository.materiasMaisReservadas(StatusReserva.DEVOLVIDO, top5)),
-                paraDTO(pedidoRepository.materiasMaisCompradas(StatusPedido.APROVADO, top5)));
+                paraDTO(pedidoRepository.materiasMaisCompradas(List.of(StatusPedido.APROVADO, StatusPedido.ENTREGUE), top5)));
     }
 
     private List<MateriaDTO> paraDTO(List<Object[]> linhas) {

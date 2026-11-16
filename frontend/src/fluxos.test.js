@@ -1070,3 +1070,44 @@ test("gerente promove e exclui funcionários na página Equipe", async () => {
   expect(chamadasPara("DELETE", "/usuarios/funcionarios/f2")).toHaveLength(1);
   await waitFor(() => expect(screen.queryByText("carla@teste.com")).not.toBeInTheDocument());
 });
+
+test("logs mostram o nome do usuário no lugar do id e são divididos em páginas de 50", async () => {
+  const ID_ALUNO = "193ac812-d66f-4d61-8889-4e7f16b29353";
+  const logs = Array.from({ length: 120 }, (_, i) => ({
+    id: "log" + i,
+    acao: "ENTREGA_LIVRO",
+    dataHora: "2026-11-15T21:" + String(59 - (i % 60)).padStart(2, "0") + ":00",
+    usuarioId: ID_USUARIO,
+    usuarioEmail: "ana@teste.com",
+    descricao: "Reserva " + i + " do livro " + ID_LIVRO + " do usuário " + ID_ALUNO + " entregue",
+  }));
+  simularApi({
+    "GET /logs": () => [200, logs],
+    "GET /usuarios": () => [
+      200,
+      [
+        { id: ID_USUARIO, nome: "Ana Gerente", email: "ana@teste.com", tipo: "GERENTE" },
+        { id: ID_ALUNO, nome: "Bruno Aluno", email: "bruno@teste.com", tipo: "ESTUDANTE" },
+      ],
+    ],
+  });
+  entrarComo("GERENTE");
+  render(<App />);
+
+  await screen.findByRole("heading", { name: "Clean Code" });
+  fireEvent.click(screen.getByRole("button", { name: "Logs" }));
+  expect(await screen.findByText("Reserva 0 do livro \u201cClean Code\u201d do usuário Bruno Aluno entregue")).toBeInTheDocument();
+  expect(screen.queryByText(new RegExp(ID_ALUNO))).not.toBeInTheDocument();
+  expect(screen.getAllByText("Ana Gerente").length).toBeGreaterThan(0);
+
+  const tabela = screen.getByRole("table");
+  expect(within(tabela).getAllByRole("row")).toHaveLength(51);
+  expect(screen.getByText("Mostrando 1–50 de 120 registros")).toBeInTheDocument();
+
+  const paginas = screen.getByRole("navigation", { name: "Páginas de logs" });
+  fireEvent.click(within(paginas).getByRole("button", { name: "Página 3" }));
+  expect(await screen.findByText("Mostrando 101–120 de 120 registros")).toBeInTheDocument();
+  expect(within(screen.getByRole("table")).getAllByRole("row")).toHaveLength(21);
+  expect(screen.getByText(/^Reserva 100 do livro/)).toBeInTheDocument();
+});
+

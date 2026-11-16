@@ -4979,3 +4979,23 @@ html {
     margin-left: 0;
   }
 }
+
+.logs-usuario {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.logs-usuario strong {
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.logs-usuario small {
+  color: #8a8a93;
+  font-size: 12px;
+}
+
+.logs-paginacao-resumo {
+  text-align: center;
+}

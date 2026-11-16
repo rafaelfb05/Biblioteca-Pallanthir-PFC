@@ -64,7 +64,9 @@ const LIMITE_COMENTARIO = 500;
 const NOTAS = [1, 2, 3, 4, 5];
 const FILTRO_LOGS_VAZIO = { usuarioId: "", texto: "", acao: "", de: "", ate: "" };
 const LIMITE_DE_LOGS = 500;
+const LOGS_POR_PAGINA = 50;
 const LIVROS_POR_PAGINA = 18;
+const UUID_NO_TEXTO = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
 
 const paginasVisiveis = (atual, total) => {
   if (total <= 7) {
@@ -85,6 +87,49 @@ const paginasVisiveis = (atual, total) => {
   paginas.push(total);
   return paginas;
 };
+function Paginacao({ atual, total, rotulo, aoTrocar }) {
+  return (
+    <nav className="paginacao" aria-label={rotulo}>
+      <button
+        type="button"
+        className="paginacao-seta"
+        onClick={() => aoTrocar(atual - 1)}
+        disabled={atual === 1}
+      >
+        ← Anterior
+      </button>
+      <div className="paginacao-numeros">
+        {paginasVisiveis(atual, total).map((numero, indice) =>
+          numero === "…" ? (
+            <span key={"reticencias-" + indice} className="paginacao-reticencias">
+              …
+            </span>
+          ) : (
+            <button
+              type="button"
+              key={numero}
+              className={"paginacao-numero" + (numero === atual ? " atual" : "")}
+              aria-current={numero === atual ? "page" : undefined}
+              aria-label={"Página " + numero}
+              onClick={() => aoTrocar(numero)}
+            >
+              {numero}
+            </button>
+          )
+        )}
+      </div>
+      <button
+        type="button"
+        className="paginacao-seta"
+        onClick={() => aoTrocar(atual + 1)}
+        disabled={atual === total}
+      >
+        Próxima →
+      </button>
+    </nav>
+  );
+}
+
 const CHAVE_SESSAO = "pallanthir:usuario";
 const FORMATO_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -934,6 +979,7 @@ function App() {
   const [alunoReservas, setAlunoReservas] = useState("");
   const [alunoCompras, setAlunoCompras] = useState("");
   const [logs, setLogs] = useState([]);
+  const [paginaLogs, setPaginaLogs] = useState(1);
   const [acoesRegistradas, setAcoesRegistradas] = useState([]);
   const [dashboard, setDashboard] = useState(null);
   const [filtroLogs, setFiltroLogs] = useState(FILTRO_LOGS_VAZIO);
@@ -2526,6 +2572,44 @@ function App() {
       );
     });
   }, [logs, filtroLogs.texto, filtroLogs.acao, filtroLogs.de, filtroLogs.ate]);
+
+  useEffect(() => {
+    setPaginaLogs(1);
+  }, [logsExibidos]);
+
+  const totalPaginasLogs = Math.max(1, Math.ceil(logsExibidos.length / LOGS_POR_PAGINA));
+  const paginaLogsAtual = Math.min(paginaLogs, totalPaginasLogs);
+  const logsDaPagina = logsExibidos.slice(
+    (paginaLogsAtual - 1) * LOGS_POR_PAGINA,
+    paginaLogsAtual * LOGS_POR_PAGINA
+  );
+
+  const nomesDosUsuarios = useMemo(
+    () => new Map(usuariosGestao.map((item) => [String(item.id).toLowerCase(), item.nome])),
+    [usuariosGestao]
+  );
+
+  const titulosDosLivros = useMemo(
+    () => new Map(livros.map((item) => [String(item.id).toLowerCase(), item.titulo])),
+    [livros]
+  );
+
+  const descricaoDoLog = (texto) =>
+    String(texto || "").replace(UUID_NO_TEXTO, (id) => {
+      const chave = id.toLowerCase();
+      if (nomesDosUsuarios.has(chave)) {
+        return nomesDosUsuarios.get(chave);
+      }
+      if (titulosDosLivros.has(chave)) {
+        return "\u201c" + titulosDosLivros.get(chave) + "\u201d";
+      }
+      return id;
+    });
+
+  const irParaPaginaDeLogs = (numero) => {
+    setPaginaLogs(numero);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   const filtrosDeLogsAtivos = Boolean(
     filtroLogs.texto || filtroLogs.acao || filtroLogs.de || filtroLogs.ate
@@ -5013,7 +5097,7 @@ function App() {
                       </tr>
                     </thead>
                     <tbody>
-                      {logsExibidos.map((log) => (
+                      {logsDaPagina.map((log) => (
                         <tr key={log.id}>
                           <td className="logs-data">{formatarData(log.dataHora)}</td>
                           <td>
@@ -5021,13 +5105,45 @@ function App() {
                               {log.acao}
                             </span>
                           </td>
-                          <td>{log.usuarioEmail || "—"}</td>
-                          <td>{log.descricao}</td>
+                          <td>
+                            {log.usuarioId &&
+                            nomesDosUsuarios.has(String(log.usuarioId).toLowerCase()) ? (
+                              <span className="logs-usuario">
+                                <strong>
+                                  {nomesDosUsuarios.get(String(log.usuarioId).toLowerCase())}
+                                </strong>
+                                <small>{log.usuarioEmail}</small>
+                              </span>
+                            ) : (
+                              log.usuarioEmail || "—"
+                            )}
+                          </td>
+                          <td>{descricaoDoLog(log.descricao)}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
+              )}
+
+              {totalPaginasLogs > 1 && (
+                <>
+                  <Paginacao
+                    atual={paginaLogsAtual}
+                    total={totalPaginasLogs}
+                    rotulo="Páginas de logs"
+                    aoTrocar={irParaPaginaDeLogs}
+                  />
+                  <p className="paginacao-resumo logs-paginacao-resumo">
+                    {"Mostrando " +
+                      ((paginaLogsAtual - 1) * LOGS_POR_PAGINA + 1) +
+                      "–" +
+                      Math.min(paginaLogsAtual * LOGS_POR_PAGINA, logsExibidos.length) +
+                      " de " +
+                      logsExibidos.length +
+                      " registros"}
+                  </p>
+                </>
               )}
             </>
           )}

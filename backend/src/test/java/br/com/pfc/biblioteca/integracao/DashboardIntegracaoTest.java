@@ -49,4 +49,23 @@ class DashboardIntegracaoTest extends TesteIntegracaoBase {
         assertThat(quantidadeDaMateria(depois.path("materiasMaisCompradas"), "MEDICINA")
                 - quantidadeDaMateria(antes.path("materiasMaisCompradas"), "MEDICINA")).isEqualTo(2);
     }
+
+    @Test
+    void compraRetiradaContinuaNasMateriasMaisCompradas() {
+        String funcionario = token(criarFuncionario());
+        Usuario estudante = criarEstudante();
+        Livro livro = criarLivro(Materia.ODONTOLOGIA, 30, 0, 5);
+        adicionarAoCarrinho(token(estudante), livro, 3);
+        String pedidoId = post("/pedidos/checkout", token(estudante), null).corpo().path("id").asText();
+        String orderId = orderDoPedido(pedidoId);
+        definirStatusNoMercadoPago(orderId, "processed");
+        notificarWebhook(orderId, SEGREDO_WEBHOOK);
+        long antes = quantidadeDaMateria(get("/dashboard", funcionario).corpo().path("materiasMaisCompradas"), "ODONTOLOGIA");
+
+        assertThat(put("/pedidos/" + pedidoId + "/entregar", funcionario, null).status()).isEqualTo(200);
+
+        long depois = quantidadeDaMateria(get("/dashboard", funcionario).corpo().path("materiasMaisCompradas"), "ODONTOLOGIA");
+        assertThat(depois).isEqualTo(antes);
+        assertThat(antes).isGreaterThanOrEqualTo(3);
+    }
 }

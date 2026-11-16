@@ -37,9 +37,9 @@ public interface PedidoRepository extends JpaRepository<Pedido, UUID> {
 
     @Query("""
         SELECT i.livro.materia, SUM(i.quantidade) FROM ItemPedido i
-        WHERE i.pedido.status = :status AND i.livro.materia IS NOT NULL
+        WHERE i.pedido.status IN :status AND i.livro.materia IS NOT NULL
         GROUP BY i.livro.materia
         ORDER BY SUM(i.quantidade) DESC
         """)
-    List<Object[]> materiasMaisCompradas(StatusPedido status, PageRequest pageRequest);
+    List<Object[]> materiasMaisCompradas(Collection<StatusPedido> status, PageRequest pageRequest);
 }
