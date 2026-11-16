@@ -112,6 +112,7 @@ public class ReservaService {
         }
 
         reserva.setStatus(StatusReserva.ENTREGUE);
+        reserva.setDataEntrega(LocalDateTime.now());
         repository.save(reserva);
         logService.registrarLogUsuarioLogado("ENTREGA_LIVRO", "Reserva " + reservaId + " do usuário " + reserva.getUsuario().getId() + " entregue");
     }

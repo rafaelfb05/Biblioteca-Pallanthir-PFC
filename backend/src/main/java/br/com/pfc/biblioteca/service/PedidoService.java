@@ -164,7 +164,7 @@ public class PedidoService {
         boolean pago = "processed".equals(order.status());
 
         if (pedido.getStatus() != StatusPedido.AGUARDANDO_PAGAMENTO) {
-            if (pago && pedido.getStatus() == StatusPedido.EXPIRADO) {
+            if (pago && (pedido.getStatus() == StatusPedido.EXPIRADO || pedido.getStatus() == StatusPedido.CANCELADO)) {
                 logService.registrarLog(pedido.getUsuario().getId(), pedido.getUsuario().getEmail(),
                         "PAGAMENTO_EM_PEDIDO_EXPIRADO", "Pedido " + pedido.getId() + ", order " + orderId);
             }
@@ -275,6 +275,35 @@ public class PedidoService {
         logService.registrarLog(pedido.getUsuario().getId(), pedido.getUsuario().getEmail(), "PEDIDO_REEMBOLSADO_AUTOMATICO",
                 "Pedido " + pedido.getId() + " reembolsado automaticamente: não foi retirado em "
                         + Pedido.DIAS_PARA_RETIRADA + " dias, order " + pedido.getMpOrderId());
+    }
+
+    @Transactional
+    public PedidoDTO cancelarPedido(UUID pedidoId) {
+        Usuario usuario = usuarioLogado();
+        Pedido pedido = repository.buscarComLock(pedidoId)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Pedido não encontrado"));
+
+        if (!pedido.getUsuario().getId().equals(usuario.getId())) {
+            throw new RegraDeNegocioException("Você só pode cancelar os seus próprios pedidos");
+        }
+        if (pedido.getStatus() != StatusPedido.AGUARDANDO_PAGAMENTO) {
+            throw new ConflitoException("Só é possível cancelar pedidos que ainda aguardam pagamento");
+        }
+
+        if (pedido.getMpOrderId() != null && !pedido.getMpOrderId().isBlank()) {
+            MercadoPagoService.OrderMP order = mercadoPagoService.buscarOrder(pedido.getMpOrderId());
+            if (order != null && "processed".equals(order.status())) {
+                throw new ConflitoException("O pagamento deste pedido já foi aprovado. Para desistir da compra, solicite o reembolso nos detalhes do pedido.");
+            }
+            mercadoPagoService.cancelarOrder(pedido.getMpOrderId());
+        }
+
+        devolverEstoque(pedido);
+        pedido.setStatus(StatusPedido.CANCELADO);
+        repository.save(pedido);
+        logService.registrarLog(usuario.getId(), usuario.getEmail(), "PEDIDO_CANCELADO",
+                "Pedido " + pedido.getId() + " cancelado pelo estudante antes do pagamento");
+        return new PedidoDTO(pedido);
     }
 
     @Transactional

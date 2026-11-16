@@ -7,10 +7,12 @@ import br.com.pfc.biblioteca.entity.jpa.Reserva;
 import java.time.LocalDateTime;
 
 public record ReservaDTO(UUID id, UUID livroId, String tituloLivro, LocalDateTime dataReserva, StatusReserva status,
-                         LocalDateTime prazoRetirada) {
+                         LocalDateTime prazoRetirada, String capaUrl, LocalDateTime dataEntrega,
+                         LocalDateTime prazoDevolucao) {
 
     public ReservaDTO(Reserva reserva){
         this(reserva.getId(), reserva.getLivro().getId(), reserva.getLivro().getTitulo(),
-                reserva.getDataReserva(), reserva.getStatus(), reserva.getPrazoRetirada());
+                reserva.getDataReserva(), reserva.getStatus(), reserva.getPrazoRetirada(),
+                reserva.getLivro().getCapaUrl(), reserva.getDataEntrega(), reserva.getPrazoDevolucao());
     }
 }

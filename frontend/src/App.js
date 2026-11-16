@@ -275,6 +275,7 @@ const ROTULO_STATUS_PEDIDO = {
   APROVADO: "Pago · aguardando retirada",
   ENTREGUE: "Retirado",
   EXPIRADO: "Expirado",
+  CANCELADO: "Cancelado",
   REEMBOLSADO: "Reembolsado",
 };
 
@@ -601,13 +602,24 @@ const tempoRestante = (prazo) => {
   return { texto, urgente: diferenca < 24 * 60 * 60 * 1000 };
 };
 
-function PrazoDeRetirada({ prazo, aviso }) {
+function PrazoDeRetirada({
+  prazo,
+  aviso,
+  rotulo = "Retire até",
+  textoVencido = "prazo encerrado",
+}) {
   const restante = tempoRestante(prazo);
   if (!restante) {
     return null;
   }
+  const vencido = restante.texto === "prazo encerrado";
   return (
-    <div className={"prazo-retirada" + (restante.urgente ? " urgente" : "")}>
+    <div
+      className={
+        "prazo-retirada" +
+        (vencido ? " vencido" : restante.urgente ? " urgente" : "")
+      }
+    >
       <svg
         viewBox="0 0 24 24"
         width="15"
@@ -624,7 +636,8 @@ function PrazoDeRetirada({ prazo, aviso }) {
       </svg>
       <div>
         <span>
-          Retire até <strong>{formatarData(prazo)}</strong> · {restante.texto}
+          {rotulo} <strong>{formatarData(prazo)}</strong> ·{" "}
+          {vencido ? textoVencido : restante.texto}
         </span>
         {aviso && <small>{aviso}</small>}
       </div>
@@ -842,6 +855,8 @@ function App() {
   const [pedidos, setPedidos] = useState([]);
   const [pedidoDetalhado, setPedidoDetalhado] = useState(null);
   const [pedidoParaReembolso, setPedidoParaReembolso] = useState(null);
+  const [pedidoParaCancelar, setPedidoParaCancelar] = useState(null);
+  const [erroCancelamento, setErroCancelamento] = useState(null);
   const [erroReembolso, setErroReembolso] = useState(null);
   const [retiradas, setRetiradas] = useState([]);
   const [buscaRetiradas, setBuscaRetiradas] = useState("");
@@ -1646,6 +1661,30 @@ function App() {
         ? { bloqueado: true, mensagem: MENSAGEM_EXCLUSAO_COM_PEDIDOS }
         : { bloqueado: false }
     );
+  };
+
+  const confirmarCancelamentoDoPedido = async () => {
+    const pedido = pedidoParaCancelar;
+    try {
+      setSalvando(true);
+      setErroCancelamento(null);
+      await pedidosApi.cancelar(pedido.id);
+      setPedidoParaCancelar(null);
+      setPedidoDetalhado(null);
+      setAviso(
+        "Pedido #" +
+          numeroDoPedido(pedido.id) +
+          " cancelado. Os livros continuam no seu carrinho."
+      );
+      await Promise.all([carregarPedidos(), carregarCarrinho(), carregarLivros()]);
+    } catch (e) {
+      setErroCancelamento(
+        mensagemDeErro(e, "Não foi possível cancelar o pedido. Tente novamente.")
+      );
+      console.error(e);
+    } finally {
+      setSalvando(false);
+    }
   };
 
   const confirmarReembolso = async () => {
@@ -3630,6 +3669,9 @@ function App() {
           {pedidoDetalhado.status === "EXPIRADO" && (
             <p>O prazo de pagamento terminou ou o pagamento foi cancelado.</p>
           )}
+          {pedidoDetalhado.status === "CANCELADO" && (
+            <p>Você cancelou este pedido antes do pagamento.</p>
+          )}
           <div>
             <span>Total</span>
             <strong>{formatarPreco(pedidoDetalhado.total)}</strong>
@@ -3646,6 +3688,18 @@ function App() {
                 Pagar com Mercado Pago
               </button>
             )}
+          {pedidoDetalhado.status === "AGUARDANDO_PAGAMENTO" && (
+            <button
+              type="button"
+              className="pedido-detalhes-fechar"
+              onClick={() => {
+                setErroCancelamento(null);
+                setPedidoParaCancelar(pedidoDetalhado);
+              }}
+            >
+              Cancelar pedido
+            </button>
+          )}
           {pedidoDetalhado.status === "APROVADO" && (
             <button
               type="button"
@@ -3664,6 +3718,51 @@ function App() {
             onClick={() => setPedidoDetalhado(null)}
           >
             Fechar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  const modalCancelamentoPedido = pedidoParaCancelar && (
+    <div
+      className="modal modal-reembolso"
+      onClick={() => !salvando && setPedidoParaCancelar(null)}
+    >
+      <div
+        className="modal-box dialogo perigo"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="cancelamento-titulo"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="dialogo-icone" aria-hidden="true">
+          ✕
+        </div>
+        <h3 id="cancelamento-titulo">Cancelar o pedido?</h3>
+        <p>
+          O pedido #{numeroDoPedido(pedidoParaCancelar.id)} de{" "}
+          <strong>{formatarPreco(pedidoParaCancelar.total)}</strong> será
+          cancelado e o link de pagamento deixará de funcionar. Os livros
+          continuam no seu carrinho, caso queira comprar depois.
+        </p>
+        {erroCancelamento && <p className="erro">{erroCancelamento}</p>}
+        <div className="dialogo-acoes">
+          <button
+            type="button"
+            className="dialogo-secundario"
+            onClick={() => setPedidoParaCancelar(null)}
+            disabled={salvando}
+          >
+            Voltar
+          </button>
+          <button
+            type="button"
+            className="dialogo-principal"
+            onClick={confirmarCancelamentoDoPedido}
+            disabled={salvando}
+          >
+            {salvando ? "Cancelando..." : "Cancelar pedido"}
           </button>
         </div>
       </div>
@@ -4477,6 +4576,13 @@ function App() {
                     {reserva.status === "RESERVADO" && (
                       <PrazoDeRetirada prazo={reserva.prazoRetirada} />
                     )}
+                    {reserva.status === "ENTREGUE" && (
+                      <PrazoDeRetirada
+                        prazo={reserva.prazoDevolucao}
+                        rotulo="Devolução até"
+                        textoVencido="devolução atrasada"
+                      />
+                    )}
 
                     <div className="retirada-acoes">
                       {reserva.status === "RESERVADO" ? (
@@ -5078,6 +5184,12 @@ function App() {
             <div className="reservas">
               {reservas.map((reserva) => (
                 <div className="reserva-card" key={reserva.id}>
+                  <div className="reserva-capa">
+                    <CapaDoItem
+                      capaUrl={reserva.capaUrl}
+                      titulo={reserva.tituloLivro}
+                    />
+                  </div>
                   <div className="reserva-info">
                     <span
                       className={
@@ -5087,11 +5199,24 @@ function App() {
                       {ROTULO_STATUS_RESERVA[reserva.status] || reserva.status}
                     </span>
                     <h3>{reserva.tituloLivro}</h3>
-                    <small>Reservado em {formatarData(reserva.dataReserva)}</small>
+                    <small>
+                      Reservado em {formatarData(reserva.dataReserva)}
+                      {reserva.dataEntrega
+                        ? " · retirado em " + formatarData(reserva.dataEntrega)
+                        : ""}
+                    </small>
                     {reserva.status === "RESERVADO" && (
                       <PrazoDeRetirada
                         prazo={reserva.prazoRetirada}
                         aviso="Se o livro não for retirado até lá, a reserva é cancelada automaticamente."
+                      />
+                    )}
+                    {reserva.status === "ENTREGUE" && (
+                      <PrazoDeRetirada
+                        prazo={reserva.prazoDevolucao}
+                        rotulo="Devolva até"
+                        textoVencido="devolução atrasada"
+                        aviso="Leve o livro até a biblioteca. Um funcionário registra a devolução."
                       />
                     )}
                   </div>
@@ -5375,6 +5500,9 @@ function App() {
                         cancelado.
                       </small>
                     )}
+                    {pedido.status === "CANCELADO" && (
+                      <small>Você cancelou este pedido antes do pagamento.</small>
+                    )}
                     {pedido.status === "APROVADO" && (
                       <small>Retire os livros no balcão da biblioteca.</small>
                     )}
@@ -5417,6 +5545,18 @@ function App() {
                           Pagar com Mercado Pago
                         </button>
                       )}
+                    {pedido.status === "AGUARDANDO_PAGAMENTO" && (
+                      <button
+                        type="button"
+                        className="pedido-cancelar-botao"
+                        onClick={() => {
+                          setErroCancelamento(null);
+                          setPedidoParaCancelar(pedido);
+                        }}
+                      >
+                        Cancelar pedido
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -5428,6 +5568,7 @@ function App() {
         {modalAutenticacao}
         {modalDetalhesDoPedido}
         {modalReembolso}
+        {modalCancelamentoPedido}
       </div>
     );
   }

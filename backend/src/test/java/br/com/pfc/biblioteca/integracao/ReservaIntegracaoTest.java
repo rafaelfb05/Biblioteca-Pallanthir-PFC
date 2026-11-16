@@ -284,4 +284,24 @@ class ReservaIntegracaoTest extends TesteIntegracaoBase {
         assertThat(post("/reservas/" + estudante.getId() + "/" + criarLivro(30, 2, 0).getId() + "?politicaVersao=" + "x".repeat(70),
                 token(estudante), null).status()).isEqualTo(400);
     }
+
+    @Test
+    void entregaDaPrazoDeSeteDiasParaDevolverEMostraACapa() {
+        Usuario estudante = criarEstudante();
+        Livro livro = criarLivro(30, 1, 0);
+        livro.setCapaUrl("https://covers.openlibrary.org/b/isbn/1-L.jpg");
+        livroRepository.save(livro);
+        reservar(estudante, livro);
+        assertThat(reservaDoLivro(estudante, livro).path("capaUrl").asText()).isEqualTo("https://covers.openlibrary.org/b/isbn/1-L.jpg");
+        assertThat(reservaDoLivro(estudante, livro).path("prazoDevolucao").isNull()).isTrue();
+        String id = reservaDoLivro(estudante, livro).path("id").asText();
+
+        put("/reservas/" + id + "/entregar", token(criarFuncionario()), null);
+
+        JsonNode entregue = reservaDoLivro(estudante, livro);
+        LocalDateTime dataEntrega = LocalDateTime.parse(entregue.path("dataEntrega").asText());
+        LocalDateTime prazo = LocalDateTime.parse(entregue.path("prazoDevolucao").asText());
+        assertThat(prazo).isEqualTo(dataEntrega.plusDays(7));
+        assertThat(entregue.path("prazoRetirada").isNull()).isTrue();
+    }
 }

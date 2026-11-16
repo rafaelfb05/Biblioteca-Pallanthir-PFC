@@ -855,6 +855,55 @@ test("reservar abre a política de reservas e só reserva depois do aceite", asy
   expect(screen.queryByRole("dialog", { name: "Política de Uso de Reservas" })).not.toBeInTheDocument();
 });
 
+test("estudante cancela pedido que ainda aguarda pagamento", async () => {
+  let cancelado = false;
+  simularApi({
+    "GET /pedidos": () => [200, [cancelado ? { ...pedidoPendente, status: "CANCELADO" } : pedidoPendente]],
+    ["POST /pedidos/" + ID_PEDIDO + "/cancelar"]: () => {
+      cancelado = true;
+      return [200, { ...pedidoPendente, status: "CANCELADO" }];
+    },
+  });
+  entrarComo("ESTUDANTE");
+  render(<App />);
+
+  fireEvent.click(await screen.findByRole("button", { name: "Pedidos" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Cancelar pedido" }));
+
+  const dialogo = await screen.findByRole("alertdialog");
+  expect(dialogo).toHaveTextContent("Cancelar o pedido?");
+  fireEvent.click(within(dialogo).getByRole("button", { name: "Cancelar pedido" }));
+
+  expect(await screen.findByText("Pedido #44444444 cancelado. Os livros continuam no seu carrinho.")).toBeInTheDocument();
+  expect(await screen.findByText("Você cancelou este pedido antes do pagamento.")).toBeInTheDocument();
+  expect(chamadasPara("POST", "/pedidos/" + ID_PEDIDO + "/cancelar")).toHaveLength(1);
+  expect(screen.queryByRole("button", { name: "Cancelar pedido" })).not.toBeInTheDocument();
+});
+
+test("reserva entregue mostra o prazo de devolução e a capa do livro", async () => {
+  const daqui = (horas) => {
+    const data = new Date(Date.now() + horas * 60 * 60 * 1000);
+    const doisDigitos = (n) => String(n).padStart(2, "0");
+    return data.getFullYear() + "-" + doisDigitos(data.getMonth() + 1) + "-" + doisDigitos(data.getDate()) +
+      "T" + doisDigitos(data.getHours()) + ":" + doisDigitos(data.getMinutes()) + ":00";
+  };
+  simularApi({
+    ["GET /reservas/usuario/" + ID_USUARIO]: () => [200, [
+      { id: "r1", livroId: ID_LIVRO, tituloLivro: "Clean Code", capaUrl: "https://covers.openlibrary.org/b/isbn/1-L.jpg", dataReserva: daqui(-50), dataEntrega: daqui(-30), status: "ENTREGUE", prazoDevolucao: daqui(138) },
+      { id: "r2", livroId: ID_LIVRO_SEM_VENDA, tituloLivro: "Sem Venda", capaUrl: null, dataReserva: daqui(-300), dataEntrega: daqui(-200), status: "ENTREGUE", prazoDevolucao: daqui(-32) },
+    ]],
+  });
+  entrarComo("ESTUDANTE");
+  render(<App />);
+
+  fireEvent.click(await screen.findByRole("button", { name: /^Reservas/ }));
+  expect(await screen.findByText(/faltam 5 dias e (17|18) h/)).toBeInTheDocument();
+  expect(screen.getByText(/devolução atrasada/)).toBeInTheDocument();
+  expect(screen.getByAltText("Capa de Clean Code")).toHaveAttribute("src", "https://covers.openlibrary.org/b/isbn/1-L.jpg");
+  expect(screen.getByRole("img", { name: "Capa genérica de Sem Venda" })).toBeInTheDocument();
+  expect(document.querySelector(".prazo-retirada.vencido")).not.toBeNull();
+});
+
 test("funcionário vê a dashboard e não vê carrinho nem pedidos", async () => {
   simularApi({
     "GET /dashboard": () => [
