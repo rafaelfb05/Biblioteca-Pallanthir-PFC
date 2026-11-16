@@ -3421,16 +3421,6 @@ function App() {
             {ehFuncionario && (
               <button
                 type="button"
-                className={"nav-link" + (pagina === "dashboard" ? " active" : "")}
-                onClick={irParaDashboard}
-              >
-                Dashboard
-              </button>
-            )}
-
-            {ehFuncionario && (
-              <button
-                type="button"
                 className={"nav-link" + (pagina === "gestao" ? " active" : "")}
                 onClick={irParaGestao}
               >
@@ -3440,19 +3430,28 @@ function App() {
             {ehGerente && (
               <button
                 type="button"
-                className={"nav-link" + (pagina === "vendas" ? " active" : "")}
-                onClick={() => abrirPagina("vendas")}
+                className={"nav-link" + (pagina === "equipe" ? " active" : "")}
+                onClick={() => abrirPagina("equipe")}
               >
-                Vendas
+                Equipe
+              </button>
+            )}
+            {ehFuncionario && (
+              <button
+                type="button"
+                className={"nav-link" + (pagina === "dashboard" ? " active" : "")}
+                onClick={irParaDashboard}
+              >
+                Dashboard
               </button>
             )}
             {ehGerente && (
               <button
                 type="button"
-                className={"nav-link" + (pagina === "equipe" ? " active" : "")}
-                onClick={() => abrirPagina("equipe")}
+                className={"nav-link" + (pagina === "vendas" ? " active" : "")}
+                onClick={() => abrirPagina("vendas")}
               >
-                Equipe
+                Vendas
               </button>
             )}
             {ehGerente && (
