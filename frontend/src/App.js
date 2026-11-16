@@ -12,6 +12,7 @@ import {
   lerDadosDoToken,
   livrosApi,
   logsApi,
+  multasApi,
   pedidosApi,
   reservasApi,
   tokenExpirado,
@@ -263,6 +264,12 @@ const CARRINHO_VAZIO = { itens: [], total: 0 };
 const INTERVALO_ATUALIZACAO_PEDIDOS = 5 * 1000;
 const MAXIMO_ATUALIZACOES_PEDIDOS = 24;
 
+const ROTULO_STATUS_MULTA = {
+  PENDENTE: "Pendente",
+  PAGA: "Paga",
+  DISPENSADA: "Dispensada",
+};
+
 const ROTULO_STATUS_PEDIDO = {
   AGUARDANDO_PAGAMENTO: "Aguardando pagamento",
   APROVADO: "Pago · aguardando retirada",
@@ -289,6 +296,29 @@ const RETORNOS_DE_PAGAMENTO = {
     aguardarConfirmacao: false,
     mensagem:
       "O pagamento não foi concluído. Você pode tentar novamente enquanto o pedido estiver aguardando pagamento.",
+  },
+  "/multa/sucesso": {
+    tipo: "sucesso",
+    multa: true,
+    pagina: "conta",
+    aguardarConfirmacao: true,
+    mensagem:
+      "Recebemos o pagamento da multa. A confirmação pode levar alguns instantes.",
+  },
+  "/multa/pendente": {
+    tipo: "pendente",
+    multa: true,
+    pagina: "conta",
+    aguardarConfirmacao: true,
+    mensagem:
+      "O pagamento da multa está pendente. Ela será quitada assim que o Mercado Pago confirmar.",
+  },
+  "/multa/falha": {
+    tipo: "falha",
+    multa: true,
+    pagina: "conta",
+    aguardarConfirmacao: false,
+    mensagem: "O pagamento da multa não foi concluído. Você pode tentar novamente.",
   },
 };
 
@@ -792,7 +822,9 @@ function App() {
   const [aviso, setAviso] = useState(null);
 
   const [pagina, setPagina] = useState(() =>
-    lerRetornoDePagamento() ? "pedidos" : "inicio"
+    lerRetornoDePagamento()
+      ? lerRetornoDePagamento().pagina || "pedidos"
+      : "inicio"
   );
   const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState({ tipo: "todos" });
@@ -815,6 +847,13 @@ function App() {
   const [buscaRetiradas, setBuscaRetiradas] = useState("");
   const [entregaEmAndamento, setEntregaEmAndamento] = useState(null);
   const [abaGestao, setAbaGestao] = useState("reservas");
+  const [multas, setMultas] = useState([]);
+  const [multasGestao, setMultasGestao] = useState([]);
+  const [buscaMultas, setBuscaMultas] = useState("");
+  const [alunoMultas, setAlunoMultas] = useState("");
+  const [multaEmAndamento, setMultaEmAndamento] = useState(null);
+  const [confirmandoDispensa, setConfirmandoDispensa] = useState(null);
+  const [devolucao, setDevolucao] = useState(null);
   const [carregandoPedidos, setCarregandoPedidos] = useState(true);
   const [erroPedidos, setErroPedidos] = useState(null);
   const [retornoPagamento, setRetornoPagamento] = useState(
@@ -955,6 +994,14 @@ function App() {
     }
   }, []);
 
+  const carregarMultas = useCallback(async () => {
+    try {
+      setMultas((await multasApi.minhas()) || []);
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
+
   const carregarAvaliacoes = useCallback(async (livroId) => {
     try {
       setCarregandoAvaliacoes(true);
@@ -1004,9 +1051,16 @@ function App() {
         carregarReservas(sessao.id),
         carregarCarrinho(),
         carregarPedidos(),
+        carregarMultas(),
       ]);
     },
-    [carregarFavoritos, carregarReservas, carregarCarrinho, carregarPedidos]
+    [
+      carregarFavoritos,
+      carregarReservas,
+      carregarCarrinho,
+      carregarPedidos,
+      carregarMultas,
+    ]
   );
 
   const ultimaAtividade = useRef(0);
@@ -1029,6 +1083,8 @@ function App() {
     setRetornoPagamento(null);
     setUsuariosGestao([]);
     setReservasAbertas([]);
+    setMultas([]);
+    setMultasGestao([]);
     setLogs([]);
     setDashboard(null);
     setRetiradas([]);
@@ -1465,7 +1521,13 @@ function App() {
     setBuscaReservasAbertas("");
     setAlunoReservas("");
     setAlunoCompras("");
-    await Promise.all([carregarReservasAbertas(), carregarRetiradas()]);
+    setBuscaMultas("");
+    setAlunoMultas("");
+    await Promise.all([
+      carregarReservasAbertas(),
+      carregarRetiradas(),
+      carregarMultasGestao(),
+    ]);
   };
 
   const carregarLogs = async (filtro) => {
@@ -1626,8 +1688,11 @@ function App() {
   const trocarAbaGestao = async (aba) => {
     setAbaGestao(aba);
     setErro(null);
+    setConfirmandoDispensa(null);
     if (aba === "compras") {
       await carregarRetiradas();
+    } else if (aba === "multas") {
+      await carregarMultasGestao();
     } else {
       await carregarReservasAbertas();
     }
@@ -1917,7 +1982,7 @@ function App() {
     [reservas]
   );
 
-    const reservarLivro = (livro) => {
+  const reservarLivro = (livro) => {
     if (!usuarioId) {
       setErro("Entre na sua conta para reservar livros.");
       abrirAutenticacao("login");
@@ -1987,24 +2052,112 @@ function App() {
     }
   };
 
-  const registrarDevolucaoDaReserva = async (reserva) => {
+  const registrarDevolucaoDaReserva = (reserva) => {
+    const livro = livros.find((item) => item.id === reserva.livroId);
+    const preco = livro && Number(livro.preco) > 0 ? Number(livro.preco) : "";
+    setErro(null);
+    setDevolucao({
+      reserva,
+      danificado: false,
+      valor: preco === "" ? "" : preco.toFixed(2).replace(".", ","),
+      observacao: "",
+      erro: null,
+    });
+  };
+
+  const confirmarDevolucao = async (evento) => {
+    evento.preventDefault();
+    const { reserva, danificado, valor, observacao } = devolucao;
+    const valorMulta = Number(String(valor).replace(",", "."));
+    if (danificado && !(valorMulta > 0)) {
+      setDevolucao({ ...devolucao, erro: "Informe o valor da multa." });
+      return;
+    }
     try {
       setReservaEmEdicao(reserva.id);
-      setErro(null);
-      await reservasApi.devolver(reserva.id);
+      await reservasApi.devolver(reserva.id, {
+        danificado,
+        valorMulta: danificado ? valorMulta : null,
+        observacao: danificado ? observacao.trim() : null,
+      });
+      setDevolucao(null);
       setReservasAbertas((atuais) =>
         atuais.filter((item) => item.id !== reserva.id)
       );
       setAviso(
-        '"' + reserva.tituloLivro + '" foi devolvido por ' + reserva.nomeEstudante + "."
+        danificado
+          ? '"' +
+              reserva.tituloLivro +
+              '" foi devolvido danificado. Multa de ' +
+              formatarPreco(valorMulta) +
+              " aplicada a " +
+              reserva.nomeEstudante +
+              "."
+          : '"' + reserva.tituloLivro + '" foi devolvido por ' + reserva.nomeEstudante + "."
       );
-      await carregarLivros();
+      await Promise.all([carregarLivros(), carregarMultasGestao()]);
     } catch (e) {
-      setErro(mensagemDeErro(e, "Não foi possível registrar a devolução."));
+      setDevolucao((atual) =>
+        atual
+          ? {
+              ...atual,
+              erro: mensagemDeErro(e, "Não foi possível registrar a devolução."),
+            }
+          : atual
+      );
       console.error(e);
-      await carregarReservasAbertas();
     } finally {
       setReservaEmEdicao(null);
+    }
+  };
+
+  const carregarMultasGestao = async () => {
+    try {
+      setMultasGestao((await multasApi.pendentes()) || []);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const dispensarMulta = async (multa) => {
+    if (confirmandoDispensa !== multa.id) {
+      setConfirmandoDispensa(multa.id);
+      return;
+    }
+    try {
+      setMultaEmAndamento(multa.id);
+      setErro(null);
+      await multasApi.dispensar(multa.id);
+      setMultasGestao((atuais) => atuais.filter((item) => item.id !== multa.id));
+      setAviso(
+        "Multa de " +
+          formatarPreco(multa.valor) +
+          " de " +
+          multa.nomeEstudante +
+          " dispensada."
+      );
+    } catch (e) {
+      setErro(mensagemDeErro(e, "Não foi possível dispensar a multa."));
+      console.error(e);
+    } finally {
+      setMultaEmAndamento(null);
+      setConfirmandoDispensa(null);
+    }
+  };
+
+  const pagarMulta = async (multa) => {
+    try {
+      setMultaEmAndamento(multa.id);
+      setErro(null);
+      const resposta = await multasApi.pagar(multa.id);
+      if (resposta && resposta.linkPagamento) {
+        await irParaMercadoPago(resposta.linkPagamento);
+      }
+    } catch (e) {
+      setErro(mensagemDeErro(e, "Não foi possível iniciar o pagamento da multa."));
+      console.error(e);
+    } finally {
+      setMultaEmAndamento(null);
     }
   };
 
@@ -2548,7 +2701,84 @@ function App() {
     return () => document.removeEventListener("keydown", aoTeclar);
   }, [dialogoExclusao, salvando]);
 
+  const multasPendentes = multas.filter((multa) => multa.status === "PENDENTE");
+  const totalDasMultas = multasPendentes.reduce(
+    (total, multa) => total + Number(multa.valor || 0),
+    0
+  );
+
+  const aguardarPagamentoDaMulta = Boolean(
+    pagina === "conta" &&
+      ehEstudante &&
+      multasPendentes.length > 0 &&
+      retornoPagamento &&
+      retornoPagamento.multa &&
+      retornoPagamento.aguardarConfirmacao
+  );
+
+  useEffect(() => {
+    if (!aguardarPagamentoDaMulta) {
+      return undefined;
+    }
+    let atualizacoes = 0;
+    const intervalo = setInterval(() => {
+      atualizacoes += 1;
+      if (atualizacoes >= MAXIMO_ATUALIZACOES_PEDIDOS) {
+        clearInterval(intervalo);
+      }
+      carregarMultas();
+    }, INTERVALO_ATUALIZACAO_PEDIDOS);
+    return () => clearInterval(intervalo);
+  }, [aguardarPagamentoDaMulta, carregarMultas]);
+
+  const modalPoliticaReserva = livroParaReservar && (
+    <ModalPoliticaReserva
+      livro={livroParaReservar}
+      enviando={reservaEmEdicao === livroParaReservar.id}
+      aoFechar={() => setLivroParaReservar(null)}
+      aoConfirmar={(versao) => confirmarReserva(livroParaReservar, versao)}
+    />
+  );
+
+  const avisoDeMulta = ehEstudante && multasPendentes.length > 0 && (
+    <div className="aviso-multa" role="alert">
+      <span className="aviso-multa-icone" aria-hidden="true">
+        !
+      </span>
+      <p>
+        {multasPendentes.length === 1
+          ? 'Você tem uma multa de ' +
+            formatarPreco(totalDasMultas) +
+            ' porque o livro "' +
+            multasPendentes[0].tituloLivro +
+            '" foi devolvido danificado.'
+          : "Você tem " +
+            multasPendentes.length +
+            " multas pendentes, no total de " +
+            formatarPreco(totalDasMultas) +
+            "."}{" "}
+        Enquanto não pagar, não é possível reservar nem comprar livros.
+      </p>
+      {multasPendentes.length === 1 ? (
+        <button
+          type="button"
+          onClick={() => pagarMulta(multasPendentes[0])}
+          disabled={multaEmAndamento === multasPendentes[0].id}
+        >
+          {multaEmAndamento === multasPendentes[0].id
+            ? "Abrindo pagamento..."
+            : "Pagar multa"}
+        </button>
+      ) : (
+        <button type="button" onClick={irParaConta}>
+          Ver multas
+        </button>
+      )}
+    </div>
+  );
+
   const cabecalho = (
+    <>
     <header className="header">
       <button type="button" className="logo" onClick={irParaInicio}>
         Pallanthir
@@ -2718,6 +2948,9 @@ function App() {
         </div>
       </div>
     </header>
+    {avisoDeMulta}
+    {modalPoliticaReserva}
+    </>
   );
 
   const modalCadastroLivro = mostrarCadastroLivro && (
@@ -2912,15 +3145,6 @@ function App() {
       aoTrocar={setDocumentoAberto}
     />
   );
-
-        {livroParaReservar && (
-        <ModalPoliticaReserva
-          livro={livroParaReservar}
-          enviando={reservaEmEdicao === livroParaReservar.id}
-          aoFechar={() => setLivroParaReservar(null)}
-          aoConfirmar={(versao) => confirmarReserva(livroParaReservar, versao)}
-        />
-      )}
 
   const modalAutenticacao = mostrarAutenticacao && (
     <div className="modal modal-auth">
@@ -3519,6 +3743,113 @@ function App() {
       numeroDoPedido(pedido.id).toLowerCase().includes(termoDaBuscaDeRetiradas))
   );
 
+  const alunosDasMultas = alunosDaLista(multasGestao, "usuarioId", "nomeEstudante");
+  const termoDaBuscaDeMultas = buscaMultas.trim().toLowerCase();
+  const multasExibidas = multasGestao.filter(
+    (multa) =>
+      (!alunoMultas || multa.usuarioId === alunoMultas) &&
+      (!termoDaBuscaDeMultas ||
+        [multa.nomeEstudante, multa.emailEstudante, multa.tituloLivro]
+          .map((valor) => String(valor || "").toLowerCase())
+          .some((valor) => valor.includes(termoDaBuscaDeMultas)))
+  );
+
+  const modalDevolucao = devolucao && (
+    <div className="modal" onClick={() => !reservaEmEdicao && setDevolucao(null)}>
+      <form
+        className="modal-box dialogo devolucao"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="devolucao-titulo"
+        onClick={(e) => e.stopPropagation()}
+        onSubmit={confirmarDevolucao}
+      >
+        <h3 id="devolucao-titulo">Registrar devolução</h3>
+        <p>
+          <strong>{devolucao.reserva.tituloLivro}</strong> devolvido por{" "}
+          {devolucao.reserva.nomeEstudante}. Como o livro voltou?
+        </p>
+
+        <div className="devolucao-opcoes" role="radiogroup" aria-label="Estado do livro">
+          <button
+            type="button"
+            role="radio"
+            aria-checked={!devolucao.danificado}
+            className={"devolucao-opcao" + (!devolucao.danificado ? " ativa" : "")}
+            onClick={() => setDevolucao({ ...devolucao, danificado: false, erro: null })}
+          >
+            <strong>Em bom estado</strong>
+            <span>O livro volta para o acervo</span>
+          </button>
+          <button
+            type="button"
+            role="radio"
+            aria-checked={devolucao.danificado}
+            className={
+              "devolucao-opcao perigo" + (devolucao.danificado ? " ativa" : "")
+            }
+            onClick={() => setDevolucao({ ...devolucao, danificado: true, erro: null })}
+          >
+            <strong>Danificado</strong>
+            <span>Aplica multa e tira o livro de circulação</span>
+          </button>
+        </div>
+
+        {devolucao.danificado && (
+          <div className="devolucao-campos">
+            <label>
+              Valor da multa (R$)
+              <input
+                inputMode="decimal"
+                value={devolucao.valor}
+                onChange={(e) =>
+                  setDevolucao({ ...devolucao, valor: e.target.value, erro: null })
+                }
+                placeholder="Ex.: 59,90"
+              />
+            </label>
+            <label>
+              O que aconteceu? (opcional)
+              <textarea
+                maxLength={300}
+                rows={3}
+                value={devolucao.observacao}
+                onChange={(e) =>
+                  setDevolucao({ ...devolucao, observacao: e.target.value })
+                }
+                placeholder="Ex.: capa rasgada, páginas molhadas"
+              />
+            </label>
+          </div>
+        )}
+
+        {devolucao.erro && <p className="erro">{devolucao.erro}</p>}
+
+        <div className="dialogo-acoes">
+          <button
+            type="button"
+            className="dialogo-secundario"
+            onClick={() => setDevolucao(null)}
+            disabled={Boolean(reservaEmEdicao)}
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            className="dialogo-principal"
+            disabled={Boolean(reservaEmEdicao)}
+          >
+            {reservaEmEdicao
+              ? "Registrando..."
+              : devolucao.danificado
+              ? "Registrar e aplicar multa"
+              : "Registrar devolução"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+
   const termosLiberados = termosLidos.termos && termosLidos.privacidade;
 
   if (termosPendentes) {
@@ -3617,6 +3948,11 @@ function App() {
             </button>
           </div>
 
+          {retornoPagamento && retornoPagamento.multa && (
+            <p className={"retorno-pagamento " + retornoPagamento.tipo}>
+              {retornoPagamento.mensagem}
+            </p>
+          )}
           {avisoDaPagina}
           {erro && <p className="erro">{erro}</p>}
 
@@ -3747,6 +4083,55 @@ function App() {
                 </div>
               </div>
 
+              {ehEstudante && multas.length > 0 && (
+                <div className="conta-bloco conta-multas">
+                  <span className="section-label">MULTAS</span>
+                  <h3>Multas por dano</h3>
+                  <p className="conta-bloco-sub">
+                    Multas aplicadas quando um livro reservado é devolvido
+                    danificado. Enquanto houver multa pendente, não é possível
+                    reservar nem comprar livros.
+                  </p>
+                  <ul className="lista-multas">
+                    {multas.map((multa) => (
+                      <li key={multa.id}>
+                        <div className="pedido-detalhes-capa">
+                          <CapaDoItem capaUrl={multa.capaUrl} titulo={multa.tituloLivro} />
+                        </div>
+                        <div className="lista-multas-info">
+                          <span className={"reserva-status multa-" + String(multa.status).toLowerCase()}>
+                            {ROTULO_STATUS_MULTA[multa.status] || multa.status}
+                          </span>
+                          <strong>{multa.tituloLivro}</strong>
+                          <span>{multa.motivo}</span>
+                          <small>
+                            Aplicada em {formatarData(multa.dataCriacao)}
+                            {multa.dataPagamento
+                              ? " · paga em " + formatarData(multa.dataPagamento)
+                              : ""}
+                          </small>
+                        </div>
+                        <div className="lista-multas-acoes">
+                          <strong>{formatarPreco(multa.valor)}</strong>
+                          {multa.status === "PENDENTE" && (
+                            <button
+                              type="button"
+                              className="cadastro-button"
+                              onClick={() => pagarMulta(multa)}
+                              disabled={multaEmAndamento === multa.id}
+                            >
+                              {multaEmAndamento === multa.id
+                                ? "Abrindo..."
+                                : "Pagar com Mercado Pago"}
+                            </button>
+                          )}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               <div className="conta-perigo">
                 <div>
                   <span className="section-label">ZONA DE PERIGO</span>
@@ -3819,11 +4204,25 @@ function App() {
                   <span className="gestao-aba-contador">{retiradas.length}</span>
                 )}
               </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={abaGestao === "multas"}
+                className={"gestao-aba" + (abaGestao === "multas" ? " ativa" : "")}
+                onClick={() => trocarAbaGestao("multas")}
+              >
+                Multas
+                {multasGestao.length > 0 && (
+                  <span className="gestao-aba-contador">{multasGestao.length}</span>
+                )}
+              </button>
             </div>
           )}
 
           <p className="materias-sub">
-            {abaGestao === "compras"
+            {abaGestao === "multas"
+              ? "Multas pendentes por livros devolvidos danificados. O estudante paga pelo Mercado Pago; dispense a multa se ela foi registrada por engano."
+              : abaGestao === "compras"
               ? "Pedidos pagos que aguardam a retirada dos livros na biblioteca, dos mais antigos para os mais recentes."
               : "Reservas em aberto de todos os estudantes. Registre a entrega quando o livro sair da biblioteca e a devolução quando ele voltar."}
           </p>
@@ -3832,6 +4231,84 @@ function App() {
           {erro && <p className="erro">{erro}</p>}
 
           {!ehFuncionario && <p>Área restrita a funcionários.</p>}
+
+          {ehFuncionario && abaGestao === "multas" && (
+            <>
+              <div className="retiradas-topo">
+                <input
+                  type="text"
+                  className="gestao-busca"
+                  placeholder="Buscar por estudante, e-mail ou livro"
+                  value={buscaMultas}
+                  onChange={(e) => setBuscaMultas(e.target.value)}
+                />
+                <FiltroPorAluno
+                  alunos={alunosDasMultas}
+                  total={multasGestao.length}
+                  selecionado={alunoMultas}
+                  aoSelecionar={setAlunoMultas}
+                />
+                <button
+                  type="button"
+                  className="logs-atualizar"
+                  onClick={carregarMultasGestao}
+                >
+                  ↻ Atualizar
+                </button>
+              </div>
+
+              {multasExibidas.length === 0 && (
+                <p>
+                  {termoDaBuscaDeMultas || alunoMultas
+                    ? "Nenhuma multa encontrada com esses filtros."
+                    : "Nenhuma multa pendente."}
+                </p>
+              )}
+
+              <div className="retiradas-lista">
+                {multasExibidas.map((multa) => (
+                  <div className="retirada-card" key={multa.id}>
+                    <div className="retirada-cabecalho">
+                      <div>
+                        <strong>{multa.nomeEstudante}</strong>
+                        <span>{multa.emailEstudante}</span>
+                      </div>
+                      <strong className="retirada-total">
+                        {formatarPreco(multa.valor)}
+                      </strong>
+                    </div>
+                    <ul className="retirada-itens">
+                      <li>
+                        <div className="pedido-detalhes-capa">
+                          <CapaDoItem capaUrl={multa.capaUrl} titulo={multa.tituloLivro} />
+                        </div>
+                        <div>
+                          <strong>{multa.tituloLivro}</strong>
+                          <span>
+                            {multa.motivo} · aplicada em {formatarData(multa.dataCriacao)}
+                          </span>
+                        </div>
+                      </li>
+                    </ul>
+                    <div className="retirada-acoes">
+                      <button
+                        type="button"
+                        className="botao-devolucao"
+                        onClick={() => dispensarMulta(multa)}
+                        disabled={multaEmAndamento === multa.id}
+                      >
+                        {multaEmAndamento === multa.id
+                          ? "Dispensando..."
+                          : confirmandoDispensa === multa.id
+                          ? "Clique de novo para confirmar"
+                          : "Dispensar multa"}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
 
           {ehFuncionario && abaGestao === "compras" && (
             <>
@@ -4033,6 +4510,7 @@ function App() {
           )}
         </section>
 
+        {modalDevolucao}
         {modalCadastroLivro}
         {modalAutenticacao}
       </div>

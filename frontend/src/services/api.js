@@ -157,17 +157,30 @@ export const usuariosApi = {
 export const reservasApi = {
   listarEmAberto: () => request("/reservas/em-aberto"),
   listarPorUsuario: (usuarioId) => request(`/reservas/usuario/${usuarioId}`),
-reservar: (usuarioId, livroId, politicaVersao) =>
-  request(
-    `/reservas/${usuarioId}/${livroId}?politicaVersao=${encodeURIComponent(politicaVersao)}`,
-    { method: "POST" }
-  ),
+  reservar: (usuarioId, livroId, politicaVersao) =>
+    request(
+      `/reservas/${usuarioId}/${livroId}` +
+        (politicaVersao
+          ? "?politicaVersao=" + encodeURIComponent(politicaVersao)
+          : ""),
+      { method: "POST" }
+    ),
   cancelar: (reservaId) =>
     request(`/reservas/${reservaId}/cancelar`, { method: "PUT" }),
   entregar: (reservaId) =>
     request(`/reservas/${reservaId}/entregar`, { method: "PUT" }),
-  devolver: (reservaId) =>
-    request(`/reservas/${reservaId}/devolver`, { method: "PUT" }),
+  devolver: (reservaId, dados) =>
+    request(`/reservas/${reservaId}/devolver`, {
+      method: "PUT",
+      body: JSON.stringify(dados || { danificado: false }),
+    }),
+};
+
+export const multasApi = {
+  minhas: () => request("/multas/minhas"),
+  pagar: (id) => request(`/multas/${id}/pagar`, { method: "POST" }),
+  pendentes: () => request("/multas"),
+  dispensar: (id) => request(`/multas/${id}/dispensar`, { method: "PUT" }),
 };
 
 export const avaliacoesApi = {

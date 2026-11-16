@@ -4110,3 +4110,246 @@ html {
 .pedido-detalhes-resumo .prazo-retirada {
   margin: 0 0 12px;
 }
+
+.aviso-multa {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 7%;
+  background: rgba(229, 29, 42, 0.1);
+  border-bottom: 1px solid rgba(229, 29, 42, 0.35);
+  color: #f3c4c7;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.aviso-multa p {
+  flex: 1;
+}
+
+.aviso-multa-icone {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #e51d2a;
+  color: #ffffff;
+  font-weight: 800;
+}
+
+.aviso-multa button {
+  flex-shrink: 0;
+  padding: 9px 16px;
+  border: none;
+  border-radius: 7px;
+  background: #e51d2a;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.aviso-multa button:hover:not(:disabled) {
+  background: #bd1620;
+}
+
+.aviso-multa button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.conta-multas {
+  margin-top: 25px;
+}
+
+.lista-multas {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lista-multas li {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 12px;
+  background: #0d0d10;
+  border: 1px solid #24242a;
+  border-radius: 10px;
+}
+
+.lista-multas .pedido-detalhes-capa {
+  width: 56px;
+  height: 82px;
+}
+
+.lista-multas-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+}
+
+.lista-multas-info strong {
+  font-size: 15px;
+}
+
+.lista-multas-info span:not(.reserva-status) {
+  color: #c9c9cf;
+  font-size: 13px;
+}
+
+.lista-multas-info small {
+  color: #77777f;
+  font-size: 12px;
+}
+
+.lista-multas-acoes {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.lista-multas-acoes strong {
+  font-size: 18px;
+}
+
+.lista-multas-acoes .cadastro-button {
+  cursor: pointer;
+}
+
+.reserva-status.multa-pendente {
+  background: rgba(229, 29, 42, 0.15);
+  color: #ff6b74;
+}
+
+.reserva-status.multa-paga {
+  background: rgba(45, 190, 120, 0.15);
+  color: #2dbe78;
+}
+
+.reserva-status.multa-dispensada {
+  background: #26262d;
+  color: #8a8a93;
+}
+
+.modal-box.dialogo.devolucao {
+  max-width: 480px;
+  text-align: left;
+}
+
+.devolucao h3 {
+  font-size: 20px;
+}
+
+.devolucao-opcoes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.devolucao-opcao {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 14px;
+  border: 1px solid #2f2f36;
+  border-radius: 10px;
+  background: #0d0d10;
+  color: #ffffff;
+  text-align: left;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.devolucao-opcao span {
+  color: #77777f;
+  font-size: 12px;
+}
+
+.devolucao-opcao:hover {
+  border-color: #6f6f77;
+}
+
+.devolucao-opcao.ativa {
+  border-color: #2dbe78;
+  background: rgba(45, 190, 120, 0.08);
+  box-shadow: inset 0 0 0 1px #2dbe78;
+}
+
+.devolucao-opcao.perigo.ativa {
+  border-color: #e51d2a;
+  background: rgba(229, 29, 42, 0.1);
+  box-shadow: inset 0 0 0 1px #e51d2a;
+}
+
+.devolucao-campos {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.devolucao-campos label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  color: #96969d;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.devolucao-campos input,
+.devolucao-campos textarea {
+  padding: 11px 13px;
+  border: 1px solid #35353b;
+  border-radius: 8px;
+  background: #0d0d10;
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 14px;
+  letter-spacing: normal;
+  text-transform: none;
+  outline: none;
+  resize: vertical;
+}
+
+.devolucao-campos input:focus,
+.devolucao-campos textarea:focus {
+  border-color: #e51d2a;
+}
+
+@media (max-width: 600px) {
+  .aviso-multa {
+    flex-wrap: wrap;
+    padding: 12px 5%;
+  }
+
+  .lista-multas li {
+    grid-template-columns: 56px minmax(0, 1fr);
+  }
+
+  .lista-multas-acoes {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    justify-content: space-between;
+  }
+
+  .devolucao-opcoes {
+    grid-template-columns: 1fr;
+  }
+}

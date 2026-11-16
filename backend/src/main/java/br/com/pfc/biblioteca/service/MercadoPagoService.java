@@ -1,6 +1,7 @@
 package br.com.pfc.biblioteca.service;
 
 import br.com.pfc.biblioteca.entity.jpa.ItemPedido;
+import br.com.pfc.biblioteca.entity.jpa.Multa;
 import br.com.pfc.biblioteca.entity.jpa.Pedido;
 import br.com.pfc.biblioteca.infra.exception.ConflitoException;
 import br.com.pfc.biblioteca.infra.exception.RegraDeNegocioException;
@@ -100,6 +101,49 @@ public class MercadoPagoService {
         if (checkoutUrl.isBlank()) {
             log.error("Mercado Pago não retornou checkout_url para o pedido {}", pedido.getId());
             throw new RuntimeException("Falha ao criar o pagamento");
+        }
+        return new OrderCriada(json.path("id").asText(), checkoutUrl);
+    }
+
+    public OrderCriada criarOrderMulta(Multa multa, int minutosValidade) {
+        ObjectNode corpo = mapper.createObjectNode();
+        corpo.put("type", "online");
+        corpo.put("processing_mode", "manual");
+        corpo.put("total_amount", multa.getValor().toPlainString());
+        corpo.put("external_reference", multa.getReferenciaDePagamento());
+        corpo.put("expiration_time", "PT" + minutosValidade + "M");
+
+        ObjectNode item = corpo.putArray("items").addObject();
+        item.put("title", "Multa por dano: " + multa.getLivro().getTitulo());
+        item.put("unit_price", multa.getValor().toPlainString());
+        item.put("quantity", 1);
+        item.put("external_code", codigoExterno(multa.getId()));
+
+        ObjectNode online = corpo.putObject("config").putObject("online");
+        online.put("success_url", frontendUrl + "/multa/sucesso");
+        online.put("pending_url", frontendUrl + "/multa/pendente");
+        online.put("failure_url", frontendUrl + "/multa/falha");
+        online.put("auto_return", "approved");
+
+        HttpResponse<String> resposta = chamar(HttpRequest.newBuilder()
+                .uri(URI.create(API))
+                .header("Content-Type", "application/json")
+                .header("Authorization", "Bearer " + accessToken)
+                .header("X-Idempotency-Key", UUID.randomUUID().toString())
+                .POST(HttpRequest.BodyPublishers.ofString(corpo.toString()))
+                .build());
+
+        if (resposta.statusCode() < 200 || resposta.statusCode() >= 300) {
+            log.error("Mercado Pago recusou a criação da order da multa ({}): {}",
+                    resposta.statusCode(), resposta.body());
+            throw new RuntimeException("Falha ao criar o pagamento da multa");
+        }
+
+        JsonNode json = lerJson(resposta.body());
+        String checkoutUrl = json.path("checkout_url").asText();
+        if (checkoutUrl.isBlank()) {
+            log.error("Mercado Pago não retornou checkout_url para a multa {}", multa.getId());
+            throw new RuntimeException("Falha ao criar o pagamento da multa");
         }
         return new OrderCriada(json.path("id").asText(), checkoutUrl);
     }

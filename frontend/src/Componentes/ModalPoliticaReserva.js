@@ -36,7 +36,6 @@ export default function ModalPoliticaReserva({
     return () => document.removeEventListener("keydown", aoTeclar);
   }, [aoFechar, enviando]);
 
-  // Se o texto couber inteiro na tela (sem rolagem), já conta como lido.
   useEffect(() => {
     const elemento = corpo.current;
     if (elemento && politica && elemento.scrollHeight - elemento.clientHeight <= 0) {

@@ -18,6 +18,10 @@ public class Reserva {
     public static final int DIAS_PARA_RETIRADA = 3;
 
     private LocalDateTime dataReserva;
+    private Boolean danificado;
+    @Column(length = 64)
+    private String politicaVersao;
+    private LocalDateTime dataAceitePolitica;
     @Enumerated(EnumType.STRING)
     private StatusReserva status;
 
@@ -83,5 +87,29 @@ public class Reserva {
             return null;
         }
         return dataReserva.plusDays(DIAS_PARA_RETIRADA);
+    }
+
+    public Boolean getDanificado() {
+        return danificado;
+    }
+
+    public void setDanificado(Boolean danificado) {
+        this.danificado = danificado;
+    }
+
+    public String getPoliticaVersao() {
+        return politicaVersao;
+    }
+
+    public void setPoliticaVersao(String politicaVersao) {
+        this.politicaVersao = politicaVersao;
+    }
+
+    public LocalDateTime getDataAceitePolitica() {
+        return dataAceitePolitica;
+    }
+
+    public void setDataAceitePolitica(LocalDateTime dataAceitePolitica) {
+        this.dataAceitePolitica = dataAceitePolitica;
     }
 }
