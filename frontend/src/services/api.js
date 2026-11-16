@@ -190,6 +190,16 @@ export const multasApi = {
   dispensar: (id) => request(`/multas/${id}/dispensar`, { method: "PUT" }),
 };
 
+export const avisosApi = {
+  meus: () => request("/avisos/meus"),
+  criar: (livroId, tipo) =>
+    request("/avisos", {
+      method: "POST",
+      body: JSON.stringify({ livroId, tipo }),
+    }),
+  cancelar: (id) => request(`/avisos/${id}`, { method: "DELETE" }),
+};
+
 export const avaliacoesApi = {
   resumo: (livroId) => request(`/avaliacoes/livro/${livroId}`),
   avaliar: (livroId, nota, comentario) =>

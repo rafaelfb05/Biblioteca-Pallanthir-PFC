@@ -6,8 +6,10 @@ import { carregarVersaoDosTermos } from "./services/termos";
 import PainelVendas from "./Componentes/PainelVendas";
 import GestaoEquipe from "./Componentes/GestaoEquipe";
 import EditorDocumentos from "./Componentes/EditorDocumentos";
+import DialogoConfirmacao, { IconeSino } from "./Componentes/DialogoConfirmacao";
 import {
   avaliacoesApi,
+  avisosApi,
   carrinhoApi,
   dashboardApi,
   definirAoExpirarSessao,
@@ -198,6 +200,8 @@ const ROTULO_TIPO_USUARIO = {
   FUNCIONARIO: "Funcionário",
   GERENTE: "Gerente",
 };
+
+const ROTULO_ESTOQUE = { RESERVA: "para reserva", COMPRA: "à venda" };
 
 const PAGINAS_DO_GERENTE = {
   vendas: {
@@ -933,6 +937,14 @@ function App() {
   const [entregaEmAndamento, setEntregaEmAndamento] = useState(null);
   const [abaGestao, setAbaGestao] = useState("reservas");
   const [multas, setMultas] = useState([]);
+  const [avisos, setAvisos] = useState([]);
+  const [confirmacao, setConfirmacao] = useState(null);
+  const [confirmando, setConfirmando] = useState(false);
+  const livroDoLink = useRef(
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("livro")
+      : null
+  );
   const [multasGestao, setMultasGestao] = useState([]);
   const [buscaMultas, setBuscaMultas] = useState("");
   const [alunoMultas, setAlunoMultas] = useState("");
@@ -1091,6 +1103,37 @@ function App() {
     }
   }, []);
 
+  const carregarAvisos = useCallback(async () => {
+    try {
+      setAvisos((await avisosApi.meus()) || []);
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
+
+  useEffect(() => {
+    const id = livroDoLink.current;
+    if (!id || livros.length === 0) {
+      return;
+    }
+    livroDoLink.current = null;
+    const parametros = new URLSearchParams(window.location.search);
+    parametros.delete("livro");
+    const consulta = parametros.toString();
+    window.history.replaceState(
+      null,
+      "",
+      window.location.pathname + (consulta ? "?" + consulta : "") + window.location.hash
+    );
+    const alvo = livros.find((item) => item.id === id);
+    if (alvo) {
+      setPagina("livro");
+      setLivroAbertoId(alvo.id);
+      setFormEdicao({ ...alvo });
+      setEditandoLivro(false);
+    }
+  }, [livros]);
+
   const carregarAvaliacoes = useCallback(async (livroId) => {
     try {
       setCarregandoAvaliacoes(true);
@@ -1141,6 +1184,7 @@ function App() {
         carregarCarrinho(),
         carregarPedidos(),
         carregarMultas(),
+        carregarAvisos(),
       ]);
     },
     [
@@ -1149,6 +1193,7 @@ function App() {
       carregarCarrinho,
       carregarPedidos,
       carregarMultas,
+      carregarAvisos,
     ]
   );
 
@@ -1173,6 +1218,8 @@ function App() {
     setUsuariosGestao([]);
     setReservasAbertas([]);
     setMultas([]);
+    setAvisos([]);
+    setConfirmacao(null);
     setMultasGestao([]);
     setLogs([]);
     setDashboard(null);
@@ -1905,23 +1952,33 @@ function App() {
     }
   };
 
-  const removerAvaliacao = async () => {
-    if (!minhaAvaliacao || !window.confirm("Remover sua avaliação deste livro?")) {
+  const removerAvaliacao = () => {
+    if (!minhaAvaliacao) {
       return;
     }
-
-    try {
-      setSalvandoAvaliacao(true);
-      setErro(null);
-      await avaliacoesApi.remover(minhaAvaliacao.id);
-      setAviso("Sua avaliação foi removida.");
-      await carregarAvaliacoes(livroAbertoId);
-    } catch (e) {
-      setErro(mensagemDeErro(e, "Não foi possível remover sua avaliação."));
-      console.error(e);
-    } finally {
-      setSalvandoAvaliacao(false);
-    }
+    const avaliacao = minhaAvaliacao;
+    const livroId = livroAbertoId;
+    setConfirmacao({
+      tom: "perigo",
+      titulo: "Remover sua avaliação?",
+      conteudo: <p>A sua nota e o seu comentário sobre este livro serão apagados.</p>,
+      textoConfirmar: "Remover avaliação",
+      textoEnviando: "Removendo...",
+      acao: async () => {
+        try {
+          setSalvandoAvaliacao(true);
+          setErro(null);
+          await avaliacoesApi.remover(avaliacao.id);
+          setAviso("Sua avaliação foi removida.");
+          await carregarAvaliacoes(livroId);
+        } catch (e) {
+          setErro(mensagemDeErro(e, "Não foi possível remover sua avaliação."));
+          console.error(e);
+        } finally {
+          setSalvandoAvaliacao(false);
+        }
+      },
+    });
   };
 
   const irParaMaterias = () => {
@@ -2358,7 +2415,11 @@ function App() {
     try {
       setSalvando(true);
       setErro(null);
+      const livroOriginal = livros.find((item) => item.id === formEdicao.id);
+      const novaCapa = String(formEdicao.capaUrl || "").trim();
+      const capaMudou = novaCapa !== ((livroOriginal && livroOriginal.capaUrl) || "");
       const atualizado = await livrosApi.atualizar(formEdicao.id, {
+        ...(capaMudou ? { capaUrl: novaCapa } : {}),
         titulo: formEdicao.titulo,
         anoLancamento: formEdicao.anoLancamento,
         numeroPagina: Number(formEdicao.numeroPagina) || 0,
@@ -2399,31 +2460,30 @@ function App() {
     setEditandoLivro(false);
   };
 
-  const deletarLivro = async (livro) => {
-    if (!window.confirm('Remover "' + livro.titulo + '" do acervo?')) {
-      return;
-    }
-
+  const excluirLivroDoAcervo = async (livro, confirmado) => {
     try {
       setSalvando(true);
       setErro(null);
-
       try {
-        await livrosApi.deletar(livro.id, false);
+        await livrosApi.deletar(livro.id, confirmado);
       } catch (conflito) {
-        if (conflito.status !== 409) {
+        if (conflito.status !== 409 || confirmado) {
           throw conflito;
         }
-        const seguir = window.confirm(
-          'O livro "' +
-            livro.titulo +
-            '" está reservado neste momento. Excluir agora também apaga as reservas ' +
-            "dele. Tem certeza de que deseja continuar?"
-        );
-        if (!seguir) {
-          return;
-        }
-        await livrosApi.deletar(livro.id, true);
+        return {
+          tom: "alerta",
+          titulo: "Este livro está reservado",
+          conteudo: (
+            <p>
+              <strong>{livro.titulo}</strong> tem reservas em aberto neste momento.
+              Excluir agora também apaga as reservas dele.
+            </p>
+          ),
+          alerta: "Esta ação não pode ser desfeita.",
+          textoConfirmar: "Excluir mesmo assim",
+          textoEnviando: "Excluindo...",
+          acao: () => excluirLivroDoAcervo(livro, true),
+        };
       }
 
       setLivroAbertoId(null);
@@ -2438,6 +2498,135 @@ function App() {
     } finally {
       setSalvando(false);
     }
+    return null;
+  };
+
+  const deletarLivro = (livro) => {
+    setConfirmacao({
+      tom: "perigo",
+      titulo: "Excluir livro do acervo?",
+      conteudo: (
+        <p>
+          <strong>{livro.titulo}</strong> deixará de aparecer no catálogo e será
+          removido dos favoritos dos estudantes. O histórico de reservas e pedidos
+          é mantido.
+        </p>
+      ),
+      textoConfirmar: "Excluir livro",
+      textoEnviando: "Excluindo...",
+      acao: () => excluirLivroDoAcervo(livro, false),
+    });
+  };
+
+  const avisoDoLivro = (livroId, tipo) =>
+    avisos.find((item) => item.livroId === livroId && item.tipo === tipo);
+
+  const alternarAvisoDeEstoque = (livro, tipo) => {
+    const rotulo = ROTULO_ESTOQUE[tipo];
+    if (!usuarioId) {
+      setErro("Entre na sua conta para ser avisado quando o livro voltar ao estoque.");
+      abrirAutenticacao("login");
+      return;
+    }
+    const existente = avisoDoLivro(livro.id, tipo);
+    if (existente) {
+      setConfirmacao({
+        tom: "sino",
+        titulo: "Cancelar o aviso?",
+        conteudo: (
+          <p>
+            Você não vai mais receber o e-mail quando <strong>{livro.titulo}</strong>{" "}
+            tiver exemplares {rotulo}.
+          </p>
+        ),
+        textoConfirmar: "Cancelar aviso",
+        textoCancelar: "Manter aviso",
+        textoEnviando: "Cancelando...",
+        acao: async () => {
+          try {
+            await avisosApi.cancelar(existente.id);
+            setAvisos((atuais) => atuais.filter((item) => item.id !== existente.id));
+            setAviso("Aviso cancelado.");
+          } catch (e) {
+            setErro(mensagemDeErro(e, "Não foi possível cancelar o aviso."));
+          }
+        },
+      });
+      return;
+    }
+    setConfirmacao({
+      tom: "sino",
+      titulo: "Avisar quando voltar?",
+      conteudo: (
+        <>
+          <div className="dialogo-livro">
+            <div className="dialogo-livro-capa">
+              <CapaDoItem capaUrl={livro.capaUrl} titulo={livro.titulo} />
+            </div>
+            <div className="dialogo-livro-info">
+              <strong>{livro.titulo}</strong>
+              <span>Sem exemplares {rotulo} no momento</span>
+            </div>
+          </div>
+          <p>
+            Assim que chegar um exemplar {rotulo}, enviamos um e-mail para{" "}
+            <strong>{usuario.email}</strong> com a capa e o link do livro.
+          </p>
+        </>
+      ),
+      textoConfirmar: "Me avise",
+      textoEnviando: "Salvando...",
+      acao: async () => {
+        try {
+          const novo = await avisosApi.criar(livro.id, tipo);
+          setAvisos((atuais) => [novo, ...atuais.filter((item) => item.id !== novo.id)]);
+          setAviso(
+            'Pronto! Você vai receber um e-mail quando "' +
+              livro.titulo +
+              '" tiver exemplares ' +
+              rotulo +
+              "."
+          );
+        } catch (e) {
+          setErro(mensagemDeErro(e, "Não foi possível criar o aviso."));
+          if (e.status === 409) {
+            await carregarLivros();
+          }
+        }
+      },
+    });
+  };
+
+  const executarConfirmacao = async () => {
+    const atual = confirmacao;
+    try {
+      setConfirmando(true);
+      const proxima = await atual.acao();
+      setConfirmacao(proxima || null);
+    } finally {
+      setConfirmando(false);
+    }
+  };
+
+  const botaoDeAviso = (livro, tipo) => {
+    const ativo = Boolean(avisoDoLivro(livro.id, tipo));
+    const rotulo = ROTULO_ESTOQUE[tipo];
+    return (
+      <button
+        type="button"
+        className={"botao-sino" + (ativo ? " ativo" : "")}
+        onClick={() => alternarAvisoDeEstoque(livro, tipo)}
+        aria-label={
+          ativo
+            ? "Aviso ativado para estoque " + rotulo + ", clique para cancelar"
+            : "Avise-me quando houver estoque " + rotulo
+        }
+        title={ativo ? "Você será avisado por e-mail" : "Avise-me quando voltar"}
+      >
+        <IconeSino preenchido={ativo} tamanho={15} />
+        <span>{ativo ? "Aviso ativado" : "Avise-me"}</span>
+      </button>
+    );
   };
 
   const cadastrarUsuario = async (evento) => {
@@ -2908,6 +3097,22 @@ function App() {
     />
   );
 
+  const modalConfirmacao = confirmacao && (
+    <DialogoConfirmacao
+      tom={confirmacao.tom}
+      titulo={confirmacao.titulo}
+      alerta={confirmacao.alerta}
+      textoConfirmar={confirmacao.textoConfirmar}
+      textoEnviando={confirmacao.textoEnviando}
+      textoCancelar={confirmacao.textoCancelar}
+      enviando={confirmando}
+      aoConfirmar={executarConfirmacao}
+      aoCancelar={() => setConfirmacao(null)}
+    >
+      {confirmacao.conteudo}
+    </DialogoConfirmacao>
+  );
+
   const devolucoesAtrasadas = reservas.filter(
     (reserva) =>
       reserva.status === "ENTREGUE" &&
@@ -3170,6 +3375,7 @@ function App() {
     {avisoDeMulta}
     {avisoDeAtraso}
     {modalPoliticaReserva}
+    {modalConfirmacao}
     </>
   );
 
@@ -6044,7 +6250,12 @@ function App() {
                       }
                     />
                   ) : (
-                    <strong>{formatarEstoque(livroAberto.estoqueReserva)}</strong>
+                    <span className="livro-dado-estoque">
+                      <strong>{formatarEstoque(livroAberto.estoqueReserva)}</strong>
+                      {!ehFuncionario &&
+                        Number(livroAberto.estoqueReserva || 0) <= 0 &&
+                        botaoDeAviso(livroAberto, "RESERVA")}
+                    </span>
                   )}
                 </div>
                 <div className={editandoLivro ? "editavel" : undefined}>
@@ -6061,7 +6272,13 @@ function App() {
                       }
                     />
                   ) : (
-                    <strong>{formatarEstoque(livroAberto.estoqueCompra)}</strong>
+                    <span className="livro-dado-estoque">
+                      <strong>{formatarEstoque(livroAberto.estoqueCompra)}</strong>
+                      {!ehFuncionario &&
+                        Number(livroAberto.estoqueCompra || 0) <= 0 &&
+                        Number(livroAberto.preco || 0) > 0 &&
+                        botaoDeAviso(livroAberto, "COMPRA")}
+                    </span>
                   )}
                 </div>
                 <div className={editandoLivro ? "editavel" : undefined}>
@@ -6092,6 +6309,24 @@ function App() {
                     <strong>{formatarIsbn13(livroAberto.isbn13)}</strong>
                   )}
                 </div>
+                {editandoLivro && (
+                  <div className="editavel livro-atributo-largo">
+                    <small>Link da capa</small>
+                    <input
+                      type="url"
+                      maxLength={255}
+                      placeholder="https://... cole o endereço da imagem da capa"
+                      aria-label="Link da capa"
+                      value={formEdicao.capaUrl || ""}
+                      onChange={(e) => alterarEdicao("capaUrl", e.target.value)}
+                    />
+                    <span className="livro-atributo-dica">
+                      Para usar a capa de outro site, clique com o botão direito na imagem,
+                      escolha "Copiar endereço da imagem" e cole aqui. Apague o link para o
+                      sistema buscar a capa sozinho pelo ISBN e pelo título.
+                    </span>
+                  </div>
+                )}
               </div>
 
               <div className="livro-acoes">

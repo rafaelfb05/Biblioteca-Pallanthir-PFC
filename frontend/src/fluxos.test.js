@@ -1131,3 +1131,115 @@ test("logs mostram o nome do usuário no lugar do id e são divididos em página
   expect(screen.getByText(/^Reserva 100 do livro/)).toBeInTheDocument();
 });
 
+test("estudante pede aviso de livro esgotado pelo sino e pode cancelar", async () => {
+  simularApi({
+    "GET /livros": () => [200, [livro(ID_LIVRO, "Clean Code", { estoqueReserva: 0, estoqueCompra: 0, preco: 40 })]],
+    ["GET /avaliacoes/livro/" + ID_LIVRO]: () => [200, { media: 0, total: 0, avaliacoes: [] }],
+    "GET /avisos/meus": () => [200, []],
+    "POST /avisos": (corpo) => [200, { id: "aviso-1", livroId: corpo.livroId, tituloLivro: "Clean Code", tipo: corpo.tipo, status: "PENDENTE" }],
+    "DELETE /avisos/aviso-1": () => [204, undefined],
+  });
+  entrarComo("ESTUDANTE");
+  render(<App />);
+
+  fireEvent.click(await screen.findByRole("heading", { name: "Clean Code" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Avise-me quando houver estoque para reserva" }));
+
+  const dialogo = await screen.findByRole("alertdialog");
+  expect(dialogo).toHaveTextContent("Avisar quando voltar?");
+  expect(dialogo).toHaveTextContent("Sem exemplares para reserva no momento");
+  expect(dialogo).toHaveTextContent("ana@teste.com");
+  fireEvent.click(within(dialogo).getByRole("button", { name: "Me avise" }));
+
+  expect(await screen.findByText('Pronto! Você vai receber um e-mail quando "Clean Code" tiver exemplares para reserva.')).toBeInTheDocument();
+  expect(chamadasPara("POST", "/avisos")[0].corpo).toEqual({ livroId: ID_LIVRO, tipo: "RESERVA" });
+  expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Avise-me quando houver estoque à venda" })).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: /^Aviso ativado para estoque para reserva/ }));
+  const cancelar = await screen.findByRole("alertdialog");
+  expect(cancelar).toHaveTextContent("Cancelar o aviso?");
+  fireEvent.click(within(cancelar).getByRole("button", { name: "Cancelar aviso" }));
+
+  expect(await screen.findByText("Aviso cancelado.")).toBeInTheDocument();
+  expect(chamadasPara("DELETE", "/avisos/aviso-1")).toHaveLength(1);
+  expect(screen.getByRole("button", { name: "Avise-me quando houver estoque para reserva" })).toBeInTheDocument();
+});
+
+test("livro com estoque não mostra o sino e funcionário nunca vê o sino", async () => {
+  simularApi({
+    "GET /livros": () => [200, [livro(ID_LIVRO, "Clean Code", { estoqueReserva: 0, estoqueCompra: 2 })]],
+    ["GET /avaliacoes/livro/" + ID_LIVRO]: () => [200, { media: 0, total: 0, avaliacoes: [] }],
+  });
+  entrarComo("FUNCIONARIO");
+  render(<App />);
+
+  fireEvent.click(await screen.findByRole("heading", { name: "Clean Code" }));
+  await screen.findByText("ISBN-10");
+  expect(screen.queryByRole("button", { name: /Avise-me/ })).not.toBeInTheDocument();
+});
+
+test("excluir livro pede confirmação na janela e confirma de novo quando há reservas", async () => {
+  simularApi({
+    ["GET /avaliacoes/livro/" + ID_LIVRO]: () => [200, { media: 0, total: 0, avaliacoes: [] }],
+    ["DELETE /livros/deletar/" + ID_LIVRO]: () => {
+      const confirmado = global.fetch.mock.calls[global.fetch.mock.calls.length - 1][0].includes("confirmado=true");
+      return confirmado ? [204, undefined] : [409, { mensagem: "Livro com reservas em aberto" }];
+    },
+  });
+  entrarComo("FUNCIONARIO");
+  render(<App />);
+
+  fireEvent.click(await screen.findByRole("heading", { name: "Clean Code" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Excluir livro" }));
+
+  const primeiro = await screen.findByRole("alertdialog");
+  expect(primeiro).toHaveTextContent("Excluir livro do acervo?");
+  fireEvent.click(within(primeiro).getByRole("button", { name: "Excluir livro" }));
+
+  const segundo = await screen.findByText("Este livro está reservado");
+  const dialogo = segundo.closest("[role=alertdialog]");
+  expect(dialogo).toHaveTextContent("Esta ação não pode ser desfeita.");
+  fireEvent.click(within(dialogo).getByRole("button", { name: "Excluir mesmo assim" }));
+
+  expect(await screen.findByText('"Clean Code" foi removido do acervo.')).toBeInTheDocument();
+  const exclusoes = global.fetch.mock.calls.map(([url]) => String(url)).filter((url) => url.includes("/livros/deletar/"));
+  expect(exclusoes).toEqual([
+    API + "/livros/deletar/" + ID_LIVRO + "?confirmado=false",
+    API + "/livros/deletar/" + ID_LIVRO + "?confirmado=true",
+  ]);
+});
+
+test("link do e-mail de aviso abre direto a página do livro", async () => {
+  window.history.pushState({}, "", "/?livro=" + ID_LIVRO);
+  simularApi({ ["GET /avaliacoes/livro/" + ID_LIVRO]: () => [200, { media: 0, total: 0, avaliacoes: [] }] });
+  render(<App />);
+
+  expect(await screen.findByText("ISBN-10")).toBeInTheDocument();
+  expect(screen.getByText("978-8595084742")).toBeInTheDocument();
+  expect(window.location.search).toBe("");
+});
+
+test("funcionário cola o link da capa na edição do livro", async () => {
+  simularApi({
+    ["GET /avaliacoes/livro/" + ID_LIVRO]: () => [200, { media: 0, total: 0, avaliacoes: [] }],
+    ["PUT /livros/atualizar/" + ID_LIVRO]: (corpo) => [200, livro(ID_LIVRO, "Clean Code", { capaUrl: corpo.capaUrl || null })],
+  });
+  entrarComo("FUNCIONARIO");
+  render(<App />);
+
+  fireEvent.click(await screen.findByRole("heading", { name: "Clean Code" }));
+  fireEvent.click(await screen.findByRole("button", { name: /Atualizar livro/ }));
+  fireEvent.click(await screen.findByRole("button", { name: "Salvar alterações" }));
+  await waitFor(() => expect(chamadasPara("PUT", "/livros/atualizar/" + ID_LIVRO)).toHaveLength(1));
+  expect(chamadasPara("PUT", "/livros/atualizar/" + ID_LIVRO)[0].corpo).not.toHaveProperty("capaUrl");
+
+  fireEvent.click(await screen.findByRole("button", { name: /Atualizar livro/ }));
+  fireEvent.change(screen.getByRole("textbox", { name: "Link da capa" }), {
+    target: { value: " https://m.media-amazon.com/images/I/capa.jpg " },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Salvar alterações" }));
+  await waitFor(() => expect(chamadasPara("PUT", "/livros/atualizar/" + ID_LIVRO)).toHaveLength(2));
+  expect(chamadasPara("PUT", "/livros/atualizar/" + ID_LIVRO)[1].corpo.capaUrl).toBe("https://m.media-amazon.com/images/I/capa.jpg");
+});
+

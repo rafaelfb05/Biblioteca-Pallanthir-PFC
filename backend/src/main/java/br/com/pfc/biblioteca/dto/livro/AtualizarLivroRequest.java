@@ -13,5 +13,6 @@ public record AtualizarLivroRequest(String titulo,
                                     Integer estoqueReserva,
                                     Integer estoqueCompra,
                                     String isbn10,
-                                    String isbn13) {
+                                    String isbn13,
+                                    String capaUrl) {
 }

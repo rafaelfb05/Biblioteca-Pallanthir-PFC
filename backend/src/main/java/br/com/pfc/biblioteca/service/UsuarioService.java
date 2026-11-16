@@ -44,11 +44,14 @@ public class UsuarioService {
     private final LogAuditoriaService logService;
     private final PedidoRepository pedidoRepository;
     private final MultaRepository multaRepository;
+    private final AvisoDisponibilidadeService avisoService;
 
     public UsuarioService(UsuarioRepository repository, LivroRepository livroRepository, ReservaRepository reservaRepository,
                           PasswordEncoder passwordEncoder, JwtService jwtService, EmailService emailService,
-                          LogAuditoriaService logService, PedidoRepository pedidoRepository, MultaRepository multaRepository) {
+                          LogAuditoriaService logService, PedidoRepository pedidoRepository, MultaRepository multaRepository,
+                          AvisoDisponibilidadeService avisoService) {
         this.multaRepository = multaRepository;
+        this.avisoService = avisoService;
         this.repository = repository;
         this.livroRepository = livroRepository;
         this.reservaRepository = reservaRepository;
@@ -209,6 +212,7 @@ public class UsuarioService {
     }
 
     private Usuario anonimizar(Usuario usuario) {
+        avisoService.cancelarTodosDoUsuario(usuario.getId());
         usuario.setNome("Usuário removido");
         usuario.setEmail("removido-" + usuario.getId() + "@anonimizado.local");
         usuario.setSenha(passwordEncoder.encode(UUID.randomUUID().toString()));

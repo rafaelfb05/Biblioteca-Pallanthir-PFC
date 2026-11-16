@@ -16,6 +16,10 @@ public interface LivroRepository extends JpaRepository<Livro, UUID> {
 
     List<Livro> findByAtivoTrue();
 
+    Optional<Livro> findFirstByIsbn13AndAtivoTrue(String isbn13);
+
+    Optional<Livro> findFirstByIsbn10AndAtivoTrue(String isbn10);
+
     long countByAtivoTrue();
 
     List<Livro> findByMateriaAndAtivoTrue(Materia materia);

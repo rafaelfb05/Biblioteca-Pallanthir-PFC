@@ -32,14 +32,30 @@ class LivroIntegracaoTest extends TesteIntegracaoBase {
     private final List<String> buscasNaGoogleBooks = new ArrayList<>();
     private final List<String> capasNaOpenLibrary = new ArrayList<>();
     private final List<String> consultasNaOpenLibrary = new ArrayList<>();
+    private final List<String> buscasPorTitulo = new ArrayList<>();
+    private final List<String> imagensValidas = new ArrayList<>();
+    private String respostaDaBuscaPorTitulo = "{\"docs\":[]}";
 
     @BeforeEach
     void simularGoogleBooks() {
+        livroRepository.findAll().stream()
+                .filter(Livro::isAtivo)
+                .filter(livro -> (livro.getIsbn13() != null && List.of("9788595084742", "9780000000001", "9781111111111").contains(livro.getIsbn13()))
+                        || "8595084742".equals(livro.getIsbn10()))
+                .forEach(livro -> {
+                    livro.setAtivo(false);
+                    livroRepository.save(livro);
+                });
         Object alvo = AopTestUtils.getUltimateTargetObject(livroService);
         consumoOriginal = ReflectionTestUtils.getField(alvo, "consumo");
         ReflectionTestUtils.setField(alvo, "consumo", new ConsumoApi() {
             @Override
             public String obterDados(String endereco) {
+                if (endereco.startsWith("https://openlibrary.org/search.json")) {
+                    String titulo = endereco.substring(endereco.indexOf("&title=") + 7);
+                    buscasPorTitulo.add(URLDecoder.decode(titulo, StandardCharsets.UTF_8));
+                    return respostaDaBuscaPorTitulo;
+                }
                 String consulta = URI.create(endereco).getRawQuery().split("&")[0].substring(2);
                 String titulo = URLDecoder.decode(consulta, StandardCharsets.UTF_8);
                 buscasNaGoogleBooks.add(titulo);
@@ -49,15 +65,21 @@ class LivroIntegracaoTest extends TesteIntegracaoBase {
                 if (titulo.startsWith("Sem capa")) {
                     return "{\"items\":[{\"volumeInfo\":{\"title\":" + texto(titulo) + ",\"pageCount\":90}}]}";
                 }
+                String numero = String.format("%09d", Math.abs((long) titulo.hashCode()) % 1_000_000_000L);
+                String isbn10 = titulo.startsWith("O Hobbit") ? "8595084742" : numero + "0";
+                String isbn13 = titulo.startsWith("O Hobbit") ? "9788595084742" : "9785" + numero;
                 return "{\"items\":[{\"volumeInfo\":{\"title\":" + texto(titulo) + ",\"authors\":[\"J. R. R. Tolkien\"],"
                         + "\"publishedDate\":\"1937\",\"pageCount\":310,"
                         + "\"imageLinks\":{\"thumbnail\":\"http://books.google.com/capa.jpg\"},"
-                        + "\"industryIdentifiers\":[{\"type\":\"ISBN_10\",\"identifier\":\"8595084742\"},"
-                        + "{\"type\":\"ISBN_13\",\"identifier\":\"9788595084742\"}]}}]}";
+                        + "\"industryIdentifiers\":[{\"type\":\"ISBN_10\",\"identifier\":\"" + isbn10 + "\"},"
+                        + "{\"type\":\"ISBN_13\",\"identifier\":\"" + isbn13 + "\"}]}}]}";
             }
 
             @Override
             public boolean imagemExiste(String endereco) {
+                if (imagensValidas.contains(endereco)) {
+                    return true;
+                }
                 consultasNaOpenLibrary.add(endereco);
                 return capasNaOpenLibrary.stream().anyMatch(isbn -> endereco.equals("https://covers.openlibrary.org/b/isbn/" + isbn + "-L.jpg?default=false"));
             }
@@ -298,5 +320,108 @@ class LivroIntegracaoTest extends TesteIntegracaoBase {
         assertThat(get("/usuarios/" + estudante.getId() + "/favoritos", token(estudante)).corpo().size()).isEqualTo(1);
         Usuario funcionario = criarFuncionario();
         assertThat(post("/usuarios/" + funcionario.getId() + "/favoritar/" + livro.getId(), token(funcionario), null).status()).isEqualTo(403);
+    }
+
+    @Test
+    void semCapaPeloIsbnBuscaPeloTituloEConfereOAutor() {
+        respostaDaBuscaPorTitulo = "{\"docs\":["
+                + "{\"title\":\"O Hobbit\",\"author_name\":[\"Fulano de Tal\"],\"cover_i\":111},"
+                + "{\"title\":\"O Hobbit Ilustrado\",\"author_name\":[\"J. R. R. Tolkien\"],\"cover_i\":222},"
+                + "{\"title\":\"Hobbit, O\",\"author_name\":[\"J.R.R. Tolkien\"]},"
+                + "{\"title\":\"Hobbit, O\",\"author_name\":[\"John Ronald Reuel Tolkien\"],\"cover_i\":333}]}";
+
+        Resposta resposta = post("/livros/cadastro", token(criarFuncionario()), novoLivro("O Hobbit"));
+
+        assertThat(resposta.status()).isEqualTo(200);
+        assertThat(resposta.corpo().path("capaUrl").asText()).isEqualTo("https://covers.openlibrary.org/b/id/333-L.jpg");
+        assertThat(buscasPorTitulo).containsExactly("O Hobbit");
+    }
+
+    @Test
+    void semCapaPeloIsbnNemPeloTituloFicaComACapaGenerica() {
+        respostaDaBuscaPorTitulo = "{\"docs\":[{\"title\":\"Outro livro qualquer\",\"author_name\":[\"J. R. R. Tolkien\"],\"cover_i\":444}]}";
+
+        Resposta resposta = post("/livros/cadastro", token(criarFuncionario()), novoLivro("O Hobbit"));
+
+        assertThat(resposta.status()).isEqualTo(200);
+        assertThat(resposta.corpo().path("capaUrl").isNull()).isTrue();
+    }
+
+    @Test
+    void capaComIsbnNaoPrecisaDaBuscaPorTitulo() {
+        capasNaOpenLibrary.add("9788595084742");
+
+        post("/livros/cadastro", token(criarFuncionario()), novoLivro("O Hobbit"));
+
+        assertThat(buscasPorTitulo).isEmpty();
+    }
+
+    @Test
+    void funcionarioColaOLinkDaCapaNaEdicao() {
+        Livro livro = criarLivro(50, 1, 0);
+        String funcionario = token(criarFuncionario());
+        String link = "https://m.media-amazon.com/images/I/capa-teste.jpg";
+        imagensValidas.add(link);
+
+        Resposta salvo = put("/livros/atualizar/" + livro.getId(), funcionario, Map.of("capaUrl", "  " + link + " "));
+        assertThat(salvo.status()).isEqualTo(200);
+        assertThat(salvo.corpo().path("capaUrl").asText()).isEqualTo(link);
+        assertThat(recarregar(livro).getCapaUrl()).isEqualTo(link);
+
+        Resposta semHttps = put("/livros/atualizar/" + livro.getId(), funcionario, Map.of("capaUrl", "http://exemplo.com/capa.jpg"));
+        assertThat(semHttps.status()).isEqualTo(400);
+        assertThat(semHttps.mensagem()).contains("https://");
+
+        Resposta naoImagem = put("/livros/atualizar/" + livro.getId(), funcionario, Map.of("capaUrl", "https://exemplo.com/pagina-do-livro"));
+        assertThat(naoImagem.status()).isEqualTo(400);
+        assertThat(naoImagem.mensagem()).contains("Copiar endereço da imagem");
+        assertThat(recarregar(livro).getCapaUrl()).isEqualTo(link);
+
+        Resposta outroCampo = put("/livros/atualizar/" + livro.getId(), funcionario, Map.of("preco", 60));
+        assertThat(outroCampo.status()).isEqualTo(200);
+        assertThat(recarregar(livro).getCapaUrl()).isEqualTo(link);
+
+        Resposta automatica = put("/livros/atualizar/" + livro.getId(), funcionario, Map.of("capaUrl", ""));
+        assertThat(automatica.status()).isEqualTo(200);
+        assertThat(recarregar(livro).getCapaUrl()).isNull();
+    }
+
+    @Test
+    void naoCadastraOMesmoLivroDuasVezes() {
+        String funcionario = token(criarFuncionario());
+
+        Resposta primeiro = post("/livros/cadastro", funcionario, novoLivro("O Hobbit"));
+        assertThat(primeiro.status()).isEqualTo(200);
+
+        Resposta repetido = post("/livros/cadastro", funcionario, novoLivro("O Hobbit edição especial"));
+        assertThat(repetido.status()).isEqualTo(409);
+        assertThat(repetido.mensagem()).contains("já está no acervo");
+
+        put("/livros/atualizar/" + primeiro.corpo().path("id").asText(), funcionario, Map.of("isbn10", "", "isbn13", ""));
+        assertThat(post("/livros/cadastro", funcionario, novoLivro("O Hobbit edição especial")).status()).isEqualTo(200);
+    }
+
+    @Test
+    void livroSemIsbnRepetidoPeloTituloEAutorTambemEBloqueado() {
+        String funcionario = token(criarFuncionario());
+        String codigo = UUID.randomUUID().toString().substring(0, 8);
+
+        assertThat(post("/livros/cadastro", funcionario, novoLivro("Sem capa " + codigo)).status()).isEqualTo(200);
+        assertThat(post("/livros/cadastro", funcionario, novoLivro("Sem capa: " + codigo.toUpperCase() + "!")).status()).isEqualTo(409);
+    }
+
+    @Test
+    void edicaoNaoUsaOIsbnDeOutroLivro() {
+        String funcionario = token(criarFuncionario());
+        Livro primeiro = criarLivro(10, 1, 0);
+        primeiro.setIsbn13("9781111111111");
+        livroRepository.save(primeiro);
+        Livro segundo = criarLivro(10, 1, 0);
+
+        Resposta resposta = put("/livros/atualizar/" + segundo.getId(), funcionario, Map.of("isbn13", "978-1111111111"));
+
+        assertThat(resposta.status()).isEqualTo(409);
+        assertThat(resposta.mensagem()).contains(primeiro.getTitulo());
+        assertThat(recarregar(segundo).getIsbn13()).isNull();
     }
 }
