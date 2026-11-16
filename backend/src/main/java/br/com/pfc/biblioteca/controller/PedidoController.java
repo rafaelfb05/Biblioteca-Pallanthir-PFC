@@ -44,6 +44,11 @@ public class PedidoController {
         return service.registrarEntrega(id);
     }
 
+    @PostMapping("/{id}/cancelar")
+    public PedidoDTO cancelar(@PathVariable UUID id) {
+        return service.cancelarPedido(id);
+    }
+
     @PostMapping("/{id}/reembolso")
     public PedidoDTO reembolsar(@PathVariable UUID id) {
         return service.solicitarReembolso(id);

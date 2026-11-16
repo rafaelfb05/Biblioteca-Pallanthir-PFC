@@ -171,6 +171,27 @@ public class MercadoPagoService {
                 json.path("status_detail").asText());
     }
 
+    public void cancelarOrder(String orderId) {
+        if (orderId == null || !orderId.matches("[A-Za-z0-9]+")) {
+            return;
+        }
+
+        HttpResponse<String> resposta = chamar(HttpRequest.newBuilder()
+                .uri(URI.create(API + "/" + orderId + "/cancel"))
+                .header("Content-Type", "application/json")
+                .header("Authorization", "Bearer " + accessToken)
+                .header("X-Idempotency-Key", UUID.randomUUID().toString())
+                .POST(HttpRequest.BodyPublishers.noBody())
+                .build());
+
+        int status = resposta.statusCode();
+        if ((status >= 200 && status < 300) || status == 404) {
+            return;
+        }
+        log.error("Mercado Pago recusou o cancelamento da order {} ({}): {}", orderId, status, resposta.body());
+        throw new ConflitoException("Não foi possível cancelar o pagamento no Mercado Pago agora. Tente novamente em instantes.");
+    }
+
     public void reembolsarOrder(String orderId) {
         if (orderId == null || !orderId.matches("[A-Za-z0-9]+")) {
             throw new RegraDeNegocioException("Pedido sem pagamento associado");

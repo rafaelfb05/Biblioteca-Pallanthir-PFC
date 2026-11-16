@@ -16,9 +16,11 @@ public class Reserva {
     @ManyToOne
     private Livro livro;
     public static final int DIAS_PARA_RETIRADA = 3;
+    public static final int DIAS_PARA_DEVOLUCAO = 7;
 
     private LocalDateTime dataReserva;
     private Boolean danificado;
+    private LocalDateTime dataEntrega;
     @Column(length = 64)
     private String politicaVersao;
     private LocalDateTime dataAceitePolitica;
@@ -111,5 +113,21 @@ public class Reserva {
 
     public void setDataAceitePolitica(LocalDateTime dataAceitePolitica) {
         this.dataAceitePolitica = dataAceitePolitica;
+    }
+
+    public LocalDateTime getDataEntrega() {
+        return dataEntrega;
+    }
+
+    public void setDataEntrega(LocalDateTime dataEntrega) {
+        this.dataEntrega = dataEntrega;
+    }
+
+    public LocalDateTime getPrazoDevolucao() {
+        if (status != StatusReserva.ENTREGUE) {
+            return null;
+        }
+        LocalDateTime entrega = dataEntrega != null ? dataEntrega : dataReserva;
+        return entrega == null ? null : entrega.plusDays(DIAS_PARA_DEVOLUCAO);
     }
 }
