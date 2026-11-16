@@ -961,6 +961,8 @@ function App() {
   const [abaGestao, setAbaGestao] = useState("reservas");
   const [multas, setMultas] = useState([]);
   const [avisos, setAvisos] = useState([]);
+  const [novoEmailPendente, setNovoEmailPendente] = useState(null);
+  const [codigoNovoEmail, setCodigoNovoEmail] = useState("");
   const [confirmacao, setConfirmacao] = useState(null);
   const [confirmando, setConfirmando] = useState(false);
   const livroDoLink = useRef(
@@ -1243,6 +1245,8 @@ function App() {
     setMultas([]);
     setAvisos([]);
     setConfirmacao(null);
+    setNovoEmailPendente(null);
+    setCodigoNovoEmail("");
     setMultasGestao([]);
     setLogs([]);
     setDashboard(null);
@@ -1549,7 +1553,9 @@ function App() {
       await usuariosApi.recuperarSenha(email);
       setFormRecuperacao({ ...FORM_RECUPERACAO_VAZIO, email });
       setModoAutenticacao("redefinir");
-      setAvisoAutenticacao("Enviamos um código de recuperação para " + email + ".");
+      setAvisoAutenticacao(
+        "Se o e-mail " + email + " estiver cadastrado, enviamos um código de recuperação para ele."
+      );
     } catch (e) {
       setErro(mensagemDeErro(e, "Não foi possível enviar o código."));
       console.error(e);
@@ -1767,18 +1773,48 @@ function App() {
       setSalvando(true);
       setErro(null);
       const atualizado = await usuariosApi.atualizar(usuario.id, { nome, email });
-      if (atualizado.email !== usuario.email) {
-        encerrarSessao("E-mail alterado. Entre novamente com o novo e-mail.");
-        setFormLogin({ email: atualizado.email, senha: "" });
-        abrirAutenticacao("login");
-        return;
-      }
       const sessao = { ...usuario, nome: atualizado.nome };
       salvarSessao(sessao);
       setUsuario(sessao);
+      if (atualizado.emailPendente) {
+        setNovoEmailPendente(atualizado.emailPendente);
+        setCodigoNovoEmail("");
+        setFormConta({ nome: atualizado.nome, email: usuario.email });
+        setAviso(
+          "Enviamos um código para " +
+            atualizado.emailPendente +
+            ". Digite-o abaixo para confirmar a troca do e-mail."
+        );
+        return;
+      }
       setAviso("Seus dados foram atualizados.");
     } catch (e) {
       setErro(mensagemDeErro(e, "Não foi possível atualizar seus dados."));
+      console.error(e);
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  const confirmarNovoEmail = async (evento) => {
+    evento.preventDefault();
+    const codigo = codigoNovoEmail.trim();
+    if (!/^\d{6}$/.test(codigo)) {
+      setErro("Digite o código de 6 dígitos enviado para o novo e-mail.");
+      return;
+    }
+    try {
+      setSalvando(true);
+      setErro(null);
+      const confirmado = await usuariosApi.confirmarEmail(codigo);
+      encerrarSessao("E-mail alterado. Entre novamente com o novo e-mail.");
+      setFormLogin({ email: confirmado.email, senha: "" });
+      abrirAutenticacao("login");
+    } catch (e) {
+      setErro(mensagemDeErro(e, "Não foi possível confirmar o novo e-mail."));
+      if (e.status === 400 && /Peça a troca/.test(e.message || "")) {
+        setNovoEmailPendente(null);
+      }
       console.error(e);
     } finally {
       setSalvando(false);
@@ -2979,10 +3015,16 @@ function App() {
               reservarLivro(livro);
             }}
             disabled={
-              reservaEmEdicao === livro.id || Number(livro.estoqueReserva || 0) <= 0
+              reservaEmEdicao === livro.id ||
+              Boolean(reservaAtivaDoLivro(livro)) ||
+              Number(livro.estoqueReserva || 0) <= 0
             }
           >
-            {Number(livro.estoqueReserva || 0) <= 0 ? "Indisponível" : "Reservar"}
+            {reservaAtivaDoLivro(livro)
+              ? "Reservado"
+              : Number(livro.estoqueReserva || 0) <= 0
+              ? "Indisponível"
+              : "Reservar"}
           </button>
         )}
         {!ehFuncionario && (
@@ -4570,7 +4612,8 @@ function App() {
                       />
                     </label>
                     <small className="dica-senha">
-                      Se você alterar o e-mail, precisará entrar novamente.
+                      Se você alterar o e-mail, enviaremos um código para o novo endereço
+                      e você precisará entrar novamente depois de confirmar.
                     </small>
 
                     <div className="modal-actions">
@@ -4579,6 +4622,41 @@ function App() {
                       </button>
                     </div>
                   </form>
+
+                  {novoEmailPendente && (
+                    <form className="confirmar-email" onSubmit={confirmarNovoEmail}>
+                      <strong>Confirme o novo e-mail</strong>
+                      <p>
+                        Digite o código enviado para <b>{novoEmailPendente}</b>. O e-mail da
+                        conta só muda depois dessa confirmação.
+                      </p>
+                      <div className="confirmar-email-linha">
+                        <input
+                          id="codigo-novo-email"
+                          inputMode="numeric"
+                          autoComplete="one-time-code"
+                          maxLength={6}
+                          placeholder="000000"
+                          aria-label="Código de confirmação do novo e-mail"
+                          value={codigoNovoEmail}
+                          onChange={(e) => setCodigoNovoEmail(e.target.value.replace(/\D/g, ""))}
+                        />
+                        <button type="submit" disabled={salvando}>
+                          {salvando ? "Confirmando..." : "Confirmar troca"}
+                        </button>
+                        <button
+                          type="button"
+                          className="link-button"
+                          onClick={() => {
+                            setNovoEmailPendente(null);
+                            setCodigoNovoEmail("");
+                          }}
+                        >
+                          Manter o e-mail atual
+                        </button>
+                      </div>
+                    </form>
+                  )}
                 </div>
 
                 <div className="conta-lateral">

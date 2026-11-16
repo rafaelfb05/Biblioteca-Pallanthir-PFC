@@ -48,7 +48,7 @@ O controlador dos dados é a **equipe do projeto Biblioteca Pallanthir**, desenv
 
 O sistema registra ações relevantes, como logins (com sucesso ou falha), verificação em duas etapas, cadastros, atualizações e exclusões de conta, favoritos, reservas, cancelamentos, entregas, devoluções, avaliações, criação de pedidos, pagamentos aprovados, pedidos expirados, alterações no acervo e tentativas de acesso negado.
 
-Cada registro contém: **identificador do usuário (quando existir), e-mail utilizado, tipo da ação, descrição da ação e data/hora**. Os logs só podem ser consultados por contas do tipo **Funcionário**.
+Cada registro contém: **identificador do usuário (quando existir), e-mail utilizado, tipo da ação, descrição da ação e data/hora**. Os logs só podem ser consultados por contas do tipo **Gerente**.
 
 A **dashboard** dos funcionários mostra apenas números gerais (quantidade de livros, de reservas por status e de matérias mais reservadas e compradas), sem identificar nenhum usuário.
 
@@ -147,7 +147,7 @@ Nenhum sistema é totalmente imune a incidentes. Caso ocorra um incidente de seg
 | Avaliações | Enquanto estiverem publicadas. As avaliações removidas deixam de ser exibidas. Após a exclusão da conta, as avaliações publicadas continuam visíveis com o nome "Usuário removido". |
 | Carrinho | Enquanto os itens estiverem no carrinho. Os itens saem quando o pedido é aprovado ou expira, ou quando você os remove. |
 | Pedidos | Mantidos para comprovação das compras e atendimento a pedidos de arrependimento e reembolso. Após a exclusão da conta, ficam associados apenas ao registro anonimizado. |
-| Logs de auditoria | Mantidos pelo tempo necessário para fins de segurança e rastreabilidade, enquanto o projeto estiver em funcionamento. |
+| Logs de auditoria | **12 meses** a partir do registro. Depois desse prazo, os registros são apagados automaticamente. |
 
 ---
 
@@ -167,7 +167,7 @@ Ao excluir:
 
 Os pedidos continuam registrados, associados apenas à conta anonimizada. As avaliações que estiverem publicadas continuam visíveis, mas passam a exibir o nome "Usuário removido". Se não quiser que elas permaneçam, remova-as antes de excluir a conta.
 
-**Importante:** os logs de auditoria registrados **antes** da exclusão continuam armazenando o e-mail utilizado em cada ação, pelo período indicado na seção 6, para fins de segurança. Se desejar a remoção também desses registros, solicite pelo e-mail de contato.
+**Importante:** os logs de auditoria registrados **antes** da exclusão continuam armazenando o e-mail utilizado em cada ação, por até **12 meses** a partir de cada registro (seção 6), para fins de segurança, e depois são apagados automaticamente. Se desejar a remoção também desses registros, solicite pelo e-mail de contato.
 
 ---
 

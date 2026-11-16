@@ -1267,3 +1267,42 @@ test("cadastrar um livro que já existe mostra a janela com o livro do acervo", 
   expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
 });
 
+test("troca de e-mail só acontece depois de confirmar o código enviado ao novo e-mail", async () => {
+  simularApi({
+    ["PUT /usuarios/atualizar/" + ID_USUARIO]: (corpo) => [
+      200,
+      { id: ID_USUARIO, nome: corpo.nome, email: "ana@teste.com", tipo: "ESTUDANTE", emailPendente: corpo.email },
+    ],
+    "POST /usuarios/confirmar-email": () => [200, { id: ID_USUARIO, nome: "Ana", email: "nova@teste.com", tipo: "ESTUDANTE" }],
+  });
+  entrarComo("ESTUDANTE");
+  render(<App />);
+
+  fireEvent.click(await screen.findByTitle("Minha conta"));
+  const email = await screen.findByDisplayValue("ana@teste.com");
+  fireEvent.change(email, { target: { value: "nova@teste.com" } });
+  fireEvent.click(screen.getByRole("button", { name: "Salvar alterações" }));
+
+  expect(await screen.findByText(/Enviamos um código para nova@teste.com/)).toBeInTheDocument();
+  expect(localStorage.getItem("pallanthir:usuario")).toContain("ana@teste.com");
+  fireEvent.change(screen.getByRole("textbox", { name: "Código de confirmação do novo e-mail" }), { target: { value: "123456" } });
+  fireEvent.click(screen.getByRole("button", { name: "Confirmar troca" }));
+
+  await waitFor(() => expect(chamadasPara("POST", "/usuarios/confirmar-email")).toHaveLength(1));
+  expect(chamadasPara("POST", "/usuarios/confirmar-email")[0].corpo).toEqual({ codigo: "123456" });
+  await waitFor(() => expect(localStorage.getItem("pallanthir:usuario")).toBeNull());
+});
+
+test("cartão do acervo mostra Reservado quando o estudante já tem reserva do livro", async () => {
+  simularApi({
+    ["GET /reservas/usuario/" + ID_USUARIO]: () => [200, [
+      { id: "r1", livroId: ID_LIVRO, tituloLivro: "Clean Code", dataReserva: "2026-11-15T10:00:00", status: "RESERVADO", prazoRetirada: "2026-11-18T10:00:00" },
+    ]],
+  });
+  entrarComo("ESTUDANTE");
+  render(<App />);
+
+  const reservado = await screen.findByRole("button", { name: "Reservado" });
+  expect(reservado).toBeDisabled();
+});
+

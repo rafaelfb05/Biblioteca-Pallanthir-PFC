@@ -15,6 +15,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 class AutenticacaoIntegracaoTest extends TesteIntegracaoBase {
@@ -27,6 +28,7 @@ class AutenticacaoIntegracaoTest extends TesteIntegracaoBase {
         corpo.put("tipo", tipo);
         corpo.put("aceitouTermos", aceitouTermos);
         corpo.put("codigoAcesso", codigo);
+        corpo.put("versaoTermos", documentoService.versaoVigenteDosTermos());
         return corpo;
     }
 
@@ -56,30 +58,37 @@ class AutenticacaoIntegracaoTest extends TesteIntegracaoBase {
     void cadastroGuardaAVersaoDosTermosERegistraOAceiteNosLogs() {
         String email = emailUnico();
         Map<String, Object> corpo = cadastro(email, SENHA, "ESTUDANTE", true, null);
-        corpo.put("versaoTermos", "a1b2c3");
+        String vigente = documentoService.versaoVigenteDosTermos();
 
         Resposta resposta = post("/usuarios/cadastro", null, corpo);
 
         assertThat(resposta.status()).isEqualTo(200);
         Usuario salvo = usuarioRepository.findByEmailAndAtivoTrue(email).orElseThrow();
-        assertThat(salvo.getVersaoTermos()).isEqualTo("a1b2c3");
-        verify(logService).registrarLog(eq(salvo.getId()), eq(email), eq("ACEITE_TERMOS"), contains("versão a1b2c3"));
+        assertThat(salvo.getVersaoTermos()).isEqualTo(vigente);
+        verify(logService).registrarLog(eq(salvo.getId()), eq(email), eq("ACEITE_TERMOS"), contains("versão " + vigente));
+
+        Map<String, Object> desatualizado = cadastro(emailUnico(), SENHA, "ESTUDANTE", true, null);
+        desatualizado.put("versaoTermos", "versao-antiga");
+        assertThat(post("/usuarios/cadastro", null, desatualizado).status()).isEqualTo(409);
     }
 
     @Test
     void usuarioAceitaANovaVersaoDosTermos() {
         Usuario estudante = criarEstudante();
+        estudante.setVersaoTermos(null);
+        usuarioRepository.save(estudante);
         String token = token(estudante);
+        String vigente = documentoService.versaoVigenteDosTermos();
 
         assertThat(get("/usuarios/termos", token).corpo().path("versaoAceita").isNull()).isTrue();
 
-        Resposta aceite = post("/usuarios/termos/aceite", token, Map.of("versao", "versao-2"));
+        Resposta aceite = post("/usuarios/termos/aceite", token, Map.of("versao", vigente));
 
         assertThat(aceite.status()).isEqualTo(200);
-        assertThat(aceite.corpo().path("versaoAceita").asText()).isEqualTo("versao-2");
-        assertThat(get("/usuarios/termos", token).corpo().path("versaoAceita").asText()).isEqualTo("versao-2");
+        assertThat(aceite.corpo().path("versaoAceita").asText()).isEqualTo(vigente);
+        assertThat(get("/usuarios/termos", token).corpo().path("versaoAceita").asText()).isEqualTo(vigente);
         Usuario salvo = usuarioRepository.findById(estudante.getId()).orElseThrow();
-        assertThat(salvo.getVersaoTermos()).isEqualTo("versao-2");
+        assertThat(salvo.getVersaoTermos()).isEqualTo(vigente);
         assertThat(salvo.getDataAceiteTermos()).isNotNull();
         verify(logService).registrarLog(eq(estudante.getId()), eq(estudante.getEmail()), eq("ACEITE_TERMOS"), contains("após atualização"));
     }
@@ -88,7 +97,8 @@ class AutenticacaoIntegracaoTest extends TesteIntegracaoBase {
     void aceiteDosTermosRecusaVersaoInvalidaEExigeLogin() {
         String token = token(criarFuncionario());
 
-        assertThat(post("/usuarios/termos/aceite", token, Map.of("versao", "versão <script>")).status()).isEqualTo(400);
+        assertThat(post("/usuarios/termos/aceite", token, Map.of("versao", "versão <script>")).status()).isEqualTo(409);
+        assertThat(post("/usuarios/termos/aceite", token, Map.of("versao", "versao-antiga")).status()).isEqualTo(409);
         assertThat(post("/usuarios/termos/aceite", token, Map.of("versao", "")).status()).isEqualTo(400);
         assertThat(post("/usuarios/termos/aceite", null, Map.of("versao", "v1")).status()).isIn(401, 403);
     }
@@ -300,4 +310,97 @@ class AutenticacaoIntegracaoTest extends TesteIntegracaoBase {
         assertThat(resposta.status()).isEqualTo(409);
         assertThat(usuarioRepository.findById(usuario.getId()).orElseThrow().isAtivo()).isTrue();
     }
+
+    @Test
+    void codigoDeRecuperacaoEInvalidadoDepoisDeCincoErros() {
+        Usuario usuario = criarEstudante();
+        post("/usuarios/recuperar-senha", null, Map.of("email", usuario.getEmail()));
+        ArgumentCaptor<String> codigo = ArgumentCaptor.forClass(String.class);
+        verify(emailService).enviarCodigo(eq(usuario.getEmail()), anyString(), anyString(), anyString(), codigo.capture(), eq(15));
+        String errado = codigo.getValue().equals("123456") ? "654321" : "123456";
+
+        for (int i = 0; i < 4; i++) {
+            Resposta resposta = post("/usuarios/redefinir-senha", null, Map.of("email", usuario.getEmail(), "codigo", errado, "novaSenha", "NovaSenha@456"));
+            assertThat(resposta.mensagem()).isEqualTo("Código inválido ou expirado");
+        }
+        Resposta quinta = post("/usuarios/redefinir-senha", null, Map.of("email", usuario.getEmail(), "codigo", errado, "novaSenha", "NovaSenha@456"));
+        assertThat(quinta.mensagem()).contains("Muitas tentativas");
+
+        Resposta comCodigoCerto = post("/usuarios/redefinir-senha", null, Map.of("email", usuario.getEmail(), "codigo", codigo.getValue(), "novaSenha", "NovaSenha@456"));
+        assertThat(comCodigoCerto.status()).isEqualTo(400);
+        assertThat(passwordEncoder.matches(SENHA, usuarioRepository.findById(usuario.getId()).orElseThrow().getSenha())).isTrue();
+    }
+
+    @Test
+    void recuperacaoNaoRevelaSeOEmailExisteENemReenviaEmMenosDeUmMinuto() {
+        String inexistente = emailUnico();
+        assertThat(post("/usuarios/recuperar-senha", null, Map.of("email", inexistente)).status()).isEqualTo(200);
+        verify(emailService, never()).enviarCodigo(eq(inexistente), anyString(), anyString(), anyString(), anyString(), eq(15));
+        Resposta redefinir = post("/usuarios/redefinir-senha", null, Map.of("email", inexistente, "codigo", "123456", "novaSenha", "NovaSenha@456"));
+        assertThat(redefinir.status()).isEqualTo(400);
+        assertThat(redefinir.mensagem()).isEqualTo("Código inválido ou expirado");
+
+        Usuario usuario = criarEstudante();
+        assertThat(post("/usuarios/recuperar-senha", null, Map.of("email", usuario.getEmail())).status()).isEqualTo(200);
+        assertThat(post("/usuarios/recuperar-senha", null, Map.of("email", usuario.getEmail())).status()).isEqualTo(200);
+        verify(emailService, times(1)).enviarCodigo(eq(usuario.getEmail()), anyString(), anyString(), anyString(), anyString(), eq(15));
+    }
+
+    @Test
+    void codigoDeVerificacaoEInvalidadoDepoisDeCincoErros() {
+        Usuario usuario = criarEstudante();
+        String codigo = loginECapturarCodigo(usuario.getEmail(), SENHA);
+        String errado = codigo.equals("123456") ? "654321" : "123456";
+
+        for (int i = 0; i < 5; i++) {
+            post("/usuarios/verificar-2fa", null, Map.of("email", usuario.getEmail(), "codigo", errado));
+        }
+        Resposta comCodigoCerto = post("/usuarios/verificar-2fa", null, Map.of("email", usuario.getEmail(), "codigo", codigo));
+
+        assertThat(comCodigoCerto.status()).isEqualTo(400);
+        Resposta emailInexistente = post("/usuarios/verificar-2fa", null, Map.of("email", emailUnico(), "codigo", "123456"));
+        assertThat(emailInexistente.status()).isEqualTo(400);
+        assertThat(emailInexistente.mensagem()).isEqualTo("Código inválido ou expirado");
+    }
+
+    @Test
+    void trocaDeEmailSoAconteceDepoisDeConfirmarOCodigoEnviadoAoNovoEmail() {
+        Usuario usuario = criarEstudante();
+        String token = token(usuario);
+        String novo = emailUnico();
+
+        Resposta pedido = put("/usuarios/atualizar/" + usuario.getId(), token, Map.of("nome", usuario.getNome(), "email", novo));
+        assertThat(pedido.status()).isEqualTo(200);
+        assertThat(pedido.corpo().path("email").asText()).isEqualTo(usuario.getEmail());
+        assertThat(pedido.corpo().path("emailPendente").asText()).isEqualTo(novo);
+        ArgumentCaptor<String> codigo = ArgumentCaptor.forClass(String.class);
+        verify(emailService).enviarCodigo(eq(novo), anyString(), anyString(), anyString(), codigo.capture(), eq(15));
+        assertThat(usuarioRepository.findById(usuario.getId()).orElseThrow().getEmail()).isEqualTo(usuario.getEmail());
+
+        String errado = codigo.getValue().equals("123456") ? "654321" : "123456";
+        assertThat(post("/usuarios/confirmar-email", token, Map.of("codigo", errado)).status()).isEqualTo(400);
+
+        Resposta confirmado = post("/usuarios/confirmar-email", token, Map.of("codigo", codigo.getValue()));
+        assertThat(confirmado.status()).isEqualTo(200);
+        assertThat(confirmado.corpo().path("email").asText()).isEqualTo(novo);
+        assertThat(usuarioRepository.findById(usuario.getId()).orElseThrow().getEmail()).isEqualTo(novo);
+        assertThat(get("/usuarios/termos", token).status()).isIn(401, 403);
+    }
+
+    @Test
+    void tokenDeContaExcluidaOuComPerfilAlteradoDeixaDeValerNaHora() {
+        Usuario funcionario = criarFuncionario();
+        String tokenFuncionario = token(funcionario);
+        assertThat(get("/reservas/em-aberto", tokenFuncionario).status()).isEqualTo(200);
+
+        funcionario.setTipo(br.com.pfc.biblioteca.enums.TipoUsuario.ESTUDANTE);
+        usuarioRepository.save(funcionario);
+        assertThat(get("/reservas/em-aberto", tokenFuncionario).status()).isEqualTo(403);
+
+        Usuario estudante = criarEstudante();
+        String tokenEstudante = token(estudante);
+        assertThat(delete("/usuarios/deletar/" + estudante.getId(), tokenEstudante).status()).isEqualTo(204);
+        assertThat(get("/reservas/usuario/" + estudante.getId(), tokenEstudante).status()).isIn(401, 403);
+    }
 }
+

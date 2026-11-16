@@ -32,6 +32,16 @@ public class ReservaService {
     private final LogAuditoriaService logService;
     private final MultaService multaService;
 
+    public static final int RESERVAS_EM_ABERTO_POR_ESTUDANTE = 3;
+    private static final List<StatusReserva> EM_ABERTO = List.of(StatusReserva.RESERVADO, StatusReserva.ENTREGUE);
+
+    private DocumentoService documentoService;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public void setDocumentoService(DocumentoService documentoService) {
+        this.documentoService = documentoService;
+    }
+
     public ReservaService(ReservaRepository repository, LivroRepository livroRepository, UsuarioRepository usuarioRepository, LogAuditoriaService logService, MultaService multaService) {
         this.multaService = multaService;
         this.repository = repository;
@@ -56,9 +66,23 @@ public class ReservaService {
         }
         multaService.garantirSemMultaPendente(usuario.getId());
         garantirSemDevolucaoAtrasada(usuario);
+        documentoService.garantirTermosAceitos(usuario);
+        if (versaoDaPolitica == null || !versaoDaPolitica.equals(documentoService.versaoVigenteDaPoliticaDeReservas())) {
+            logService.registrarLog(usuario.getId(), usuario.getEmail(), "FALHA_RESERVA", "Política de reservas não aceita na versão vigente");
+            throw new RegraDeNegocioException("Leia e aceite a versão atual da Política de Uso de Reservas para reservar");
+        }
 
         Livro livro = livroRepository.buscarComLock(livroId)
+                .filter(Livro::isAtivo)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Livro não encontrado"));
+
+        if (repository.existsByUsuarioIdAndLivroIdAndStatusIn(usuario.getId(), livro.getId(), EM_ABERTO)) {
+            throw new ConflitoException("Você já tem uma reserva em aberto deste livro");
+        }
+        if (repository.countByUsuarioIdAndStatusIn(usuario.getId(), EM_ABERTO) >= RESERVAS_EM_ABERTO_POR_ESTUDANTE) {
+            throw new ConflitoException("Você já tem " + RESERVAS_EM_ABERTO_POR_ESTUDANTE
+                    + " reservas em aberto. Devolva ou cancele uma delas para reservar outro livro.");
+        }
 
         if(livro.getEstoqueReserva() == null || livro.getEstoqueReserva() <= 0){
             logService.registrarLog(usuario.getId(), usuario.getEmail(), "FALHA_RESERVA", "Livro " + livro.getId() + " esgotado");

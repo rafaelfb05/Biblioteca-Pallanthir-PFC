@@ -10,6 +10,7 @@ import br.com.pfc.biblioteca.repository.LivroRepository;
 import br.com.pfc.biblioteca.repository.PedidoRepository;
 import br.com.pfc.biblioteca.repository.ReservaRepository;
 import br.com.pfc.biblioteca.repository.UsuarioRepository;
+import br.com.pfc.biblioteca.service.DocumentoService;
 import br.com.pfc.biblioteca.service.EmailService;
 import br.com.pfc.biblioteca.service.LogAuditoriaService;
 import br.com.pfc.biblioteca.service.MercadoPagoService;
@@ -80,6 +81,9 @@ public abstract class TesteIntegracaoBase {
     @Autowired
     protected JwtService jwtService;
 
+    @Autowired
+    protected DocumentoService documentoService;
+
     protected final ObjectMapper json = new ObjectMapper();
     protected final HttpClient http = HttpClient.newHttpClient();
     protected final Map<String, MercadoPagoService.OrderMP> ordensMercadoPago = new ConcurrentHashMap<>();
@@ -120,6 +124,9 @@ public abstract class TesteIntegracaoBase {
     }
 
     protected Resposta requisicao(String metodo, String caminho, String token, Object corpo, Map<String, String> cabecalhos) {
+        if (metodo.equals("POST") && caminho.matches("^/reservas/[^/?]+/[^/?]+$")) {
+            caminho = caminho + "?politicaVersao=" + documentoService.versaoVigenteDaPoliticaDeReservas();
+        }
         try {
             HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create("http://localhost:" + porta + caminho))
                     .header("Content-Type", "application/json")
@@ -158,6 +165,7 @@ public abstract class TesteIntegracaoBase {
         usuario.setEmail(emailUnico());
         usuario.setSenha(passwordEncoder.encode(SENHA));
         usuario.setTipo(tipo);
+        usuario.setVersaoTermos(documentoService.versaoVigenteDosTermos());
         return usuarioRepository.save(usuario);
     }
 

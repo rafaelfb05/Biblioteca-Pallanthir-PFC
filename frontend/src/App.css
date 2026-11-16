@@ -5282,3 +5282,56 @@ html {
   background: rgba(229, 29, 42, 0.08);
 }
 
+.confirmar-email {
+  display: grid;
+  gap: 8px;
+  margin-top: 18px;
+  padding: 16px 18px;
+  border: 1px solid rgba(240, 170, 40, 0.4);
+  border-radius: 10px;
+  background: rgba(240, 170, 40, 0.08);
+}
+
+.confirmar-email strong {
+  color: #ffffff;
+  font-size: 15px;
+}
+
+.confirmar-email p {
+  margin: 0;
+  color: #cfcfd6;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.confirmar-email-linha {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.confirmar-email-linha input {
+  width: 130px;
+  padding: 10px 12px;
+  border: 1px solid #35353b;
+  border-radius: 8px;
+  background: #0d0d10;
+  color: #ffffff;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  text-align: center;
+}
+
+.confirmar-email-linha button[type="submit"] {
+  padding: 10px 16px;
+  border: 1px solid #e51d2a;
+  border-radius: 8px;
+  background: #e51d2a;
+  color: #ffffff;
+  font-weight: 700;
+  cursor: pointer;
+}
+

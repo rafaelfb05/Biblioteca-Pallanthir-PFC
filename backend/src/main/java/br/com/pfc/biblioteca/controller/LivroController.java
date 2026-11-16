@@ -1,5 +1,6 @@
 package br.com.pfc.biblioteca.controller;
 
+import jakarta.validation.Valid;
 import java.util.UUID;
 import br.com.pfc.biblioteca.dto.livro.AtualizarLivroRequest;
 import br.com.pfc.biblioteca.dto.livro.CadastroLivroRequest;
@@ -24,7 +25,7 @@ public class LivroController {
     }
 
     @PostMapping("/cadastro")
-    public ResponseEntity<LivroDTO> salvarLivro(@RequestBody CadastroLivroRequest request) {
+    public ResponseEntity<LivroDTO> salvarLivro(@RequestBody @Valid CadastroLivroRequest request) {
         Livro livro = service.salvarLivro(request.titulo(), request.materia(), request.preco(), request.estoqueReserva(), request.estoqueCompra());
         return ResponseEntity.ok(new LivroDTO(livro));
     }
@@ -35,7 +36,7 @@ public class LivroController {
     }
 
     @PutMapping("/atualizar/{id}")
-    public ResponseEntity<LivroDTO> atualizarLivro(@PathVariable UUID id, @RequestBody AtualizarLivroRequest request) {
+    public ResponseEntity<LivroDTO> atualizarLivro(@PathVariable UUID id, @RequestBody @Valid AtualizarLivroRequest request) {
         Livro livro = service.atualizarLivro(id, request);
         return ResponseEntity.ok(new LivroDTO(livro));
     }

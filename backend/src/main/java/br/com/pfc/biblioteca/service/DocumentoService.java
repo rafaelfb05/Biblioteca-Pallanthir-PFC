@@ -1,5 +1,6 @@
 package br.com.pfc.biblioteca.service;
 
+import br.com.pfc.biblioteca.infra.exception.ConflitoException;
 import br.com.pfc.biblioteca.dto.documento.DocumentoDTO;
 import br.com.pfc.biblioteca.dto.documento.DocumentoVersaoDTO;
 import br.com.pfc.biblioteca.entity.jpa.Documento;
@@ -67,6 +68,24 @@ public class DocumentoService {
     @Transactional(readOnly = true)
     public DocumentoDTO obter(TipoDocumento tipo) {
         return paraDTO(buscar(tipo));
+    }
+
+    @Transactional(readOnly = true)
+    public String versaoVigenteDosTermos() {
+        return VersaoDeDocumentos.calcular(buscar(TipoDocumento.TERMOS_DE_USO).getConteudo(),
+                buscar(TipoDocumento.POLITICA_DE_PRIVACIDADE).getConteudo());
+    }
+
+    @Transactional(readOnly = true)
+    public String versaoVigenteDaPoliticaDeReservas() {
+        return VersaoDeDocumentos.calcular(buscar(TipoDocumento.POLITICA_DE_RESERVAS).getConteudo());
+    }
+
+    public void garantirTermosAceitos(Usuario usuario) {
+        if (!versaoVigenteDosTermos().equals(usuario.getVersaoTermos())) {
+            throw new ConflitoException("Os Termos de Uso ou a Política de Privacidade foram atualizados. "
+                    + "Aceite a nova versão para continuar.");
+        }
     }
 
     @Transactional(readOnly = true)

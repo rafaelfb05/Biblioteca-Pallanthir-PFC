@@ -275,11 +275,12 @@ class ReservaIntegracaoTest extends TesteIntegracaoBase {
         Usuario estudante = criarEstudante();
         Livro livro = criarLivro(30, 2, 0);
 
-        Resposta resposta = post("/reservas/" + estudante.getId() + "/" + livro.getId() + "?politicaVersao=abc123", token(estudante), null);
+        String vigente = documentoService.versaoVigenteDaPoliticaDeReservas();
+        Resposta resposta = post("/reservas/" + estudante.getId() + "/" + livro.getId() + "?politicaVersao=" + vigente, token(estudante), null);
 
         assertThat(resposta.status()).isEqualTo(200);
         Reserva salva = reservaRepository.findById(UUID.fromString(reservaDoLivro(estudante, livro).path("id").asText())).orElseThrow();
-        assertThat(salva.getPoliticaVersao()).isEqualTo("abc123");
+        assertThat(salva.getPoliticaVersao()).isEqualTo(vigente);
         assertThat(salva.getDataAceitePolitica()).isNotNull();
         assertThat(post("/reservas/" + estudante.getId() + "/" + criarLivro(30, 2, 0).getId() + "?politicaVersao=" + "x".repeat(70),
                 token(estudante), null).status()).isEqualTo(400);
@@ -330,4 +331,63 @@ class ReservaIntegracaoTest extends TesteIntegracaoBase {
         put("/reservas/" + id + "/devolver", funcionario, null);
         assertThat(reservar(estudante, maisUm).status()).isEqualTo(200);
     }
+
+    @Test
+    void reservaExigeAPoliticaVigenteELivroAtivo() {
+        Usuario estudante = criarEstudante();
+        String token = token(estudante);
+        Livro livro = criarLivro(30, 3, 0);
+
+        assertThat(post("/reservas/" + estudante.getId() + "/" + livro.getId() + "?politicaVersao=versao-antiga", token, null).status()).isEqualTo(400);
+
+        livro.setAtivo(false);
+        livroRepository.save(livro);
+        assertThat(post("/reservas/" + estudante.getId() + "/" + livro.getId(), token, null).status()).isEqualTo(404);
+        assertThat(recarregar(livro).getEstoqueReserva()).isEqualTo(3);
+    }
+
+    @Test
+    void estudanteTemUmaReservaPorLivroEAteTresEmAberto() {
+        Usuario estudante = criarEstudante();
+        String token = token(estudante);
+        Livro primeiro = criarLivro(30, 5, 0);
+
+        assertThat(post("/reservas/" + estudante.getId() + "/" + primeiro.getId(), token, null).status()).isEqualTo(200);
+        Resposta repetida = post("/reservas/" + estudante.getId() + "/" + primeiro.getId(), token, null);
+        assertThat(repetida.status()).isEqualTo(409);
+        assertThat(recarregar(primeiro).getEstoqueReserva()).isEqualTo(4);
+
+        assertThat(post("/reservas/" + estudante.getId() + "/" + criarLivro(30, 5, 0).getId(), token, null).status()).isEqualTo(200);
+        assertThat(post("/reservas/" + estudante.getId() + "/" + criarLivro(30, 5, 0).getId(), token, null).status()).isEqualTo(200);
+        Resposta quarta = post("/reservas/" + estudante.getId() + "/" + criarLivro(30, 5, 0).getId(), token, null);
+        assertThat(quarta.status()).isEqualTo(409);
+        assertThat(quarta.mensagem()).contains("3 reservas em aberto");
+    }
+
+    @Test
+    void termosDesatualizadosBloqueiamReservaECompra() {
+        Usuario estudante = criarEstudante();
+        estudante.setVersaoTermos("versao-antiga");
+        usuarioRepository.save(estudante);
+        String token = token(estudante);
+        Livro livro = criarLivro(30, 3, 3);
+
+        Resposta reserva = post("/reservas/" + estudante.getId() + "/" + livro.getId(), token, null);
+        assertThat(reserva.status()).isEqualTo(409);
+        assertThat(reserva.mensagem()).contains("Aceite a nova versão");
+
+        adicionarAoCarrinho(token, livro, 1);
+        assertThat(post("/pedidos/checkout", token, null).status()).isEqualTo(409);
+    }
+
+    @Test
+    void livroNaoAceitaPrecoNemEstoqueNegativos() {
+        String funcionario = token(criarFuncionario());
+        Livro livro = criarLivro(30, 3, 3);
+
+        assertThat(put("/livros/atualizar/" + livro.getId(), funcionario, java.util.Map.of("estoqueReserva", -5)).status()).isEqualTo(400);
+        assertThat(put("/livros/atualizar/" + livro.getId(), funcionario, java.util.Map.of("preco", -1.0)).status()).isEqualTo(400);
+        assertThat(recarregar(livro).getEstoqueReserva()).isEqualTo(3);
+    }
 }
+

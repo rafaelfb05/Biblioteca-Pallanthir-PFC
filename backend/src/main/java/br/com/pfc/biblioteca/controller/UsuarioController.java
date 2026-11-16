@@ -5,6 +5,7 @@ import br.com.pfc.biblioteca.dto.auth.*;
 import br.com.pfc.biblioteca.dto.livro.LivroDTO;
 import br.com.pfc.biblioteca.dto.usuario.AceiteTermosRequest;
 import br.com.pfc.biblioteca.dto.usuario.AlterarPerfilRequest;
+import br.com.pfc.biblioteca.dto.usuario.ConfirmarEmailRequest;
 import br.com.pfc.biblioteca.dto.usuario.TermosDTO;
 import br.com.pfc.biblioteca.dto.usuario.UsuarioDTO;
 import br.com.pfc.biblioteca.dto.usuario.UsuarioRequest;
@@ -41,6 +42,11 @@ public class UsuarioController {
     public ResponseEntity<UsuarioDTO> atualizarUsuario(@PathVariable UUID id, @RequestBody UsuarioRequest request) {
         Usuario usuario = service.atualizarUsuario(id, request);
         return ResponseEntity.ok(new UsuarioDTO(usuario));
+    }
+
+    @PostMapping("/confirmar-email")
+    public ResponseEntity<UsuarioDTO> confirmarNovoEmail(@RequestBody @Valid ConfirmarEmailRequest request) {
+        return ResponseEntity.ok(new UsuarioDTO(service.confirmarNovoEmail(request.codigo())));
     }
 
     @PutMapping("/{id}/perfil")

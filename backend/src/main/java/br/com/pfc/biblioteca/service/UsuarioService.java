@@ -1,5 +1,8 @@
 package br.com.pfc.biblioteca.service;
 
+import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
+import java.security.MessageDigest;
 import br.com.pfc.biblioteca.dto.auth.*;
 import br.com.pfc.biblioteca.dto.livro.LivroDTO;
 import br.com.pfc.biblioteca.dto.usuario.AceiteTermosRequest;
@@ -45,11 +48,16 @@ public class UsuarioService {
     private final PedidoRepository pedidoRepository;
     private final MultaRepository multaRepository;
     private final AvisoDisponibilidadeService avisoService;
+    private final DocumentoService documentoService;
+    private static final SecureRandom GERADOR = new SecureRandom();
+    private static final int TENTATIVAS_MAXIMAS_CODIGO = 5;
+    private static final String CODIGO_INVALIDO = "Código inválido ou expirado";
 
     public UsuarioService(UsuarioRepository repository, LivroRepository livroRepository, ReservaRepository reservaRepository,
                           PasswordEncoder passwordEncoder, JwtService jwtService, EmailService emailService,
                           LogAuditoriaService logService, PedidoRepository pedidoRepository, MultaRepository multaRepository,
-                          AvisoDisponibilidadeService avisoService) {
+                          AvisoDisponibilidadeService avisoService, DocumentoService documentoService) {
+        this.documentoService = documentoService;
         this.multaRepository = multaRepository;
         this.avisoService = avisoService;
         this.repository = repository;
@@ -67,7 +75,7 @@ public class UsuarioService {
         return usuario.stream()
                 .map(u -> new UsuarioDTO(
                         u.getId(), u.getNome(),
-                        u.getEmail(), u.getTipo()))
+                        u.getEmail(), u.getTipo(), null))
                 .collect(Collectors.toList());
     }
 
@@ -101,7 +109,7 @@ public class UsuarioService {
         Usuario usuario = new Usuario(request);
         usuario.setSenha(passwordEncoder.encode(request.senha()));
         usuario.setDataAceiteTermos(LocalDateTime.now());
-        usuario.setVersaoTermos(versaoValida(request.versaoTermos()));
+        usuario.setVersaoTermos(versaoVigente(request.versaoTermos(), request.email()));
         Usuario salvo = repository.save(usuario);
         logService.registrarLog(salvo.getId(), salvo.getEmail(), "CADASTRO_USUARIO", "Usuário cadastrado como " + salvo.getTipo());
         registrarAceiteDosTermos(salvo, "no cadastro");
@@ -116,22 +124,20 @@ public class UsuarioService {
     @Transactional
     public TermosDTO aceitarTermos(AceiteTermosRequest request) {
         Usuario usuario = usuarioLogado();
-        usuario.setVersaoTermos(versaoValida(request.versao()));
+        usuario.setVersaoTermos(versaoVigente(request.versao(), usuario.getEmail()));
         usuario.setDataAceiteTermos(LocalDateTime.now());
         Usuario salvo = repository.save(usuario);
         registrarAceiteDosTermos(salvo, "após atualização dos documentos");
         return new TermosDTO(salvo.getVersaoTermos(), salvo.getDataAceiteTermos());
     }
 
-    private String versaoValida(String versao) {
-        if (versao == null || versao.isBlank()) {
-            return null;
+    private String versaoVigente(String versao, String email) {
+        String vigente = documentoService.versaoVigenteDosTermos();
+        if (versao == null || !vigente.equals(versao.trim())) {
+            logService.registrarLog(null, email, "FALHA_ACEITE_TERMOS", "Versão dos termos diferente da versão vigente");
+            throw new ConflitoException("Os Termos de Uso foram atualizados. Recarregue a página e leia a nova versão.");
         }
-        String limpa = versao.trim();
-        if (!limpa.matches("^[A-Za-z0-9_-]{1,64}$")) {
-            throw new RegraDeNegocioException("Versão dos termos inválida");
-        }
-        return limpa;
+        return vigente;
     }
 
     private void registrarAceiteDosTermos(Usuario usuario, String momento) {
@@ -165,15 +171,74 @@ public class UsuarioService {
         if(request.nome() != null && !request.nome().isBlank()){
             usuario.setNome(request.nome());
         }
-        if(request.email() != null && !request.email().isBlank() && !request.email().equals(usuario.getEmail())){
-            if(repository.findByEmailAndAtivoTrue(request.email()).isPresent()){
+        String novoEmail = request.email() == null ? "" : request.email().trim();
+        if(!novoEmail.isEmpty() && !novoEmail.equalsIgnoreCase(usuario.getEmail())){
+            if(!novoEmail.matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")){
+                throw new RegraDeNegocioException("Informe um e-mail válido");
+            }
+            if(repository.findByEmailAndAtivoTrue(novoEmail).isPresent()){
                 throw new ConflitoException("Já existe um usuário ativo com esse email");
             }
-            usuario.setEmail(request.email());
+            String codigo = gerarCodigo();
+            usuario.setNovoEmailPendente(novoEmail);
+            usuario.setCodigoNovoEmail(codigo);
+            usuario.setExpiracaoCodigoNovoEmail(LocalDateTime.now().plusMinutes(15));
+            usuario.setTentativasNovoEmail(0);
+            emailService.enviarCodigo(novoEmail, "Confirme seu novo e-mail - Biblioteca Pallanthir",
+                    "Confirme seu novo e-mail",
+                    "Use o código abaixo para confirmar a troca do e-mail da sua conta na Biblioteca Pallanthir.",
+                    codigo, 15);
+            logService.registrarLog(usuario.getId(), usuario.getEmail(), "SOLICITACAO_TROCA_EMAIL", "Código de confirmação enviado ao novo e-mail");
         }
         Usuario salvo = repository.save(usuario);
         logService.registrarLog(salvo.getId(), salvo.getEmail(), "ATUALIZACAO_USUARIO", "Dados do usuário atualizados");
         return salvo;
+    }
+
+    @Transactional
+    public Usuario confirmarNovoEmail(String codigo) {
+        Usuario usuario = usuarioLogado();
+        if (usuario.getNovoEmailPendente() == null) {
+            throw new RegraDeNegocioException("Não há troca de e-mail pendente");
+        }
+        if (!codigoConfere(usuario.getCodigoNovoEmail(), usuario.getExpiracaoCodigoNovoEmail(), codigo)) {
+            int tentativas = usuario.getTentativasNovoEmail() + 1;
+            usuario.setTentativasNovoEmail(tentativas);
+            boolean esgotou = tentativas >= TENTATIVAS_MAXIMAS_CODIGO;
+            if (esgotou) {
+                limparTrocaDeEmail(usuario);
+            }
+            repository.save(usuario);
+            logService.registrarLog(usuario.getId(), usuario.getEmail(), "FALHA_TROCA_EMAIL", "Código de confirmação incorreto ou expirado");
+            throw new RegraDeNegocioException(esgotou
+                    ? "Muitas tentativas com o código errado. Peça a troca do e-mail novamente."
+                    : CODIGO_INVALIDO);
+        }
+        String novoEmail = usuario.getNovoEmailPendente();
+        if (repository.findByEmailAndAtivoTrue(novoEmail).isPresent()) {
+            limparTrocaDeEmail(usuario);
+            repository.save(usuario);
+            throw new ConflitoException("Já existe um usuário ativo com esse email");
+        }
+        String emailAnterior = usuario.getEmail();
+        usuario.setEmail(novoEmail);
+        limparTrocaDeEmail(usuario);
+        Usuario salvo = repository.save(usuario);
+        logService.registrarLog(salvo.getId(), salvo.getEmail(), "TROCA_EMAIL", "E-mail alterado de " + emailAnterior);
+        return salvo;
+    }
+
+    private void limparTrocaDeEmail(Usuario usuario) {
+        usuario.setNovoEmailPendente(null);
+        usuario.setCodigoNovoEmail(null);
+        usuario.setExpiracaoCodigoNovoEmail(null);
+        usuario.setTentativasNovoEmail(0);
+    }
+
+    private boolean codigoConfere(String esperado, LocalDateTime expiracao, String informado) {
+        return esperado != null && informado != null && expiracao != null
+                && expiracao.isAfter(LocalDateTime.now())
+                && MessageDigest.isEqual(esperado.getBytes(StandardCharsets.UTF_8), informado.trim().getBytes(StandardCharsets.UTF_8));
     }
 
     @Transactional
@@ -339,6 +404,7 @@ public class UsuarioService {
         String codigo = gerarCodigo();
         usuario.setCodigo2FA(codigo);
         usuario.setExpiracao2FA(LocalDateTime.now().plusMinutes(10));
+        usuario.setTentativas2FA(0);
         repository.save(usuario);
 
         emailService.enviarCodigo(usuario.getEmail(), "Código de login - Biblioteca Pallanthir",
@@ -350,7 +416,7 @@ public class UsuarioService {
     }
 
     private String gerarCodigo(){
-        return String.valueOf((int) (Math.random() * 900000) + 100000);
+        return String.valueOf(100000 + GERADOR.nextInt(900000));
     }
 
     public LoginResponse renovarToken(){
@@ -359,21 +425,31 @@ public class UsuarioService {
     }
 
     public LoginResponse confirmar2FA(Confirmar2FARequest request){
-        Usuario usuario = repository.findByEmailAndAtivoTrue(request.email())
-                .orElseThrow(() -> {
-                    logService.registrarLog(null, request.email(), "FALHA_2FA", "Email não encontrado");
-                    return new RecursoNaoEncontradoException("Usuário não encontrado");
-                });
+        Usuario usuario = repository.findByEmailAndAtivoTrue(request.email()).orElse(null);
+        if (usuario == null) {
+            logService.registrarLog(null, request.email(), "FALHA_2FA", "Email não encontrado");
+            throw new RegraDeNegocioException(CODIGO_INVALIDO);
+        }
 
-        if(usuario.getCodigo2FA() == null
-                || !usuario.getCodigo2FA().equals(request.codigo())
-                || usuario.getExpiracao2FA().isBefore(LocalDateTime.now())){
-            logService.registrarLog(usuario.getId(), usuario.getEmail(), "FALHA_2FA", "Código 2FA inválido ou expirado");
-            throw new RegraDeNegocioException("Código invalido ou expirado!");
+        if (!codigoConfere(usuario.getCodigo2FA(), usuario.getExpiracao2FA(), request.codigo())) {
+            int tentativas = usuario.getTentativas2FA() + 1;
+            usuario.setTentativas2FA(tentativas);
+            boolean esgotou = usuario.getCodigo2FA() != null && tentativas >= TENTATIVAS_MAXIMAS_CODIGO;
+            if (esgotou) {
+                usuario.setCodigo2FA(null);
+                usuario.setExpiracao2FA(null);
+            }
+            repository.save(usuario);
+            logService.registrarLog(usuario.getId(), usuario.getEmail(), "FALHA_2FA",
+                    esgotou ? "Código 2FA invalidado após " + tentativas + " tentativas erradas" : "Código 2FA inválido ou expirado");
+            throw new RegraDeNegocioException(esgotou
+                    ? "Muitas tentativas com o código errado. Faça login novamente para receber um novo código."
+                    : CODIGO_INVALIDO);
         }
 
         usuario.setCodigo2FA(null);
         usuario.setExpiracao2FA(null);
+        usuario.setTentativas2FA(0);
         repository.save(usuario);
 
         String token = jwtService.gerarToken(usuario);
@@ -382,15 +458,22 @@ public class UsuarioService {
     }
 
     public void recuperacaoSenha(SolicitarRecuperacaoRequest request){
-        Usuario usuario = repository.findByEmailAndAtivoTrue(request.email())
-                .orElseThrow(() -> {
-                    logService.registrarLog(null, request.email(), "FALHA_RECUPERACAO_SENHA", "Email não encontrado");
-                    return new RecursoNaoEncontradoException("Usuário não encontrado");
-                });
+        Usuario usuario = repository.findByEmailAndAtivoTrue(request.email()).orElse(null);
+        if (usuario == null) {
+            logService.registrarLog(null, request.email(), "FALHA_RECUPERACAO_SENHA", "Email não encontrado");
+            return;
+        }
+        LocalDateTime agora = LocalDateTime.now();
+        if (usuario.getDataCodigoRecuperacao() != null && usuario.getDataCodigoRecuperacao().isAfter(agora.minusMinutes(1))) {
+            logService.registrarLog(usuario.getId(), usuario.getEmail(), "RECUPERACAO_SENHA_REPETIDA", "Novo pedido em menos de 1 minuto, código não reenviado");
+            return;
+        }
 
         String codigo = gerarCodigo();
         usuario.setCodigoRecuperacao(codigo);
-        usuario.setExpiracaoCodigo(LocalDateTime.now().plusMinutes(15));
+        usuario.setExpiracaoCodigo(agora.plusMinutes(15));
+        usuario.setDataCodigoRecuperacao(agora);
+        usuario.setTentativasRecuperacao(0);
         repository.save(usuario);
         emailService.enviarCodigo(usuario.getEmail(), "Recuperação de Conta - Biblioteca Pallanthir",
                 "Recuperação de conta",
@@ -400,22 +483,33 @@ public class UsuarioService {
     }
 
     public void redefinirSenha(RedefinirSenhaRequest request){
-        Usuario usuario = repository.findByEmailAndAtivoTrue(request.email())
-                .orElseThrow(() -> {
-                    logService.registrarLog(null, request.email(), "FALHA_REDEFINICAO_SENHA", "Email não encontrado");
-                    return new RecursoNaoEncontradoException("Usuário não encontrado");
-                });
+        Usuario usuario = repository.findByEmailAndAtivoTrue(request.email()).orElse(null);
+        if (usuario == null) {
+            logService.registrarLog(null, request.email(), "FALHA_REDEFINICAO_SENHA", "Email não encontrado");
+            throw new RegraDeNegocioException(CODIGO_INVALIDO);
+        }
 
-        if(usuario.getCodigoRecuperacao() == null
-        || !usuario.getCodigoRecuperacao().equals(request.codigo())
-        || usuario.getExpiracaoCodigo().isBefore(LocalDateTime.now())){
-            logService.registrarLog(usuario.getId(), usuario.getEmail(), "FALHA_REDEFINICAO_SENHA", "Código de recuperação inválido ou expirado");
-            throw new RegraDeNegocioException("Código de recuperção invalido ou expirado!");
+        if (!codigoConfere(usuario.getCodigoRecuperacao(), usuario.getExpiracaoCodigo(), request.codigo())) {
+            int tentativas = usuario.getTentativasRecuperacao() + 1;
+            usuario.setTentativasRecuperacao(tentativas);
+            boolean esgotou = usuario.getCodigoRecuperacao() != null && tentativas >= TENTATIVAS_MAXIMAS_CODIGO;
+            if (esgotou) {
+                usuario.setCodigoRecuperacao(null);
+                usuario.setExpiracaoCodigo(null);
+            }
+            repository.save(usuario);
+            logService.registrarLog(usuario.getId(), usuario.getEmail(), "FALHA_REDEFINICAO_SENHA",
+                    esgotou ? "Código de recuperação invalidado após " + tentativas + " tentativas erradas" : "Código de recuperação inválido ou expirado");
+            throw new RegraDeNegocioException(esgotou
+                    ? "Muitas tentativas com o código errado. Peça um novo código de recuperação."
+                    : CODIGO_INVALIDO);
         }
 
         usuario.setSenha(passwordEncoder.encode(request.novaSenha()));
         usuario.setCodigoRecuperacao(null);
         usuario.setExpiracaoCodigo(null);
+        usuario.setTentativasRecuperacao(0);
+        usuario.setDataCodigoRecuperacao(null);
         repository.save(usuario);
         logService.registrarLog(usuario.getId(), usuario.getEmail(), "REDEFINICAO_SENHA", "Senha redefinida com sucesso");
     }

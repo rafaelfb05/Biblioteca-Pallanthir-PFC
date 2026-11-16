@@ -41,6 +41,13 @@ public class Usuario {
     private LocalDateTime dataAceiteTermos;
     @Column(length = 64)
     private String versaoTermos;
+    private Integer tentativas2FA = 0;
+    private Integer tentativasRecuperacao = 0;
+    private LocalDateTime dataCodigoRecuperacao;
+    private String novoEmailPendente;
+    private String codigoNovoEmail;
+    private LocalDateTime expiracaoCodigoNovoEmail;
+    private Integer tentativasNovoEmail = 0;
 
     public Usuario(){}
 
@@ -49,6 +56,62 @@ public class Usuario {
         this.email=request.email();
         this.senha=request.senha();
         this.tipo=request.tipo();
+    }
+
+    public Integer getTentativas2FA() {
+        return tentativas2FA == null ? 0 : tentativas2FA;
+    }
+
+    public void setTentativas2FA(Integer tentativas2FA) {
+        this.tentativas2FA = tentativas2FA;
+    }
+
+    public Integer getTentativasRecuperacao() {
+        return tentativasRecuperacao == null ? 0 : tentativasRecuperacao;
+    }
+
+    public void setTentativasRecuperacao(Integer tentativasRecuperacao) {
+        this.tentativasRecuperacao = tentativasRecuperacao;
+    }
+
+    public LocalDateTime getDataCodigoRecuperacao() {
+        return dataCodigoRecuperacao;
+    }
+
+    public void setDataCodigoRecuperacao(LocalDateTime dataCodigoRecuperacao) {
+        this.dataCodigoRecuperacao = dataCodigoRecuperacao;
+    }
+
+    public String getNovoEmailPendente() {
+        return novoEmailPendente;
+    }
+
+    public void setNovoEmailPendente(String novoEmailPendente) {
+        this.novoEmailPendente = novoEmailPendente;
+    }
+
+    public String getCodigoNovoEmail() {
+        return codigoNovoEmail;
+    }
+
+    public void setCodigoNovoEmail(String codigoNovoEmail) {
+        this.codigoNovoEmail = codigoNovoEmail;
+    }
+
+    public LocalDateTime getExpiracaoCodigoNovoEmail() {
+        return expiracaoCodigoNovoEmail;
+    }
+
+    public void setExpiracaoCodigoNovoEmail(LocalDateTime expiracaoCodigoNovoEmail) {
+        this.expiracaoCodigoNovoEmail = expiracaoCodigoNovoEmail;
+    }
+
+    public Integer getTentativasNovoEmail() {
+        return tentativasNovoEmail == null ? 0 : tentativasNovoEmail;
+    }
+
+    public void setTentativasNovoEmail(Integer tentativasNovoEmail) {
+        this.tentativasNovoEmail = tentativasNovoEmail;
     }
 
     public String getVersaoTermos() {

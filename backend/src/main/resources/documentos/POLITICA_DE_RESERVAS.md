@@ -13,6 +13,8 @@ O exemplar reservado fica sob a sua responsabilidade desde a retirada até a dev
 - **Retirada:** depois de reservar, você tem **3 dias** para retirar o livro no balcão da biblioteca. Se ele não for retirado nesse prazo, **a reserva é cancelada automaticamente** e o exemplar volta a ficar disponível para outros estudantes.
 - **Devolução:** depois de retirar o livro, você tem **7 dias** para devolvê-lo. **Enquanto houver um livro com a devolução atrasada, não é possível fazer novas reservas.** O bloqueio termina assim que a devolução for registrada pela equipe.
 
+- **Limite de reservas:** você pode ter **uma reserva em aberto de cada livro** e **até 3 reservas em aberto ao mesmo tempo**, contando os livros reservados e os que estão com você. Para reservar outro livro, devolva ou cancele uma das reservas.
+
 Os dois prazos aparecem em **Minhas reservas**.
 
 ## 3. Danos e perda

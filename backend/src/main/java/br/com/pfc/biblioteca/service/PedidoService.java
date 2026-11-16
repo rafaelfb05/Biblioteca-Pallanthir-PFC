@@ -43,6 +43,12 @@ public class PedidoService {
     private final MercadoPagoService mercadoPagoService;
     private final LogAuditoriaService logService;
     private final MultaService multaService;
+    private DocumentoService documentoService;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public void setDocumentoService(DocumentoService documentoService) {
+        this.documentoService = documentoService;
+    }
 
     public PedidoService(PedidoRepository repository, ItemCarrinhoRepository itemCarrinhoRepository, LivroRepository livroRepository, UsuarioRepository usuarioRepository, MercadoPagoService mercadoPagoService, LogAuditoriaService logService, MultaService multaService) {
         this.multaService = multaService;
@@ -57,6 +63,7 @@ public class PedidoService {
     @Transactional
     public PedidoDTO finalizarCompra(){
         Usuario usuario = usuarioLogado();
+        documentoService.garantirTermosAceitos(usuario);
 
         List<ItemCarrinho> itensCarrinho = new ArrayList<>(itemCarrinhoRepository.findByUsuarioIdAndAtivoTrue(usuario.getId()));
         if(itensCarrinho.isEmpty()){
