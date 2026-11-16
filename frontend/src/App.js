@@ -2779,6 +2779,30 @@ function App() {
     />
   );
 
+  const devolucoesAtrasadas = reservas.filter(
+    (reserva) =>
+      reserva.status === "ENTREGUE" &&
+      reserva.prazoDevolucao &&
+      new Date(reserva.prazoDevolucao).getTime() < Date.now()
+  );
+
+  const avisoDeAtraso = ehEstudante && devolucoesAtrasadas.length > 0 && (
+    <div className="aviso-multa aviso-atraso" role="alert">
+      <span className="aviso-multa-icone" aria-hidden="true">
+        !
+      </span>
+      <p>
+        {devolucoesAtrasadas.length === 1
+          ? 'A devolução de "' + devolucoesAtrasadas[0].tituloLivro + '" está atrasada.'
+          : "Você tem " + devolucoesAtrasadas.length + " livros com a devolução atrasada."}{" "}
+        Enquanto não devolver, não é possível fazer novas reservas.
+      </p>
+      <button type="button" onClick={irParaReservas}>
+        Ver reservas
+      </button>
+    </div>
+  );
+
   const avisoDeMulta = ehEstudante && multasPendentes.length > 0 && (
     <div className="aviso-multa" role="alert">
       <span className="aviso-multa-icone" aria-hidden="true">
@@ -2988,6 +3012,7 @@ function App() {
       </div>
     </header>
     {avisoDeMulta}
+    {avisoDeAtraso}
     {modalPoliticaReserva}
     </>
   );

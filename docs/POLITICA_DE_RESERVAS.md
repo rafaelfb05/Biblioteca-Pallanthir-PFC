@@ -8,9 +8,12 @@ Ao reservar um livro, você declara que leu e concorda com as regras abaixo. Lei
 
 O exemplar reservado fica sob a sua responsabilidade desde a retirada até a devolução à biblioteca. Você deve conservá-lo em bom estado e devolvê-lo dentro do prazo.
 
-## 2. Prazo para retirar
+## 2. Prazos
 
-Depois de reservar, você tem **3 dias** para retirar o livro no balcão da biblioteca. O prazo aparece em **Minhas reservas**. Se o livro não for retirado dentro desse prazo, **a reserva é cancelada automaticamente** e o exemplar volta a ficar disponível para outros estudantes.
+- **Retirada:** depois de reservar, você tem **3 dias** para retirar o livro no balcão da biblioteca. Se ele não for retirado nesse prazo, **a reserva é cancelada automaticamente** e o exemplar volta a ficar disponível para outros estudantes.
+- **Devolução:** depois de retirar o livro, você tem **7 dias** para devolvê-lo. **Enquanto houver um livro com a devolução atrasada, não é possível fazer novas reservas.** O bloqueio termina assim que a devolução for registrada pela equipe.
+
+Os dois prazos aparecem em **Minhas reservas**.
 
 ## 3. Danos e perda
 

@@ -304,4 +304,30 @@ class ReservaIntegracaoTest extends TesteIntegracaoBase {
         assertThat(prazo).isEqualTo(dataEntrega.plusDays(7));
         assertThat(entregue.path("prazoRetirada").isNull()).isTrue();
     }
+
+    @Test
+    void devolucaoAtrasadaBloqueiaNovasReservasAteODevolverOLivro() {
+        Usuario estudante = criarEstudante();
+        String funcionario = token(criarFuncionario());
+        Livro emprestado = criarLivro(30, 1, 0);
+        reservar(estudante, emprestado);
+        String id = reservaDoLivro(estudante, emprestado).path("id").asText();
+        put("/reservas/" + id + "/entregar", funcionario, null);
+        Livro outro = criarLivro(30, 2, 0);
+
+        assertThat(reservar(estudante, outro).status()).isEqualTo(200);
+
+        Reserva entregue = reservaRepository.findById(UUID.fromString(id)).orElseThrow();
+        entregue.setDataEntrega(LocalDateTime.now().minusDays(8));
+        reservaRepository.save(entregue);
+        Livro maisUm = criarLivro(30, 2, 0);
+
+        Resposta bloqueada = reservar(estudante, maisUm);
+        assertThat(bloqueada.status()).isEqualTo(409);
+        assertThat(bloqueada.mensagem()).contains("devolução").contains(emprestado.getTitulo());
+        assertThat(recarregar(maisUm).getEstoqueReserva()).isEqualTo(2);
+
+        put("/reservas/" + id + "/devolver", funcionario, null);
+        assertThat(reservar(estudante, maisUm).status()).isEqualTo(200);
+    }
 }

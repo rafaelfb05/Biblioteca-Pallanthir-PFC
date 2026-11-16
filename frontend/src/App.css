@@ -4060,6 +4060,8 @@ html {
 
 .prazo-retirada {
   display: flex;
+  width: fit-content;
+  max-width: 100%;
   align-items: flex-start;
   gap: 10px;
   margin-top: 10px;
@@ -4121,6 +4123,26 @@ html {
   color: #f3c4c7;
   font-size: 13px;
   line-height: 1.5;
+}
+
+.aviso-atraso {
+  background: rgba(240, 170, 40, 0.1);
+  border-bottom-color: rgba(240, 170, 40, 0.4);
+  color: #f3dcb0;
+}
+
+.aviso-multa.aviso-atraso .aviso-multa-icone {
+  background: #f0aa28;
+  color: #1a1206;
+}
+
+.aviso-multa.aviso-atraso button {
+  background: #f0aa28;
+  color: #1a1206;
+}
+
+.aviso-multa.aviso-atraso button:hover:not(:disabled) {
+  background: #d8961c;
 }
 
 .aviso-multa p {

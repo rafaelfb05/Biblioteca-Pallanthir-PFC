@@ -904,6 +904,22 @@ test("reserva entregue mostra o prazo de devolução e a capa do livro", async (
   expect(document.querySelector(".prazo-retirada.vencido")).not.toBeNull();
 });
 
+test("devolução atrasada mostra o aviso de bloqueio de reservas", async () => {
+  simularApi({
+    ["GET /reservas/usuario/" + ID_USUARIO]: () => [200, [
+      { id: "r1", livroId: ID_LIVRO, tituloLivro: "Clean Code", capaUrl: null, dataReserva: "2026-11-01T10:00:00", dataEntrega: "2026-11-02T10:00:00", status: "ENTREGUE", prazoDevolucao: "2026-11-09T10:00:00" },
+    ]],
+  });
+  entrarComo("ESTUDANTE");
+  render(<App />);
+
+  const aviso = await screen.findByRole("alert");
+  expect(aviso).toHaveTextContent('A devolução de "Clean Code" está atrasada.');
+  expect(aviso).toHaveTextContent("não é possível fazer novas reservas");
+  fireEvent.click(within(aviso).getByRole("button", { name: "Ver reservas" }));
+  expect(await screen.findByRole("heading", { name: "Minhas reservas" })).toBeInTheDocument();
+});
+
 test("funcionário vê a dashboard e não vê carrinho nem pedidos", async () => {
   simularApi({
     "GET /dashboard": () => [

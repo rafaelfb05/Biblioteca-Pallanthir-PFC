@@ -55,6 +55,7 @@ public class ReservaService {
             throw new RegraDeNegocioException("Você só pode reservar livros para a sua própria conta");
         }
         multaService.garantirSemMultaPendente(usuario.getId());
+        garantirSemDevolucaoAtrasada(usuario);
 
         Livro livro = livroRepository.buscarComLock(livroId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Livro não encontrado"));
@@ -75,6 +76,19 @@ public class ReservaService {
         logService.registrarLog(usuario.getId(), usuario.getEmail(), "RESERVA_LIVRO", "Reserva " + reserva.getId() + " do livro " + livro.getId() + " criada"
                 + (versaoDaPolitica == null ? "" : ", política de reservas aceita (versão " + versaoDaPolitica + ")"));
         return reserva;
+    }
+
+    private void garantirSemDevolucaoAtrasada(Usuario usuario) {
+        LocalDateTime agora = LocalDateTime.now();
+        repository.findByUsuarioIdAndStatus(usuario.getId(), StatusReserva.ENTREGUE).stream()
+                .filter(reserva -> reserva.getPrazoDevolucao() != null && reserva.getPrazoDevolucao().isBefore(agora))
+                .findFirst()
+                .ifPresent(atrasada -> {
+                    logService.registrarLog(usuario.getId(), usuario.getEmail(), "FALHA_RESERVA",
+                            "Devolução atrasada da reserva " + atrasada.getId());
+                    throw new ConflitoException("Você está com a devolução de \"" + atrasada.getLivro().getTitulo()
+                            + "\" atrasada. Devolva o livro na biblioteca para voltar a fazer reservas.");
+                });
     }
 
     @Transactional
