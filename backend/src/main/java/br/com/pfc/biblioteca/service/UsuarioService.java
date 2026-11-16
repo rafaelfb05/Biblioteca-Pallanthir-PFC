@@ -6,6 +6,7 @@ import br.com.pfc.biblioteca.dto.usuario.AceiteTermosRequest;
 import br.com.pfc.biblioteca.dto.usuario.TermosDTO;
 import br.com.pfc.biblioteca.dto.usuario.UsuarioDTO;
 import br.com.pfc.biblioteca.dto.usuario.UsuarioRequest;
+import br.com.pfc.biblioteca.enums.StatusMulta;
 import br.com.pfc.biblioteca.enums.StatusPedido;
 import br.com.pfc.biblioteca.enums.StatusReserva;
 import br.com.pfc.biblioteca.enums.TipoUsuario;
@@ -17,6 +18,7 @@ import br.com.pfc.biblioteca.infra.security.JwtService;
 import br.com.pfc.biblioteca.entity.jpa.Livro;
 import br.com.pfc.biblioteca.entity.jpa.Usuario;
 import br.com.pfc.biblioteca.repository.LivroRepository;
+import br.com.pfc.biblioteca.repository.MultaRepository;
 import br.com.pfc.biblioteca.repository.PedidoRepository;
 import br.com.pfc.biblioteca.repository.ReservaRepository;
 import br.com.pfc.biblioteca.repository.UsuarioRepository;
@@ -41,10 +43,12 @@ public class UsuarioService {
     private final EmailService emailService;
     private final LogAuditoriaService logService;
     private final PedidoRepository pedidoRepository;
+    private final MultaRepository multaRepository;
 
     public UsuarioService(UsuarioRepository repository, LivroRepository livroRepository, ReservaRepository reservaRepository,
                           PasswordEncoder passwordEncoder, JwtService jwtService, EmailService emailService,
-                          LogAuditoriaService logService, PedidoRepository pedidoRepository) {
+                          LogAuditoriaService logService, PedidoRepository pedidoRepository, MultaRepository multaRepository) {
+        this.multaRepository = multaRepository;
         this.repository = repository;
         this.livroRepository = livroRepository;
         this.reservaRepository = reservaRepository;
@@ -183,6 +187,10 @@ public class UsuarioService {
         boolean temPedidoEmAberto = pedidoRepository.existsByUsuarioIdAndStatusIn(
                 usuario.getId(),
                 List.of(StatusPedido.AGUARDANDO_PAGAMENTO, StatusPedido.APROVADO));
+
+        if (multaRepository.existsByUsuarioIdAndStatus(usuario.getId(), StatusMulta.PENDENTE)) {
+            throw new ConflitoException("Você tem uma multa pendente. Pague a multa antes de excluir a conta.");
+        }
 
         if (temPedidoEmAberto) {
             throw new ConflitoException(

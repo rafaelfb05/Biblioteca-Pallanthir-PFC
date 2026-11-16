@@ -38,3 +38,12 @@ export const carregarVersaoDosTermos = async () => {
   );
   return versaoDosTermos(...textos);
 };
+
+export const carregarPoliticaDeReservas = async () => {
+  const resposta = await fetch(process.env.PUBLIC_URL + "/docs/POLITICA_DE_RESERVAS.md");
+  if (!resposta.ok) {
+    throw new Error("Não foi possível carregar a política de reservas");
+  }
+  const texto = await resposta.text();
+  return { texto, versao: versaoDosTermos(texto) };
+};

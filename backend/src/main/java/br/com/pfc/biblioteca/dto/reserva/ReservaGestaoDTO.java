@@ -9,12 +9,12 @@ import java.util.UUID;
 public record ReservaGestaoDTO(UUID id, UUID livroId, String tituloLivro, String capaUrl,
                                LocalDateTime dataReserva, StatusReserva status,
                                UUID usuarioId, String nomeEstudante, String emailEstudante,
-                               LocalDateTime prazoRetirada) {
+                               LocalDateTime prazoRetirada, LocalDateTime prazoDevolucao) {
 
     public ReservaGestaoDTO(Reserva reserva) {
         this(reserva.getId(), reserva.getLivro().getId(), reserva.getLivro().getTitulo(),
                 reserva.getLivro().getCapaUrl(), reserva.getDataReserva(), reserva.getStatus(),
                 reserva.getUsuario().getId(), reserva.getUsuario().getNome(), reserva.getUsuario().getEmail(),
-                reserva.getPrazoRetirada());
+                reserva.getPrazoRetirada(), reserva.getPrazoDevolucao());
     }
 }

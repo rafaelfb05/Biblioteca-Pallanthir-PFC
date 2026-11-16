@@ -3,6 +3,17 @@ import App from "./App";
 import { versaoDosTermos } from "./services/termos";
 
 jest.mock("./Componentes/ModalDocumento", () => () => null);
+jest.mock("./Componentes/ModalPoliticaReserva", () => {
+  const React = require("react");
+  return ({ livro, aoConfirmar, aoFechar }) =>
+    React.createElement(
+      "div",
+      { role: "dialog", "aria-label": "Política de Uso de Reservas" },
+      React.createElement("span", null, livro.titulo),
+      React.createElement("button", { type: "button", onClick: () => aoConfirmar("versao-teste") }, "Confirmar reserva"),
+      React.createElement("button", { type: "button", onClick: aoFechar }, "Cancelar política")
+    );
+});
 
 const API = "http://localhost:8080";
 const ID_USUARIO = "11111111-1111-4111-8111-111111111111";
@@ -688,7 +699,11 @@ test("aba de reservas da gestão registra entrega e devolução", async () => {
   expect(screen.getAllByText("Com o estudante")).toHaveLength(2);
 
   fireEvent.click(screen.getAllByRole("button", { name: "Registrar devolução" })[1]);
+  const janela = await screen.findByRole("dialog", { name: "Registrar devolução" });
+  expect(within(janela).getByRole("radio", { name: /Em bom estado/ })).toHaveAttribute("aria-checked", "true");
+  fireEvent.click(within(janela).getByRole("button", { name: "Registrar devolução" }));
   expect(await screen.findByText('"Sem Venda" foi devolvido por Bruno.')).toBeInTheDocument();
+  expect(chamadasPara("PUT", "/reservas/r2/devolver")[0].corpo).toEqual({ danificado: false, valorMulta: null, observacao: null });
   expect(screen.queryByText("Bruno", { selector: ".retirada-cabecalho strong" })).not.toBeInTheDocument();
   expect(chamadasPara("PUT", "/reservas/r1/entregar")).toHaveLength(1);
   expect(chamadasPara("PUT", "/reservas/r2/devolver")).toHaveLength(1);
@@ -746,6 +761,147 @@ test("reservas e pedidos mostram o prazo para retirada", async () => {
   expect(await screen.findByText(/faltam [45] h/)).toBeInTheDocument();
   expect(screen.getByText("Se a compra não for retirada até lá, ela é reembolsada automaticamente.")).toBeInTheDocument();
   expect(document.querySelector(".prazo-retirada.urgente")).not.toBeNull();
+});
+
+test("devolução com dano aplica multa com valor e observação", async () => {
+  simularApi({
+    "GET /livros": () => [200, [livro(ID_LIVRO, "Clean Code", { preco: 59.9 })]],
+    "GET /reservas/em-aberto": () => [200, [{
+      id: "r9", livroId: ID_LIVRO, tituloLivro: "Clean Code", capaUrl: null, dataReserva: "2026-11-15T09:00:00",
+      status: "ENTREGUE", usuarioId: "u1", nomeEstudante: "Ana", emailEstudante: "ana@teste.com",
+    }]],
+    "PUT /reservas/r9/devolver": () => [200, undefined],
+  });
+  entrarComo("FUNCIONARIO");
+  render(<App />);
+
+  await screen.findByRole("heading", { name: "Clean Code" });
+  fireEvent.click(screen.getByRole("button", { name: "Gestão" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Registrar devolução" }));
+  const janela = await screen.findByRole("dialog", { name: "Registrar devolução" });
+  fireEvent.click(within(janela).getByRole("radio", { name: /Danificado/ }));
+
+  const valor = within(janela).getByLabelText("Valor da multa (R$)");
+  expect(valor).toHaveValue("59,90");
+  fireEvent.change(valor, { target: { value: "45,50" } });
+  fireEvent.change(within(janela).getByLabelText("O que aconteceu? (opcional)"), { target: { value: "Capa rasgada" } });
+  fireEvent.click(within(janela).getByRole("button", { name: "Registrar e aplicar multa" }));
+
+  expect(await screen.findByText(/foi devolvido danificado. Multa de R\$\s45,50 aplicada a Ana/)).toBeInTheDocument();
+  expect(chamadasPara("PUT", "/reservas/r9/devolver")[0].corpo).toEqual({ danificado: true, valorMulta: 45.5, observacao: "Capa rasgada" });
+});
+
+test("estudante com multa pendente vê o aviso e paga pelo Mercado Pago", async () => {
+  const multa = {
+    id: "m1", livroId: ID_LIVRO, tituloLivro: "Clean Code", capaUrl: null, valor: 59.9, motivo: "Capa rasgada",
+    status: "PENDENTE", dataCriacao: "2026-11-15T10:00:00", dataPagamento: null,
+  };
+  simularApi({
+    "GET /multas/minhas": () => [200, [multa]],
+    "POST /multas/m1/pagar": () => [200, { ...multa, linkPagamento: "https://www.mercadopago.com.br/checkout/v1/redirect?order_id=ORDM1" }],
+  });
+  entrarComo("ESTUDANTE");
+  const assign = jest.fn();
+  delete window.location;
+  window.location = { ...localizacaoOriginal, pathname: "/", search: "", assign };
+  render(<App />);
+
+  const aviso = await screen.findByRole("alert");
+  expect(aviso).toHaveTextContent('porque o livro "Clean Code" foi devolvido danificado');
+  expect(aviso).toHaveTextContent("não é possível reservar nem comprar livros");
+  fireEvent.click(within(aviso).getByRole("button", { name: "Pagar multa" }));
+
+  await waitFor(() => expect(assign).toHaveBeenCalledWith("https://www.mercadopago.com.br/checkout/v1/redirect?order_id=ORDM1"));
+  expect(chamadasPara("POST", "/multas/m1/pagar")).toHaveLength(1);
+});
+
+test("funcionário dispensa multa na aba Multas da gestão", async () => {
+  simularApi({
+    "GET /multas": () => [200, [{
+      id: "m2", livroId: ID_LIVRO, tituloLivro: "Clean Code", capaUrl: null, valor: 30, motivo: "Páginas molhadas",
+      status: "PENDENTE", dataCriacao: "2026-11-15T10:00:00", usuarioId: "u1", nomeEstudante: "Ana", emailEstudante: "ana@teste.com",
+    }]],
+    "PUT /multas/m2/dispensar": () => [200, {}],
+  });
+  entrarComo("FUNCIONARIO");
+  render(<App />);
+
+  fireEvent.click(await screen.findByRole("button", { name: "Gestão" }));
+  fireEvent.click(await screen.findByRole("tab", { name: /^Multas/ }));
+  expect(await screen.findByText(/Páginas molhadas/)).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: "Dispensar multa" }));
+  expect(chamadasPara("PUT", "/multas/m2/dispensar")).toHaveLength(0);
+  fireEvent.click(screen.getByRole("button", { name: "Clique de novo para confirmar" }));
+
+  expect(await screen.findByText(/Multa de R\$\s30,00 de Ana dispensada./)).toBeInTheDocument();
+  expect(screen.getByText("Nenhuma multa pendente.")).toBeInTheDocument();
+});
+
+test("reservar abre a política de reservas e só reserva depois do aceite", async () => {
+  simularApi({ ["POST /reservas/" + ID_USUARIO + "/" + ID_LIVRO]: () => [200, undefined] });
+  entrarComo("ESTUDANTE");
+  render(<App />);
+
+  await screen.findByRole("heading", { name: "Clean Code" });
+  fireEvent.click(screen.getAllByRole("button", { name: "Reservar" })[0]);
+
+  const politica = await screen.findByRole("dialog", { name: "Política de Uso de Reservas" });
+  expect(chamadasPara("POST", "/reservas/" + ID_USUARIO + "/" + ID_LIVRO)).toHaveLength(0);
+  fireEvent.click(within(politica).getByRole("button", { name: "Confirmar reserva" }));
+
+  expect(await screen.findByText('"Clean Code" foi reservado.')).toBeInTheDocument();
+  expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith("/reservas/" + ID_USUARIO + "/" + ID_LIVRO + "?politicaVersao=versao-teste"))).toBe(true);
+  expect(screen.queryByRole("dialog", { name: "Política de Uso de Reservas" })).not.toBeInTheDocument();
+});
+
+test("estudante cancela pedido que ainda aguarda pagamento", async () => {
+  let cancelado = false;
+  simularApi({
+    "GET /pedidos": () => [200, [cancelado ? { ...pedidoPendente, status: "CANCELADO" } : pedidoPendente]],
+    ["POST /pedidos/" + ID_PEDIDO + "/cancelar"]: () => {
+      cancelado = true;
+      return [200, { ...pedidoPendente, status: "CANCELADO" }];
+    },
+  });
+  entrarComo("ESTUDANTE");
+  render(<App />);
+
+  fireEvent.click(await screen.findByRole("button", { name: "Pedidos" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Cancelar pedido" }));
+
+  const dialogo = await screen.findByRole("alertdialog");
+  expect(dialogo).toHaveTextContent("Cancelar o pedido?");
+  fireEvent.click(within(dialogo).getByRole("button", { name: "Cancelar pedido" }));
+
+  expect(await screen.findByText("Pedido #44444444 cancelado. Os livros continuam no seu carrinho.")).toBeInTheDocument();
+  expect(await screen.findByText("Você cancelou este pedido antes do pagamento.")).toBeInTheDocument();
+  expect(chamadasPara("POST", "/pedidos/" + ID_PEDIDO + "/cancelar")).toHaveLength(1);
+  expect(screen.queryByRole("button", { name: "Cancelar pedido" })).not.toBeInTheDocument();
+});
+
+test("reserva entregue mostra o prazo de devolução e a capa do livro", async () => {
+  const daqui = (horas) => {
+    const data = new Date(Date.now() + horas * 60 * 60 * 1000);
+    const doisDigitos = (n) => String(n).padStart(2, "0");
+    return data.getFullYear() + "-" + doisDigitos(data.getMonth() + 1) + "-" + doisDigitos(data.getDate()) +
+      "T" + doisDigitos(data.getHours()) + ":" + doisDigitos(data.getMinutes()) + ":00";
+  };
+  simularApi({
+    ["GET /reservas/usuario/" + ID_USUARIO]: () => [200, [
+      { id: "r1", livroId: ID_LIVRO, tituloLivro: "Clean Code", capaUrl: "https://covers.openlibrary.org/b/isbn/1-L.jpg", dataReserva: daqui(-50), dataEntrega: daqui(-30), status: "ENTREGUE", prazoDevolucao: daqui(138) },
+      { id: "r2", livroId: ID_LIVRO_SEM_VENDA, tituloLivro: "Sem Venda", capaUrl: null, dataReserva: daqui(-300), dataEntrega: daqui(-200), status: "ENTREGUE", prazoDevolucao: daqui(-32) },
+    ]],
+  });
+  entrarComo("ESTUDANTE");
+  render(<App />);
+
+  fireEvent.click(await screen.findByRole("button", { name: /^Reservas/ }));
+  expect(await screen.findByText(/faltam 5 dias e (17|18) h/)).toBeInTheDocument();
+  expect(screen.getByText(/devolução atrasada/)).toBeInTheDocument();
+  expect(screen.getByAltText("Capa de Clean Code")).toHaveAttribute("src", "https://covers.openlibrary.org/b/isbn/1-L.jpg");
+  expect(screen.getByRole("img", { name: "Capa genérica de Sem Venda" })).toBeInTheDocument();
+  expect(document.querySelector(".prazo-retirada.vencido")).not.toBeNull();
 });
 
 test("funcionário vê a dashboard e não vê carrinho nem pedidos", async () => {

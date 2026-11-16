@@ -1,6 +1,7 @@
 package br.com.pfc.biblioteca.service;
 
 import java.util.UUID;
+import br.com.pfc.biblioteca.dto.reserva.DevolucaoRequest;
 import br.com.pfc.biblioteca.dto.reserva.ReservaDTO;
 import br.com.pfc.biblioteca.dto.reserva.ReservaGestaoDTO;
 import br.com.pfc.biblioteca.enums.StatusReserva;
@@ -29,8 +30,10 @@ public class ReservaService {
     private final LivroRepository livroRepository;
     private final UsuarioRepository usuarioRepository;
     private final LogAuditoriaService logService;
+    private final MultaService multaService;
 
-    public ReservaService(ReservaRepository repository, LivroRepository livroRepository, UsuarioRepository usuarioRepository, LogAuditoriaService logService) {
+    public ReservaService(ReservaRepository repository, LivroRepository livroRepository, UsuarioRepository usuarioRepository, LogAuditoriaService logService, MultaService multaService) {
+        this.multaService = multaService;
         this.repository = repository;
         this.livroRepository = livroRepository;
         this.usuarioRepository = usuarioRepository;
@@ -38,7 +41,11 @@ public class ReservaService {
     }
 
     @Transactional
-    public Reserva reservarLivro(UUID usuarioId, UUID livroId){
+    public Reserva reservarLivro(UUID usuarioId, UUID livroId, String politicaVersao){
+        String versaoDaPolitica = politicaVersao == null || politicaVersao.isBlank() ? null : politicaVersao.trim();
+        if (versaoDaPolitica != null && !versaoDaPolitica.matches("^[A-Za-z0-9_-]{1,64}$")) {
+            throw new RegraDeNegocioException("Versão da política de reservas inválida");
+        }
         Usuario usuario = usuarioRepository.findById(usuarioId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado"));
 
@@ -47,6 +54,7 @@ public class ReservaService {
             logService.registrarLogUsuarioLogado("ACESSO_NEGADO", "Tentativa de reservar em nome do usuário " + usuarioId);
             throw new RegraDeNegocioException("Você só pode reservar livros para a sua própria conta");
         }
+        multaService.garantirSemMultaPendente(usuario.getId());
 
         Livro livro = livroRepository.buscarComLock(livroId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Livro não encontrado"));
@@ -58,8 +66,14 @@ public class ReservaService {
         livro.setEstoqueReserva(livro.getEstoqueReserva() -1);
         livroRepository.save(livro);
 
-        Reserva reserva = repository.save(new Reserva(usuario, livro));
-        logService.registrarLog(usuario.getId(), usuario.getEmail(), "RESERVA_LIVRO", "Reserva " + reserva.getId() + " do livro " + livro.getId() + " criada");
+        Reserva nova = new Reserva(usuario, livro);
+        if (versaoDaPolitica != null) {
+            nova.setPoliticaVersao(versaoDaPolitica);
+            nova.setDataAceitePolitica(LocalDateTime.now());
+        }
+        Reserva reserva = repository.save(nova);
+        logService.registrarLog(usuario.getId(), usuario.getEmail(), "RESERVA_LIVRO", "Reserva " + reserva.getId() + " do livro " + livro.getId() + " criada"
+                + (versaoDaPolitica == null ? "" : ", política de reservas aceita (versão " + versaoDaPolitica + ")"));
         return reserva;
     }
 
@@ -98,12 +112,13 @@ public class ReservaService {
         }
 
         reserva.setStatus(StatusReserva.ENTREGUE);
+        reserva.setDataEntrega(LocalDateTime.now());
         repository.save(reserva);
         logService.registrarLogUsuarioLogado("ENTREGA_LIVRO", "Reserva " + reservaId + " do usuário " + reserva.getUsuario().getId() + " entregue");
     }
 
     @Transactional
-    public void devolverLivro(UUID reservaId){
+    public void devolverLivro(UUID reservaId, DevolucaoRequest request){
         Reserva reserva = repository.findById(reservaId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Reserva não encontrada!"));
 
@@ -111,13 +126,21 @@ public class ReservaService {
             throw new RegraDeNegocioException("Só é possível devolver livros que já foram entregues");
         }
 
-        Livro livro = reserva.getLivro();
-        livro.setEstoqueReserva(livro.getEstoqueReserva() + 1);
-        livroRepository.save(livro);
+        boolean danificado = request != null && Boolean.TRUE.equals(request.danificado());
+        if (danificado) {
+            multaService.registrarPorDano(reserva, request.valorMulta(), request.observacao());
+        } else {
+            Livro livro = reserva.getLivro();
+            livro.setEstoqueReserva(livro.getEstoqueReserva() + 1);
+            livroRepository.save(livro);
+        }
 
+        reserva.setDanificado(danificado);
         reserva.setStatus(StatusReserva.DEVOLVIDO);
         repository.save(reserva);
-        logService.registrarLogUsuarioLogado("DEVOLUCAO_LIVRO", "Reserva " + reservaId + " do usuário " + reserva.getUsuario().getId() + " devolvida");
+        logService.registrarLogUsuarioLogado(danificado ? "DEVOLUCAO_COM_DANO" : "DEVOLUCAO_LIVRO",
+                "Reserva " + reservaId + " do usuário " + reserva.getUsuario().getId()
+                        + (danificado ? " devolvida com o livro danificado" : " devolvida"));
     }
 
     public List<UUID> reservasComPrazoVencido() {

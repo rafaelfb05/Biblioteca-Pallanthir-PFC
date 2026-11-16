@@ -51,6 +51,10 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/avaliacoes/**").hasRole("ESTUDANTE")
                         .requestMatchers(HttpMethod.POST, "/pagamentos/webhook").permitAll()
                         .requestMatchers("/carrinho/**").hasRole("ESTUDANTE")
+                        .requestMatchers(HttpMethod.GET, "/multas/minhas").hasRole("ESTUDANTE")
+                        .requestMatchers(HttpMethod.POST, "/multas/*/pagar").hasRole("ESTUDANTE")
+                        .requestMatchers(HttpMethod.GET, "/multas").hasRole("FUNCIONARIO")
+                        .requestMatchers(HttpMethod.PUT, "/multas/*/dispensar").hasRole("FUNCIONARIO")
                         .requestMatchers(HttpMethod.GET, "/pedidos/pendentes-retirada").hasRole("FUNCIONARIO")
                         .requestMatchers(HttpMethod.PUT, "/pedidos/*/entregar").hasRole("FUNCIONARIO")
 

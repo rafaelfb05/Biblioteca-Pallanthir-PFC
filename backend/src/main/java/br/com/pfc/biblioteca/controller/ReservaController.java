@@ -1,6 +1,7 @@
 package br.com.pfc.biblioteca.controller;
 
 import java.util.UUID;
+import br.com.pfc.biblioteca.dto.reserva.DevolucaoRequest;
 import br.com.pfc.biblioteca.dto.reserva.ReservaDTO;
 import br.com.pfc.biblioteca.dto.reserva.ReservaGestaoDTO;
 import br.com.pfc.biblioteca.service.ReservaService;
@@ -20,8 +21,9 @@ public class ReservaController {
     }
 
     @PostMapping("/{usuarioId}/{livroId}")
-    public ResponseEntity<Void> reservar(@PathVariable UUID usuarioId, @PathVariable UUID livroId){
-        service.reservarLivro(usuarioId, livroId);
+    public ResponseEntity<Void> reservar(@PathVariable UUID usuarioId, @PathVariable UUID livroId,
+                                         @RequestParam(required = false) String politicaVersao){
+        service.reservarLivro(usuarioId, livroId, politicaVersao);
         return ResponseEntity.ok().build();
     }
 
@@ -38,8 +40,8 @@ public class ReservaController {
     }
 
     @PutMapping("/{reservaId}/devolver")
-    public ResponseEntity<Void> devolver(@PathVariable UUID reservaId){
-        service.devolverLivro(reservaId);
+    public ResponseEntity<Void> devolver(@PathVariable UUID reservaId, @RequestBody(required = false) DevolucaoRequest request){
+        service.devolverLivro(reservaId, request);
         return ResponseEntity.ok().build();
     }
 
