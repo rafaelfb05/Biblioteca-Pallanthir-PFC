@@ -1,11 +1,14 @@
 package br.com.pfc.biblioteca.service;
 
 import br.com.pfc.biblioteca.dto.documento.DocumentoDTO;
+import br.com.pfc.biblioteca.dto.documento.DocumentoVersaoDTO;
 import br.com.pfc.biblioteca.entity.jpa.Documento;
+import br.com.pfc.biblioteca.entity.jpa.DocumentoVersao;
 import br.com.pfc.biblioteca.entity.jpa.Usuario;
 import br.com.pfc.biblioteca.enums.TipoDocumento;
 import br.com.pfc.biblioteca.infra.exception.RecursoNaoEncontradoException;
 import br.com.pfc.biblioteca.repository.DocumentoRepository;
+import br.com.pfc.biblioteca.repository.DocumentoVersaoRepository;
 import br.com.pfc.biblioteca.repository.UsuarioRepository;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -18,17 +21,20 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 public class DocumentoService {
 
     private final DocumentoRepository repository;
+    private final DocumentoVersaoRepository versaoRepository;
     private final UsuarioRepository usuarioRepository;
     private final LogAuditoriaService logService;
 
-    public DocumentoService(DocumentoRepository repository, UsuarioRepository usuarioRepository,
-                            LogAuditoriaService logService) {
+    public DocumentoService(DocumentoRepository repository, DocumentoVersaoRepository versaoRepository,
+                            UsuarioRepository usuarioRepository, LogAuditoriaService logService) {
         this.repository = repository;
+        this.versaoRepository = versaoRepository;
         this.usuarioRepository = usuarioRepository;
         this.logService = logService;
     }
@@ -54,13 +60,27 @@ public class DocumentoService {
     public List<DocumentoDTO> listar() {
         return Arrays.stream(TipoDocumento.values())
                 .map(this::buscar)
-                .map(DocumentoDTO::new)
+                .map(this::paraDTO)
                 .toList();
     }
 
     @Transactional(readOnly = true)
     public DocumentoDTO obter(TipoDocumento tipo) {
-        return new DocumentoDTO(buscar(tipo));
+        return paraDTO(buscar(tipo));
+    }
+
+    @Transactional(readOnly = true)
+    public List<DocumentoVersaoDTO> versoesAnteriores(TipoDocumento tipo) {
+        return versaoRepository.findByTipoOrderByNumeroDesc(tipo).stream()
+                .map(DocumentoVersaoDTO::resumo)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public DocumentoVersaoDTO versao(UUID id) {
+        return versaoRepository.findById(id)
+                .map(DocumentoVersaoDTO::completo)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Versão não encontrada"));
     }
 
     @Transactional
@@ -72,8 +92,11 @@ public class DocumentoService {
 
         String novo = normalizar(conteudo);
         if (novo.equals(normalizar(documento.getConteudo()))) {
-            return new DocumentoDTO(documento);
+            return paraDTO(documento);
         }
+
+        long versaoArquivada = versaoRepository.countByTipo(tipo) + 1;
+        versaoRepository.save(new DocumentoVersao(documento, (int) versaoArquivada));
 
         documento.setConteudo(novo + "\n");
         documento.setAtualizadoEm(LocalDateTime.now());
@@ -81,8 +104,13 @@ public class DocumentoService {
         documento.setAtualizadoPorNome(gerente.getNome());
         Documento salvo = repository.save(documento);
         logService.registrarLog(gerente.getId(), gerente.getEmail(), "DOCUMENTO_ATUALIZADO",
-                tipo.getTitulo() + " atualizado pelo gerente");
-        return new DocumentoDTO(salvo);
+                tipo.getTitulo() + " atualizado pelo gerente (versão " + (versaoArquivada + 1)
+                        + "; a versão " + versaoArquivada + " foi guardada no histórico)");
+        return paraDTO(salvo);
+    }
+
+    private DocumentoDTO paraDTO(Documento documento) {
+        return new DocumentoDTO(documento, versaoRepository.countByTipo(documento.getTipo()) + 1);
     }
 
     private String normalizar(String texto) {

@@ -159,4 +159,37 @@ class GerenteIntegracaoTest extends TesteIntegracaoBase {
 
         assertThat(get("/dashboard/vendas?de=2001-03-16&ate=2001-03-15", gerente).status()).isEqualTo(400);
     }
+
+    @Test
+    void cadaAlteracaoGuardaAVersaoAnteriorNoHistorico() {
+        Usuario gerente = criarGerente();
+        String token = token(gerente);
+        String caminho = "/documentos/POLITICA_DE_PRIVACIDADE";
+        JsonNode atual = get(caminho, null).corpo();
+        String original = atual.path("conteudo").asText();
+        long versaoInicial = atual.path("versao").asLong();
+        int historicoInicial = get(caminho + "/versoes", token).corpo().size();
+
+        put(caminho, token, Map.of("conteudo", "# Privacidade\n\nPrimeira revisão."));
+        Resposta segunda = put(caminho, token, Map.of("conteudo", "# Privacidade\n\nSegunda revisão."));
+        assertThat(segunda.corpo().path("versao").asLong()).isEqualTo(versaoInicial + 2);
+
+        JsonNode historico = get(caminho + "/versoes", token).corpo();
+        assertThat(historico).hasSize(historicoInicial + 2);
+        assertThat(historico.get(0).path("numero").asLong()).isEqualTo(versaoInicial + 1);
+        assertThat(historico.get(0).path("publicadoPor").asText()).isEqualTo(gerente.getNome());
+        assertThat(historico.get(0).path("conteudo").isNull()).isTrue();
+        assertThat(historico.get(1).path("numero").asLong()).isEqualTo(versaoInicial);
+
+        String idDaPrimeiraRevisao = historico.get(0).path("id").asText();
+        JsonNode primeiraRevisao = get("/documentos/versoes/" + idDaPrimeiraRevisao, token).corpo();
+        assertThat(primeiraRevisao.path("conteudo").asText()).isEqualTo("# Privacidade\n\nPrimeira revisão.\n");
+        assertThat(get("/documentos/versoes/" + historico.get(1).path("id").asText(), token).corpo().path("conteudo").asText())
+                .isEqualTo(original);
+
+        assertThat(get(caminho + "/versoes", token(criarFuncionario())).status()).isEqualTo(403);
+        assertThat(get("/documentos/versoes/" + idDaPrimeiraRevisao, null).status()).isIn(401, 403);
+
+        put(caminho, token, Map.of("conteudo", original));
+    }
 }

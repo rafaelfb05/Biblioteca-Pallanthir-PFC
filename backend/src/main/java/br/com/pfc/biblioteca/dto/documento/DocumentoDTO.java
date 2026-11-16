@@ -6,10 +6,10 @@ import br.com.pfc.biblioteca.enums.TipoDocumento;
 import java.time.LocalDateTime;
 
 public record DocumentoDTO(TipoDocumento tipo, String titulo, String conteudo,
-                           LocalDateTime atualizadoEm, String atualizadoPor) {
+                           LocalDateTime atualizadoEm, String atualizadoPor, long versao) {
 
-    public DocumentoDTO(Documento documento) {
+    public DocumentoDTO(Documento documento, long versao) {
         this(documento.getTipo(), documento.getTipo().getTitulo(), documento.getConteudo(),
-                documento.getAtualizadoEm(), documento.getAtualizadoPorNome());
+                documento.getAtualizadoEm(), documento.getAtualizadoPorNome(), versao);
     }
 }

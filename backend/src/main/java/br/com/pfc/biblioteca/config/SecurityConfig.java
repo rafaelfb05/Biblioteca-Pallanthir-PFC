@@ -34,6 +34,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/livros/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/logs/**").hasRole("GERENTE")
                         .requestMatchers(HttpMethod.GET, "/documentos", "/documentos/*").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/documentos/**").hasRole("GERENTE")
                         .requestMatchers(HttpMethod.PUT, "/documentos/*").hasRole("GERENTE")
                         .requestMatchers(HttpMethod.PUT, "/usuarios/*/perfil").hasRole("GERENTE")
                         .requestMatchers(HttpMethod.DELETE, "/usuarios/funcionarios/*").hasRole("GERENTE")

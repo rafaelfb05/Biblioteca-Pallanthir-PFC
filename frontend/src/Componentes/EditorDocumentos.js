@@ -35,6 +35,9 @@ export default function EditorDocumentos({ aoSalvar }) {
   const [confirmando, setConfirmando] = useState(false);
   const [erro, setErro] = useState(null);
   const [aviso, setAviso] = useState(null);
+  const [versoes, setVersoes] = useState([]);
+  const [versaoAberta, setVersaoAberta] = useState(null);
+  const [abrindoVersao, setAbrindoVersao] = useState(null);
 
   const carregar = useCallback(async () => {
     try {
@@ -54,6 +57,41 @@ export default function EditorDocumentos({ aoSalvar }) {
   useEffect(() => {
     carregar();
   }, [carregar]);
+
+  const carregarVersoes = useCallback(async (escolhido) => {
+    try {
+      setVersoes((await documentosApi.versoes(escolhido)) || []);
+    } catch (e) {
+      setVersoes([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (tipo) {
+      carregarVersoes(tipo);
+    }
+  }, [tipo, carregarVersoes]);
+
+  const abrirVersao = async (versao) => {
+    try {
+      setAbrindoVersao(versao.id);
+      setErro(null);
+      setVersaoAberta(await documentosApi.versao(versao.id));
+    } catch (e) {
+      setErro(mensagem(e, "Não foi possível abrir a versão."));
+    } finally {
+      setAbrindoVersao(null);
+    }
+  };
+
+  const usarVersaoNoEditor = () => {
+    setRascunhos((atuais) => ({ ...atuais, [versaoAberta.tipo]: versaoAberta.conteudo }));
+    setModo("editar");
+    setAviso(
+      "O texto da versão " + versaoAberta.numero + " foi copiado para o editor. Revise e salve para publicá-lo de novo."
+    );
+    setVersaoAberta(null);
+  };
 
   const documento = documentos.find((doc) => doc.tipo === tipo);
   const rascunho = documento ? rascunhos[tipo] ?? "" : "";
@@ -75,6 +113,7 @@ export default function EditorDocumentos({ aoSalvar }) {
       setRascunhos((atuais) => ({ ...atuais, [salvo.tipo]: salvo.conteudo }));
       setAviso(salvo.titulo + " salvo com sucesso.");
       setConfirmando(false);
+      carregarVersoes(salvo.tipo);
       if (aoSalvar) {
         aoSalvar(salvo.tipo);
       }
@@ -119,6 +158,7 @@ export default function EditorDocumentos({ aoSalvar }) {
             <div>
               <h3>{documento.titulo}</h3>
               <span className="editor-atualizacao">
+                {"Versão " + (documento.versao || 1) + " · "}
                 {documento.atualizadoEm
                   ? "Última alteração em " +
                     formatarDataHora(documento.atualizadoEm) +
@@ -194,6 +234,85 @@ export default function EditorDocumentos({ aoSalvar }) {
             >
               Salvar documento
             </button>
+          </div>
+        </div>
+      )}
+
+      {documento && (
+        <section className="editor-historico" aria-labelledby="editor-historico-titulo">
+          <h3 id="editor-historico-titulo">Versões anteriores</h3>
+          <p className="dashboard-card-sub">
+            Sempre que um documento é salvo, a versão que estava publicada fica guardada aqui.
+          </p>
+          {versoes.length === 0 ? (
+            <p className="dashboard-vazio">Nenhuma versão anterior deste documento.</p>
+          ) : (
+            <ul className="editor-versoes">
+              {versoes.map((versao) => (
+                <li key={versao.id}>
+                  <span className="editor-versao-numero">v{versao.numero}</span>
+                  <div className="editor-versao-info">
+                    <strong>
+                      {versao.publicadoEm
+                        ? "Publicada em " +
+                          formatarDataHora(versao.publicadoEm) +
+                          (versao.publicadoPor ? " por " + versao.publicadoPor : "")
+                        : "Versão original do sistema"}
+                    </strong>
+                    <span>Substituída em {formatarDataHora(versao.substituidaEm)}</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="equipe-botao"
+                    onClick={() => abrirVersao(versao)}
+                    disabled={abrindoVersao === versao.id}
+                    aria-label={"Ver versão " + versao.numero}
+                  >
+                    {abrindoVersao === versao.id ? "Abrindo..." : "Ver"}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
+
+      {versaoAberta && (
+        <div className="modal" onClick={() => setVersaoAberta(null)}>
+          <div
+            className="modal-box editor-versao-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="editor-versao-titulo"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-header">
+              <h3 id="editor-versao-titulo">
+                Versão {versaoAberta.numero} · {documento ? documento.titulo : ""}
+              </h3>
+              <button type="button" onClick={() => setVersaoAberta(null)} aria-label="Fechar versão">
+                ✕
+              </button>
+            </div>
+            <p className="modal-sub">
+              {versaoAberta.publicadoEm
+                ? "Publicada em " +
+                  formatarDataHora(versaoAberta.publicadoEm) +
+                  (versaoAberta.publicadoPor ? " por " + versaoAberta.publicadoPor : "")
+                : "Versão original do sistema"}
+              {" · substituída em " + formatarDataHora(versaoAberta.substituidaEm)}
+            </p>
+            <div className="editor-previa documento-conteudo">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{versaoAberta.conteudo}</ReactMarkdown>
+            </div>
+            <div className="editor-acoes">
+              <button type="button" className="dialogo-secundario" onClick={() => setVersaoAberta(null)}>
+                Fechar
+              </button>
+              <button type="button" className="dialogo-principal" onClick={usarVersaoNoEditor}>
+                Usar esta versão no editor
+              </button>
+            </div>
           </div>
         </div>
       )}

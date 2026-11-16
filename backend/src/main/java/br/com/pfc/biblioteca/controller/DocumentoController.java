@@ -2,12 +2,14 @@ package br.com.pfc.biblioteca.controller;
 
 import br.com.pfc.biblioteca.dto.documento.AtualizarDocumentoRequest;
 import br.com.pfc.biblioteca.dto.documento.DocumentoDTO;
+import br.com.pfc.biblioteca.dto.documento.DocumentoVersaoDTO;
 import br.com.pfc.biblioteca.enums.TipoDocumento;
 import br.com.pfc.biblioteca.service.DocumentoService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/documentos")
@@ -27,6 +29,16 @@ public class DocumentoController {
     @GetMapping("/{tipo}")
     public DocumentoDTO obter(@PathVariable TipoDocumento tipo) {
         return service.obter(tipo);
+    }
+
+    @GetMapping("/{tipo}/versoes")
+    public List<DocumentoVersaoDTO> versoes(@PathVariable TipoDocumento tipo) {
+        return service.versoesAnteriores(tipo);
+    }
+
+    @GetMapping("/versoes/{id}")
+    public DocumentoVersaoDTO versao(@PathVariable UUID id) {
+        return service.versao(id);
     }
 
     @PutMapping("/{tipo}")

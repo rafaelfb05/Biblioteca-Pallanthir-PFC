@@ -4713,7 +4713,7 @@ html {
 
 .equipe-card {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: auto minmax(0, 1fr) 130px 270px;
   align-items: center;
   gap: 16px;
   padding: 14px 18px;
@@ -4771,6 +4771,7 @@ html {
 }
 
 .equipe-perfil {
+  justify-self: center;
   padding: 4px 10px;
   border-radius: 20px;
   font-size: 11px;
@@ -4998,4 +4999,83 @@ html {
 
 .logs-paginacao-resumo {
   text-align: center;
+}
+
+.editor-historico {
+  margin-top: 18px;
+  padding: 22px;
+  border: 1px solid #26262d;
+  border-radius: 12px;
+  background: #131317;
+}
+
+.editor-historico h3 {
+  margin: 0;
+  color: #ffffff;
+  font-size: 17px;
+}
+
+.editor-versoes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.editor-versoes li {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  border: 1px solid #23232a;
+  border-radius: 10px;
+  background: #0d0d10;
+}
+
+.editor-versao-numero {
+  flex-shrink: 0;
+  min-width: 42px;
+  padding: 4px 8px;
+  border-radius: 20px;
+  background: #23232a;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.editor-versao-info {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.editor-versao-info strong {
+  color: #e6e6eb;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.editor-versao-info span {
+  color: #8a8a93;
+  font-size: 12px;
+}
+
+.modal-box.editor-versao-modal {
+  width: min(860px, 94vw);
+  max-width: none;
+}
+
+.editor-versao-modal .editor-previa {
+  min-height: 0;
+  max-height: 60vh;
+}
+
+
+.editor-versao-modal .modal-sub {
+  margin-bottom: 14px;
 }

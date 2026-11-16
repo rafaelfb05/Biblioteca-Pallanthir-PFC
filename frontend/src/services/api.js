@@ -243,6 +243,8 @@ export const dashboardApi = {
 export const documentosApi = {
   listar: () => request("/documentos"),
   obter: (tipo) => request(`/documentos/${tipo}`),
+  versoes: (tipo) => request(`/documentos/${tipo}/versoes`),
+  versao: (id) => request(`/documentos/versoes/${id}`),
   atualizar: (tipo, conteudo) =>
     request(`/documentos/${tipo}`, {
       method: "PUT",
