@@ -4626,8 +4626,6 @@ function App() {
                       </strong>
                     </div>
 
-                    <PrazoDeRetirada prazo={pedido.prazoRetirada} />
-
                     <ul className="retirada-itens">
                       {(pedido.itens || []).map((item) => (
                         <li key={item.livroId}>
@@ -4647,6 +4645,8 @@ function App() {
                         </li>
                       ))}
                     </ul>
+
+                    <PrazoDeRetirada prazo={pedido.prazoRetirada} />
 
                     <div className="retirada-acoes">
                       <button
