@@ -269,4 +269,19 @@ class ReservaIntegracaoTest extends TesteIntegracaoBase {
 
         assertThat(reservaDoLivro(estudante, livro).path("status").asText()).isEqualTo("ENTREGUE");
     }
+
+    @Test
+    void reservaRegistraAVersaoAceitaDaPoliticaDeReservas() {
+        Usuario estudante = criarEstudante();
+        Livro livro = criarLivro(30, 2, 0);
+
+        Resposta resposta = post("/reservas/" + estudante.getId() + "/" + livro.getId() + "?politicaVersao=abc123", token(estudante), null);
+
+        assertThat(resposta.status()).isEqualTo(200);
+        Reserva salva = reservaRepository.findById(UUID.fromString(reservaDoLivro(estudante, livro).path("id").asText())).orElseThrow();
+        assertThat(salva.getPoliticaVersao()).isEqualTo("abc123");
+        assertThat(salva.getDataAceitePolitica()).isNotNull();
+        assertThat(post("/reservas/" + estudante.getId() + "/" + criarLivro(30, 2, 0).getId() + "?politicaVersao=" + "x".repeat(70),
+                token(estudante), null).status()).isEqualTo(400);
+    }
 }

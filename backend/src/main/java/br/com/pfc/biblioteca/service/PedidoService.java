@@ -42,8 +42,10 @@ public class PedidoService {
     private final UsuarioRepository usuarioRepository;
     private final MercadoPagoService mercadoPagoService;
     private final LogAuditoriaService logService;
+    private final MultaService multaService;
 
-    public PedidoService(PedidoRepository repository, ItemCarrinhoRepository itemCarrinhoRepository, LivroRepository livroRepository, UsuarioRepository usuarioRepository, MercadoPagoService mercadoPagoService, LogAuditoriaService logService) {
+    public PedidoService(PedidoRepository repository, ItemCarrinhoRepository itemCarrinhoRepository, LivroRepository livroRepository, UsuarioRepository usuarioRepository, MercadoPagoService mercadoPagoService, LogAuditoriaService logService, MultaService multaService) {
+        this.multaService = multaService;
         this.repository = repository;
         this.itemCarrinhoRepository = itemCarrinhoRepository;
         this.livroRepository = livroRepository;
@@ -60,6 +62,7 @@ public class PedidoService {
         if(itensCarrinho.isEmpty()){
             throw new RegraDeNegocioException("O carrinho está vazio");
         }
+        multaService.garantirSemMultaPendente(usuario.getId());
         if (repository.existsByUsuarioIdAndStatus(usuario.getId(), StatusPedido.AGUARDANDO_PAGAMENTO)) {
             throw new ConflitoException("Você já tem um pedido aguardando pagamento");
         }
@@ -143,6 +146,10 @@ public class PedidoService {
     public void processarNotificacao(String orderId){
         MercadoPagoService.OrderMP order = mercadoPagoService.buscarOrder(orderId);
         if (order == null || order.externalReference() == null) return;
+        if (order.externalReference().startsWith(Multa.PREFIXO_REFERENCIA)) {
+            multaService.processarPagamento(order);
+            return;
+        }
 
         UUID pedidoId;
         try {
