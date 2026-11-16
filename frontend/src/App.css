@@ -1783,10 +1783,7 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 15px;
-  background: #09090b;
-  border: 1px solid #27272c;
-  border-radius: 8px;
+  padding: 4px 0;
 }
 
 .aceite-documentos {
@@ -3402,9 +3399,7 @@ html {
 
 .auth-box .aceite-termos {
   gap: 12px;
-  padding: 14px 16px;
-  border-radius: 9px;
-  background: #0d0d10;
+  padding: 4px 0;
 }
 
 .aceite-link {
