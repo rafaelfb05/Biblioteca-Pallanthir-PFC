@@ -3992,22 +3992,6 @@ function App() {
             )}
 
             <div className="aceite-termos">
-              <div className="aceite-documentos">
-                <button
-                  type="button"
-                  className="aceite-link"
-                  onClick={() => setDocumentoAberto("termos")}
-                >
-                  Ler Termos de Uso
-                </button>
-                <button
-                  type="button"
-                  className="aceite-link"
-                  onClick={() => setDocumentoAberto("privacidade")}
-                >
-                  Ler Política de Privacidade
-                </button>
-              </div>
               <label className="aceite-checkbox">
                 <input
                   type="checkbox"
@@ -4020,7 +4004,31 @@ function App() {
                   }
                 />
                 <span>
-                  Li e aceito os Termos de Uso e a Política de Privacidade.
+                  Li e aceito os{" "}
+                  <button
+                    type="button"
+                    className="aceite-texto-link"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setDocumentoAberto("termos");
+                    }}
+                  >
+                    Termos de Uso
+                  </button>{" "}
+                  e a{" "}
+                  <button
+                    type="button"
+                    className="aceite-texto-link"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setDocumentoAberto("privacidade");
+                    }}
+                  >
+                    Política de Privacidade
+                  </button>
+                  .
                 </span>
               </label>
             </div>

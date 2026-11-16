@@ -1306,3 +1306,18 @@ test("cartão do acervo mostra Reservado quando o estudante já tem reserva do l
   expect(reservado).toBeDisabled();
 });
 
+test("no cadastro os nomes dos documentos abrem a leitura sem marcar o aceite", async () => {
+  simularApi();
+  render(<App />);
+
+  fireEvent.click(await screen.findByRole("button", { name: "Entrar" }));
+  fireEvent.click(await screen.findByRole("button", { name: /Criar conta|Cadastre-se/ }));
+  expect(screen.queryByRole("button", { name: "Ler Termos de Uso" })).not.toBeInTheDocument();
+  const aceite = screen.getByRole("checkbox");
+  fireEvent.click(screen.getByRole("button", { name: "Termos de Uso" }));
+  fireEvent.click(screen.getByRole("button", { name: "Política de Privacidade" }));
+  expect(aceite).not.toBeChecked();
+  fireEvent.click(aceite);
+  expect(aceite).toBeChecked();
+});
+

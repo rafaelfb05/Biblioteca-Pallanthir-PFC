@@ -5335,3 +5335,32 @@ html {
   cursor: pointer;
 }
 
+
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-text-fill-color: #ffffff;
+  caret-color: #ffffff;
+  -webkit-box-shadow: 0 0 0 1000px #09090b inset;
+  box-shadow: 0 0 0 1000px #09090b inset;
+  transition: background-color 9999s ease-out 0s;
+}
+
+.aceite-texto-link {
+  display: inline;
+  padding: 0;
+  border: none;
+  background: none;
+  color: #ff5560;
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.aceite-texto-link:hover {
+  color: #ffffff;
+}
+
