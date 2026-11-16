@@ -186,8 +186,8 @@ public class EmailService {
                 ? "Disponível para reserva"
                 : "À venda por " + NumberFormat.getCurrencyInstance(Locale.of("pt", "BR")).format(livro.getPreco());
         String link = frontendUrl.replaceAll("/+$", "") + "/?livro=" + livro.getId();
-        String capaUrl = livro.getCapaUrl();
-        String capa = capaUrl != null && capaUrl.startsWith("https://")
+        String capaUrl = capaParaEmail(livro.getCapaUrl());
+        String capa = capaUrl != null
                 ? CAPA_COM_IMAGEM.formatted(HtmlUtils.htmlEscape(capaUrl))
                 : CAPA_GENERICA.formatted(HtmlUtils.htmlEscape(titulo));
 
@@ -207,6 +207,17 @@ public class EmailService {
                 + "\n\nVocê recebeu este e-mail porque pediu para ser avisado quando este livro tivesse estoque.";
 
         enviar(destinatario, "\"" + titulo + "\" voltou ao estoque - Biblioteca Pallanthir", texto, html);
+    }
+
+    static String capaParaEmail(String capaUrl) {
+        if (capaUrl == null || capaUrl.isBlank()) {
+            return null;
+        }
+        String endereco = capaUrl.trim().replaceFirst("^http://", "https://");
+        if (!endereco.startsWith("https://")) {
+            return null;
+        }
+        return endereco.replace("&edge=curl", "").replace("?edge=curl&", "?");
     }
 
     private void enviar(String destinatario, String assunto, String texto, String html){
