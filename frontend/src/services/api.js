@@ -146,6 +146,13 @@ export const usuariosApi = {
       body: JSON.stringify(dados),
     }),
   deletar: (id) => request(`/usuarios/deletar/${id}`, { method: "DELETE" }),
+  alterarPerfil: (id, tipo) =>
+    request(`/usuarios/${id}/perfil`, {
+      method: "PUT",
+      body: JSON.stringify({ tipo }),
+    }),
+  excluirFuncionario: (id) =>
+    request(`/usuarios/funcionarios/${id}`, { method: "DELETE" }),
 
   listarFavoritos: (usuarioId) => request(`/usuarios/${usuarioId}/favoritos`),
   favoritar: (usuarioId, livroId) =>
@@ -221,6 +228,26 @@ export const pedidosApi = {
 
 export const dashboardApi = {
   obter: () => request("/dashboard"),
+  vendas: (filtros = {}) => {
+    const parametros = new URLSearchParams();
+    ["de", "ate"].forEach((campo) => {
+      if (filtros[campo]) {
+        parametros.set(campo, filtros[campo]);
+      }
+    });
+    const consulta = parametros.toString();
+    return request("/dashboard/vendas" + (consulta ? "?" + consulta : ""));
+  },
+};
+
+export const documentosApi = {
+  listar: () => request("/documentos"),
+  obter: (tipo) => request(`/documentos/${tipo}`),
+  atualizar: (tipo, conteudo) =>
+    request(`/documentos/${tipo}`, {
+      method: "PUT",
+      body: JSON.stringify({ conteudo }),
+    }),
 };
 
 export const logsApi = {

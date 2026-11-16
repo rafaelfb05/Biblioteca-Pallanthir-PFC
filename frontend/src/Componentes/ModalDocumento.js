@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { documentosApi } from "../services/api";
 
 export const DOCUMENTOS = {
-  termos: { titulo: "Termos de Uso", arquivo: "TERMOS_DE_USO.md" },
+  termos: { titulo: "Termos de Uso", arquivo: "TERMOS_DE_USO.md", tipo: "TERMOS_DE_USO" },
   privacidade: {
     titulo: "Política de Privacidade",
     arquivo: "POLITICA_DE_PRIVACIDADE.md",
+    tipo: "POLITICA_DE_PRIVACIDADE",
   },
 };
 
@@ -30,14 +32,9 @@ export default function ModalDocumento({ documento, aoFechar, aoTrocar }) {
       corpo.current.scrollTop = 0;
     }
 
-    fetch(process.env.PUBLIC_URL + "/docs/" + DOCUMENTOS[documento].arquivo)
-      .then((resposta) => {
-        if (!resposta.ok) {
-          throw new Error();
-        }
-        return resposta.text();
-      })
-      .then((texto) => ativo && setConteudo(texto))
+    documentosApi
+      .obter(DOCUMENTOS[documento].tipo)
+      .then((dados) => ativo && setConteudo(dados.conteudo))
       .catch(() => ativo && setErro("Não foi possível carregar o documento."));
 
     return () => {

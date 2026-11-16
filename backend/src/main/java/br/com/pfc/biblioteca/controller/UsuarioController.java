@@ -4,6 +4,7 @@ import java.util.UUID;
 import br.com.pfc.biblioteca.dto.auth.*;
 import br.com.pfc.biblioteca.dto.livro.LivroDTO;
 import br.com.pfc.biblioteca.dto.usuario.AceiteTermosRequest;
+import br.com.pfc.biblioteca.dto.usuario.AlterarPerfilRequest;
 import br.com.pfc.biblioteca.dto.usuario.TermosDTO;
 import br.com.pfc.biblioteca.dto.usuario.UsuarioDTO;
 import br.com.pfc.biblioteca.dto.usuario.UsuarioRequest;
@@ -40,6 +41,17 @@ public class UsuarioController {
     public ResponseEntity<UsuarioDTO> atualizarUsuario(@PathVariable UUID id, @RequestBody UsuarioRequest request) {
         Usuario usuario = service.atualizarUsuario(id, request);
         return ResponseEntity.ok(new UsuarioDTO(usuario));
+    }
+
+    @PutMapping("/{id}/perfil")
+    public ResponseEntity<UsuarioDTO> alterarPerfil(@PathVariable UUID id, @RequestBody @Valid AlterarPerfilRequest request) {
+        return ResponseEntity.ok(new UsuarioDTO(service.alterarPerfil(id, request.tipo())));
+    }
+
+    @DeleteMapping("/funcionarios/{id}")
+    public ResponseEntity<Void> excluirFuncionario(@PathVariable UUID id) {
+        service.excluirFuncionario(id);
+        return ResponseEntity.noContent().build();
     }
 
     @DeleteMapping("/deletar/{id}")

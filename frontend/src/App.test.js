@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import App from './App';
 
 jest.mock('./Componentes/ModalDocumento', () => () => null);
+jest.mock('./Componentes/EditorDocumentos', () => () => null);
 jest.mock("./Componentes/ModalPoliticaReserva", () => {
   const React = require("react");
   return ({ livro, aoConfirmar, aoFechar }) =>

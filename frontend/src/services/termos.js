@@ -1,4 +1,4 @@
-const ARQUIVOS_DOS_TERMOS = ["TERMOS_DE_USO.md", "POLITICA_DE_PRIVACIDADE.md"];
+import { documentosApi } from "./api";
 
 const resumo = (texto, semente) => {
   let h1 = 0xdeadbeef ^ semente;
@@ -27,23 +27,21 @@ export const versaoDosTermos = (...textos) => {
 };
 
 export const carregarVersaoDosTermos = async () => {
-  const textos = await Promise.all(
-    ARQUIVOS_DOS_TERMOS.map(async (arquivo) => {
-      const resposta = await fetch(process.env.PUBLIC_URL + "/docs/" + arquivo);
-      if (!resposta.ok) {
-        throw new Error("Não foi possível carregar " + arquivo);
-      }
-      return resposta.text();
-    })
-  );
-  return versaoDosTermos(...textos);
+  const documentos = (await documentosApi.listar()) || [];
+  const conteudo = (tipo) => {
+    const documento = documentos.find((item) => item.tipo === tipo);
+    if (!documento) {
+      throw new Error("Documento não encontrado: " + tipo);
+    }
+    return documento.conteudo;
+  };
+  return versaoDosTermos(conteudo("TERMOS_DE_USO"), conteudo("POLITICA_DE_PRIVACIDADE"));
 };
 
 export const carregarPoliticaDeReservas = async () => {
-  const resposta = await fetch(process.env.PUBLIC_URL + "/docs/POLITICA_DE_RESERVAS.md");
-  if (!resposta.ok) {
+  const documento = await documentosApi.obter("POLITICA_DE_RESERVAS");
+  if (!documento || !documento.conteudo) {
     throw new Error("Não foi possível carregar a política de reservas");
   }
-  const texto = await resposta.text();
-  return { texto, versao: versaoDosTermos(texto) };
+  return { texto: documento.conteudo, versao: versaoDosTermos(documento.conteudo) };
 };

@@ -32,7 +32,11 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/usuarios/cadastro", "/usuarios/login",
                                "/usuarios/verificar-2fa", "/usuarios/recuperar-senha", "/usuarios/redefinir-senha").permitAll()
                         .requestMatchers(HttpMethod.GET, "/livros/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/logs/**").hasRole("FUNCIONARIO")
+                        .requestMatchers(HttpMethod.GET, "/logs/**").hasRole("GERENTE")
+                        .requestMatchers(HttpMethod.GET, "/documentos", "/documentos/*").permitAll()
+                        .requestMatchers(HttpMethod.PUT, "/documentos/*").hasRole("GERENTE")
+                        .requestMatchers(HttpMethod.PUT, "/usuarios/*/perfil").hasRole("GERENTE")
+                        .requestMatchers(HttpMethod.DELETE, "/usuarios/funcionarios/*").hasRole("GERENTE")
                         .requestMatchers(HttpMethod.POST, "/livros/cadastro").hasRole("FUNCIONARIO")
                         .requestMatchers(HttpMethod.PUT, "/livros/atualizar/*").hasRole("FUNCIONARIO")
                         .requestMatchers(HttpMethod.DELETE, "/livros/deletar/*").hasRole("FUNCIONARIO")
@@ -59,6 +63,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/pedidos/*/entregar").hasRole("FUNCIONARIO")
 
                         .requestMatchers("/pedidos/**").hasRole("ESTUDANTE")
+                        .requestMatchers(HttpMethod.GET, "/dashboard/vendas").hasRole("GERENTE")
                         .requestMatchers(HttpMethod.GET, "/dashboard", "/dashboard/**").hasRole("FUNCIONARIO")
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);

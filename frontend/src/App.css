@@ -4442,3 +4442,540 @@ html {
   padding: 10px 18px;
   white-space: nowrap;
 }
+
+.vendas-filtros {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 14px;
+  margin-bottom: 8px;
+}
+
+.vendas-filtros .gestao-abas {
+  margin-top: 0;
+}
+
+.vendas-periodo {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.vendas-periodo label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: #8a8a93;
+  font-size: 12px;
+}
+
+.vendas-periodo input {
+  padding: 9px 10px;
+  border: 1px solid #2a2a30;
+  border-radius: 8px;
+  background: #131317;
+  color: #ffffff;
+  font: inherit;
+  font-size: 14px;
+  color-scheme: dark;
+}
+
+.vendas-aplicar {
+  padding: 10px 16px;
+  border: 1px solid #2a2a30;
+  border-radius: 8px;
+  background: #1b1b21;
+  color: #ffffff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.vendas-aplicar:hover {
+  border-color: #e51d2a;
+}
+
+.vendas-filtros .favoritar-button {
+  margin-left: auto;
+}
+
+.vendas-destaque {
+  border-color: rgba(229, 29, 42, 0.45);
+  background: linear-gradient(160deg, rgba(229, 29, 42, 0.14), #131317 70%);
+}
+
+.vendas-secundarios {
+  margin-top: 14px;
+}
+
+.vendas-secundarios .dashboard-numero strong {
+  font-size: 24px;
+}
+
+.vendas-grafico {
+  margin-top: 30px;
+}
+
+.vendas-meses {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  min-height: 230px;
+  margin: 0;
+  padding: 0;
+  overflow-x: auto;
+  list-style: none;
+}
+
+.vendas-meses li {
+  display: flex;
+  flex: 1 0 64px;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.vendas-mes-valor {
+  color: #cfcfd6;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.vendas-mes-trilho {
+  display: flex;
+  flex: 1;
+  align-items: flex-end;
+  width: 100%;
+  max-width: 46px;
+  min-height: 140px;
+  border-radius: 6px 6px 0 0;
+  background: #1d1d23;
+}
+
+.vendas-mes-barra {
+  display: block;
+  width: 100%;
+  border-radius: 6px 6px 0 0;
+  background: #e51d2a;
+  transition: height 0.3s;
+}
+
+.vendas-meses li:hover .vendas-mes-barra {
+  background: #ff3d48;
+}
+
+.vendas-mes-rotulo {
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.vendas-meses small {
+  color: #8a8a93;
+  font-size: 11px;
+}
+
+.vendas-ranking {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vendas-ranking li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.vendas-ranking-posicao {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #1d1d23;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.vendas-ranking li:first-child .vendas-ranking-posicao {
+  background: #e51d2a;
+}
+
+.vendas-ranking-info {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.vendas-ranking-linha {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.vendas-ranking-nome {
+  overflow: hidden;
+  color: #cfcfd6;
+  font-size: 14px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.vendas-ranking-linha strong {
+  flex-shrink: 0;
+  color: #ffffff;
+  font-size: 14px;
+}
+
+.vendas-ranking small {
+  color: #8a8a93;
+  font-size: 12px;
+}
+
+.vendas-status {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.vendas-status-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  border: 1px solid #26262d;
+  border-radius: 10px;
+  background: #131317;
+}
+
+.vendas-status-item span {
+  color: #8a8a93;
+  font-size: 13px;
+}
+
+.vendas-status-item strong {
+  color: #ffffff;
+  font-size: 22px;
+}
+
+.vendas-status-item small {
+  color: #6f6f78;
+  font-size: 12px;
+}
+
+.equipe-topo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.equipe-busca {
+  flex: 1;
+  max-width: 380px;
+  padding: 11px 14px;
+  border: 1px solid #2a2a30;
+  border-radius: 10px;
+  background: #131317;
+  color: #ffffff;
+  font: inherit;
+  font-size: 14px;
+}
+
+.equipe-busca:focus {
+  border-color: #e51d2a;
+  outline: none;
+}
+
+.equipe-contagem {
+  color: #8a8a93;
+  font-size: 13px;
+}
+
+.equipe-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.equipe-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 18px;
+  border: 1px solid #26262d;
+  border-radius: 12px;
+  background: #131317;
+}
+
+.equipe-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: #23232a;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.equipe-avatar.gerente {
+  background: #e51d2a;
+}
+
+.equipe-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.equipe-info strong {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #ffffff;
+  font-size: 15px;
+}
+
+.equipe-info span {
+  overflow: hidden;
+  color: #8a8a93;
+  font-size: 13px;
+  text-overflow: ellipsis;
+}
+
+.equipe-voce {
+  padding: 2px 8px;
+  border-radius: 20px;
+  background: #23232a;
+  color: #cfcfd6 !important;
+  font-size: 11px !important;
+  font-weight: 600;
+}
+
+.equipe-perfil {
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.equipe-perfil.gerente {
+  background: rgba(229, 29, 42, 0.15);
+  color: #ff5560;
+}
+
+.equipe-perfil.funcionario {
+  background: rgba(150, 150, 157, 0.15);
+  color: #cfcfd6;
+}
+
+.equipe-acoes {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 120px;
+}
+
+.equipe-botao {
+  padding: 8px 14px;
+  border: 1px solid #2a2a30;
+  border-radius: 8px;
+  background: transparent;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.equipe-botao:hover {
+  border-color: #e51d2a;
+}
+
+.equipe-botao.perigo {
+  color: #ff5560;
+}
+
+.equipe-botao.perigo:hover {
+  background: rgba(229, 29, 42, 0.12);
+}
+
+.editor-documentos .gestao-abas {
+  flex-wrap: wrap;
+  margin-top: 0;
+}
+
+.editor-alterado {
+  color: #f0aa28;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.editor-painel {
+  margin-top: 18px;
+  padding: 22px;
+  border: 1px solid #26262d;
+  border-radius: 12px;
+  background: #131317;
+}
+
+.editor-cabecalho {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.editor-cabecalho h3 {
+  margin: 0 0 4px;
+  color: #ffffff;
+  font-size: 18px;
+}
+
+.editor-atualizacao {
+  color: #8a8a93;
+  font-size: 13px;
+}
+
+.editor-modos {
+  display: inline-flex;
+  padding: 3px;
+  border: 1px solid #2a2a30;
+  border-radius: 8px;
+  background: #0d0d10;
+}
+
+.editor-modo {
+  padding: 7px 14px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #96969d;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.editor-modo.ativo {
+  background: #23232a;
+  color: #ffffff;
+}
+
+.editor-aviso {
+  margin: 16px 0;
+  padding: 10px 14px;
+  border-left: 3px solid #f0aa28;
+  border-radius: 6px;
+  background: rgba(240, 170, 40, 0.08);
+  color: #f3dcb0;
+  font-size: 13px;
+}
+
+.editor-texto {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 460px;
+  padding: 16px;
+  border: 1px solid #2a2a30;
+  border-radius: 10px;
+  background: #0d0d10;
+  color: #e6e6eb;
+  font-family: "Consolas", "Courier New", monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+.editor-texto:focus {
+  border-color: #e51d2a;
+  outline: none;
+}
+
+.editor-dica {
+  display: block;
+  margin-top: 6px;
+  color: #6f6f78;
+  font-size: 12px;
+}
+
+.editor-previa {
+  min-height: 460px;
+  max-height: 640px;
+  margin-top: 0;
+  padding: 4px 18px;
+  overflow-y: auto;
+  border: 1px solid #2a2a30;
+  border-radius: 10px;
+  background: #0d0d10;
+}
+
+.editor-previa.documento-conteudo > h1:first-child {
+  display: block;
+}
+
+.editor-acoes {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.editor-acoes button {
+  padding: 11px 18px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.editor-acoes button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+@media (max-width: 700px) {
+  .equipe-card {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .equipe-perfil {
+    grid-row: 2;
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .equipe-acoes {
+    grid-row: 3;
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+    min-width: 0;
+  }
+
+  .equipe-acoes:empty {
+    display: none;
+  }
+
+  .vendas-filtros .favoritar-button {
+    margin-left: 0;
+  }
+}

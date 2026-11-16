@@ -3,6 +3,9 @@ import "./App.css";
 import ModalDocumento from "./Componentes/ModalDocumento";
 import ModalPoliticaReserva from "./Componentes/ModalPoliticaReserva";
 import { carregarVersaoDosTermos } from "./services/termos";
+import PainelVendas from "./Componentes/PainelVendas";
+import GestaoEquipe from "./Componentes/GestaoEquipe";
+import EditorDocumentos from "./Componentes/EditorDocumentos";
 import {
   avaliacoesApi,
   carrinhoApi,
@@ -148,6 +151,25 @@ const DICA_SENHA =
 const ROTULO_TIPO_USUARIO = {
   ESTUDANTE: "Estudante",
   FUNCIONARIO: "Funcionário",
+  GERENTE: "Gerente",
+};
+
+const PAGINAS_DO_GERENTE = {
+  vendas: {
+    rotulo: "VENDAS",
+    titulo: "Dashboard de vendas",
+    descricao: "Faturamento, pedidos, livros e matérias mais vendidos e multas recebidas no período.",
+  },
+  equipe: {
+    rotulo: "EQUIPE",
+    titulo: "Funcionários e gerentes",
+    descricao: "Promova funcionários a gerente, volte gerentes para funcionário e exclua contas de funcionários.",
+  },
+  documentos: {
+    rotulo: "DOCUMENTOS",
+    titulo: "Termos e políticas",
+    descricao: "Edite os Termos de Uso, a Política de Privacidade e a Política de Uso de Reservas sem alterar o código.",
+  },
 };
 
 const TITULOS_AUTENTICACAO = {
@@ -167,6 +189,9 @@ const PAGINAS_PRIVADAS = [
   "gestao",
   "logs",
   "dashboard",
+  "vendas",
+  "equipe",
+  "documentos",
 ];
 
 const formatarNumero = (valor) => Number(valor || 0).toLocaleString("pt-BR");
@@ -929,7 +954,10 @@ function App() {
   const [erroRanking, setErroRanking] = useState(null);
 
   const usuarioId = usuario ? usuario.id : null;
-  const ehFuncionario = Boolean(usuario && usuario.tipo === "FUNCIONARIO");
+  const ehGerente = Boolean(usuario && usuario.tipo === "GERENTE");
+  const ehFuncionario = Boolean(
+    usuario && (usuario.tipo === "FUNCIONARIO" || usuario.tipo === "GERENTE")
+  );
   const ehEstudante = Boolean(usuario && usuario.tipo === "ESTUDANTE");
 
   const idsFavoritos = useMemo(
@@ -2998,7 +3026,34 @@ function App() {
                 Gestão
               </button>
             )}
-            {ehFuncionario && (
+            {ehGerente && (
+              <button
+                type="button"
+                className={"nav-link" + (pagina === "vendas" ? " active" : "")}
+                onClick={() => abrirPagina("vendas")}
+              >
+                Vendas
+              </button>
+            )}
+            {ehGerente && (
+              <button
+                type="button"
+                className={"nav-link" + (pagina === "equipe" ? " active" : "")}
+                onClick={() => abrirPagina("equipe")}
+              >
+                Equipe
+              </button>
+            )}
+            {ehGerente && (
+              <button
+                type="button"
+                className={"nav-link" + (pagina === "documentos" ? " active" : "")}
+                onClick={() => abrirPagina("documentos")}
+              >
+                Documentos
+              </button>
+            )}
+            {ehGerente && (
               <button
                 type="button"
                 className={"nav-link" + (pagina === "logs" ? " active" : "")}
@@ -4766,6 +4821,37 @@ function App() {
     );
   }
 
+  if (PAGINAS_DO_GERENTE[pagina]) {
+    const paginaDoGerente = PAGINAS_DO_GERENTE[pagina];
+    return (
+      <div className="app">
+        {cabecalho}
+
+        <section className={"section pagina-gerente pagina-" + pagina}>
+          <div className="section-header">
+            <div>
+              <span className="section-label">{paginaDoGerente.rotulo}</span>
+              <h2>{paginaDoGerente.titulo}</h2>
+            </div>
+            <button type="button" className="link-button" onClick={irParaInicio}>
+              Voltar ao acervo →
+            </button>
+          </div>
+
+          <p className="materias-sub">{paginaDoGerente.descricao}</p>
+
+          {!ehGerente && <p>Área restrita a gerentes.</p>}
+          {ehGerente && pagina === "vendas" && <PainelVendas />}
+          {ehGerente && pagina === "equipe" && <GestaoEquipe usuarioAtualId={usuario.id} />}
+          {ehGerente && pagina === "documentos" && <EditorDocumentos />}
+        </section>
+
+        {modalCadastroLivro}
+        {modalAutenticacao}
+      </div>
+    );
+  }
+
   if (pagina === "logs") {
     return (
       <div className="app">
@@ -4789,9 +4875,9 @@ function App() {
 
           {erro && <p className="erro">{erro}</p>}
 
-          {!ehFuncionario && <p>Área restrita a funcionários.</p>}
+          {!ehGerente && <p>Área restrita a gerentes.</p>}
 
-          {ehFuncionario && (
+          {ehGerente && (
             <>
               <div className="logs-painel">
                 <div className="logs-painel-topo">

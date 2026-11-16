@@ -20,7 +20,11 @@ const TEXTO = "# Política de Uso de Reservas\n\nTexto da política.";
 
 beforeEach(() => {
   global.fetch = jest.fn(() =>
-    Promise.resolve({ ok: true, text: () => Promise.resolve(TEXTO) })
+    Promise.resolve({
+      ok: true,
+      status: 200,
+      text: () => Promise.resolve(JSON.stringify({ tipo: "POLITICA_DE_RESERVAS", conteudo: TEXTO })),
+    })
   );
 });
 

@@ -1,5 +1,6 @@
 package br.com.pfc.biblioteca.repository;
 
+import br.com.pfc.biblioteca.enums.TipoUsuario;
 import java.util.UUID;
 import br.com.pfc.biblioteca.entity.jpa.Usuario;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -18,4 +19,6 @@ public interface UsuarioRepository extends JpaRepository<Usuario, UUID> {
 
     @Query("SELECT u FROM Usuario u JOIN u.favoritos f WHERE f.id = :livroId")
     List<Usuario> buscarPorLivroFavoritado(UUID livroId);
+
+    long countByTipoAndAtivoTrue(TipoUsuario tipo);
 }

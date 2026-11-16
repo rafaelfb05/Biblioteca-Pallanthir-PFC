@@ -27,6 +27,8 @@ public interface PedidoRepository extends JpaRepository<Pedido, UUID> {
 
     List<Pedido> findByStatusOrderByDataCriacaoAsc(StatusPedido status);
 
+    List<Pedido> findByDataCriacaoBetween(LocalDateTime inicio, LocalDateTime fim);
+
     boolean existsByUsuarioIdAndStatusIn(UUID usuarioId, Collection<StatusPedido> status);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

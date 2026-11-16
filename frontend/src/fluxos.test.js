@@ -3,6 +3,7 @@ import App from "./App";
 import { versaoDosTermos } from "./services/termos";
 
 jest.mock("./Componentes/ModalDocumento", () => () => null);
+jest.mock("./Componentes/EditorDocumentos", () => () => null);
 jest.mock("./Componentes/ModalPoliticaReserva", () => {
   const React = require("react");
   return ({ livro, aoConfirmar, aoFechar }) =>
@@ -68,8 +69,16 @@ const simularApi = (rotasExtras = {}) => {
     "GET /carrinho": () => [200, { itens: [], total: 0 }],
     "GET /pedidos": () => [200, []],
     "GET /avaliacoes/ranking": () => [200, []],
-    "GET /usuarios/termos": () => [200, { versaoAceita: versaoDosTermos("[]", "[]"), dataAceite: "2026-11-01T10:00:00" }],
+    "GET /usuarios/termos": () => [200, { versaoAceita: versaoDosTermos("Termos", "Privacidade"), dataAceite: "2026-11-01T10:00:00" }],
     "POST /usuarios/renovar-token": () => [200, { token: tokenValido(), usuario: { nome: "Ana" } }],
+    "GET /documentos": () => [
+      200,
+      [
+        { tipo: "TERMOS_DE_USO", titulo: "Termos de Uso", conteudo: "Termos" },
+        { tipo: "POLITICA_DE_PRIVACIDADE", titulo: "Política de Privacidade", conteudo: "Privacidade" },
+        { tipo: "POLITICA_DE_RESERVAS", titulo: "Política de Uso de Reservas", conteudo: "Reservas" },
+      ],
+    ],
     ...rotasExtras,
   };
   global.fetch = jest.fn((url, opcoes = {}) => {
@@ -363,8 +372,8 @@ test("cadastrar livro aparece só na tela principal do funcionário", async () =
   await screen.findByRole("heading", { name: "Clean Code" });
   expect(screen.getAllByRole("button", { name: "+ Cadastrar livro" })).toHaveLength(1);
 
-  fireEvent.click(screen.getByRole("button", { name: "Logs" }));
-  await screen.findByRole("heading", { name: "Logs do sistema" });
+  fireEvent.click(screen.getByRole("button", { name: "Dashboard" }));
+  await screen.findByRole("heading", { name: "Dashboard" });
   expect(screen.queryByRole("button", { name: "+ Cadastrar livro" })).not.toBeInTheDocument();
 });
 
@@ -381,7 +390,7 @@ test("logs podem ser filtrados por ação e por período", async () => {
     ],
     "GET /usuarios": () => [200, []],
   });
-  entrarComo("FUNCIONARIO");
+  entrarComo("GERENTE");
   render(<App />);
 
   fireEvent.click(await screen.findByRole("button", { name: "Logs" }));
@@ -426,7 +435,7 @@ test("usuário precisa ler e aceitar os termos quando eles mudam", async () => {
 
   expect(await screen.findByText("Obrigado! Você aceitou a nova versão dos termos.")).toBeInTheDocument();
   expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
-  expect(chamadasPara("POST", "/usuarios/termos/aceite")[0].corpo).toEqual({ versao: versaoDosTermos("[]", "[]") });
+  expect(chamadasPara("POST", "/usuarios/termos/aceite")[0].corpo).toEqual({ versao: versaoDosTermos("Termos", "Privacidade") });
 });
 
 test("usuário com os termos em dia não vê a janela de aceite", async () => {
@@ -943,4 +952,121 @@ test("funcionário vê a dashboard e não vê carrinho nem pedidos", async () =>
   expect(screen.getByText("Direito")).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: /^Carrinho/ })).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Pedidos" })).not.toBeInTheDocument();
+});
+
+test("funcionário não vê logs nem as páginas do gerente", async () => {
+  simularApi();
+  entrarComo("FUNCIONARIO");
+  render(<App />);
+
+  await screen.findByRole("button", { name: "Dashboard" });
+  expect(screen.getByRole("button", { name: "Gestão" })).toBeInTheDocument();
+  ["Logs", "Vendas", "Equipe", "Documentos"].forEach((nome) =>
+    expect(screen.queryByRole("button", { name: nome })).not.toBeInTheDocument()
+  );
+});
+
+test("gerente vê as páginas do funcionário e as próprias", async () => {
+  simularApi();
+  entrarComo("GERENTE");
+  render(<App />);
+
+  await screen.findByRole("button", { name: "Dashboard" });
+  ["Gestão", "Logs", "Vendas", "Equipe", "Documentos"].forEach((nome) =>
+    expect(screen.getByRole("button", { name: nome })).toBeInTheDocument()
+  );
+  expect(screen.getAllByRole("button", { name: "+ Cadastrar livro" })).toHaveLength(1);
+  expect(screen.queryByRole("button", { name: /^Carrinho/ })).not.toBeInTheDocument();
+});
+
+test("gerente consulta o dashboard de vendas e troca o período", async () => {
+  simularApi({
+    "GET /dashboard/vendas": () => [
+      200,
+      {
+        resumo: {
+          faturamento: 1250.5,
+          pedidosPagos: 10,
+          ticketMedio: 125.05,
+          exemplaresVendidos: 14,
+          aguardandoRetirada: 3,
+          entregues: 7,
+          reembolsados: 1,
+          valorReembolsado: 40,
+        },
+        pedidosPorStatus: { AGUARDANDO_PAGAMENTO: 2, APROVADO: 3, ENTREGUE: 7, EXPIRADO: 1, CANCELADO: 1, REEMBOLSADO: 1 },
+        livrosMaisVendidos: [{ nome: "1", rotulo: "Clean Code", quantidade: 5, receita: 200 }],
+        materiasMaisVendidas: [{ nome: "TI", rotulo: "Ti", quantidade: 9, receita: 600 }],
+        vendasPorMes: [
+          { mes: "2026-10", faturamento: 500, pedidos: 4 },
+          { mes: "2026-11", faturamento: 750.5, pedidos: 6 },
+        ],
+        multas: { valorRecebido: 80, recebidas: 2, valorPendente: 45, pendentes: 1 },
+      },
+    ],
+  });
+  entrarComo("GERENTE");
+  render(<App />);
+
+  fireEvent.click(await screen.findByRole("button", { name: "Vendas" }));
+  expect(await screen.findByRole("heading", { name: "Dashboard de vendas" })).toBeInTheDocument();
+  expect(await screen.findByText("R$ 1.250,50")).toBeInTheDocument();
+  expect(screen.getByText("R$ 125,05")).toBeInTheDocument();
+  expect(screen.getByText("nov/26")).toBeInTheDocument();
+  expect(screen.getByText("Clean Code")).toBeInTheDocument();
+  expect(screen.getByText("Pago · aguardando retirada")).toBeInTheDocument();
+  expect(chamadas.some((c) => c.caminho === "/dashboard/vendas")).toBe(true);
+  expect(global.fetch.mock.calls.some(([url]) => /\/dashboard\/vendas\?de=\d{4}-\d{2}-\d{2}&ate=/.test(String(url)))).toBe(true);
+
+  fireEvent.click(screen.getByRole("tab", { name: "Tudo" }));
+  await waitFor(() =>
+    expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith("/dashboard/vendas"))).toBe(true)
+  );
+});
+
+test("gerente promove e exclui funcionários na página Equipe", async () => {
+  let equipe = [
+    { id: ID_USUARIO, nome: "Ana", email: "ana@teste.com", tipo: "GERENTE" },
+    { id: "f1", nome: "Bruno", email: "bruno@teste.com", tipo: "FUNCIONARIO" },
+    { id: "f2", nome: "Carla", email: "carla@teste.com", tipo: "FUNCIONARIO" },
+    { id: "e1", nome: "Estudante", email: "estudante@teste.com", tipo: "ESTUDANTE" },
+  ];
+  simularApi({
+    "GET /usuarios": () => [200, equipe],
+    "PUT /usuarios/f1/perfil": (corpo) => {
+      equipe = equipe.map((u) => (u.id === "f1" ? { ...u, tipo: corpo.tipo } : u));
+      return [200, equipe.find((u) => u.id === "f1")];
+    },
+    "DELETE /usuarios/funcionarios/f2": () => {
+      equipe = equipe.filter((u) => u.id !== "f2");
+      return [204, undefined];
+    },
+  });
+  entrarComo("GERENTE");
+  render(<App />);
+
+  fireEvent.click(await screen.findByRole("button", { name: "Equipe" }));
+  expect(await screen.findByText("Bruno")).toBeInTheDocument();
+  expect(screen.queryByText("Estudante")).not.toBeInTheDocument();
+  expect(screen.getByText("1 gerente(s) · 2 funcionário(s)")).toBeInTheDocument();
+
+  const cartaoDaAna = screen.getByText("ana@teste.com").closest("li");
+  expect(within(cartaoDaAna).queryByRole("button")).not.toBeInTheDocument();
+
+  const cartaoDoBruno = screen.getByText("bruno@teste.com").closest("li");
+  fireEvent.click(within(cartaoDoBruno).getByRole("button", { name: "Tornar gerente" }));
+  const promover = await screen.findByRole("alertdialog");
+  fireEvent.click(within(promover).getByRole("button", { name: "Tornar gerente" }));
+  expect(await screen.findByText("Bruno agora é gerente.")).toBeInTheDocument();
+  expect(chamadasPara("PUT", "/usuarios/f1/perfil")[0].corpo).toEqual({ tipo: "GERENTE" });
+  expect(await screen.findByText("2 gerente(s) · 1 funcionário(s)")).toBeInTheDocument();
+
+  const cartaoDaCarla = screen.getByText("carla@teste.com").closest("li");
+  fireEvent.click(within(cartaoDaCarla).getByRole("button", { name: "Excluir conta" }));
+  const excluir = await screen.findByRole("alertdialog");
+  expect(excluir).toHaveTextContent("Esta ação não pode ser desfeita.");
+  fireEvent.click(within(excluir).getByRole("button", { name: "Excluir conta" }));
+  expect(await screen.findByText("A conta de Carla foi excluída.")).toBeInTheDocument();
+  expect(chamadasPara("DELETE", "/usuarios/funcionarios/f2")).toHaveLength(1);
+  await waitFor(() => expect(screen.queryByText("carla@teste.com")).not.toBeInTheDocument());
 });

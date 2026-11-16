@@ -81,6 +81,11 @@ public class UsuarioService {
             throw new RegraDeNegocioException("É necessário aceitar os Termos de Uso e a Política de Privacidade");
         }
 
+        if(request.tipo() == TipoUsuario.GERENTE){
+            logService.registrarLog(null, request.email(), "FALHA_CADASTRO", "Tentativa de cadastro como gerente");
+            throw new RegraDeNegocioException("Não é possível criar uma conta de gerente pelo cadastro");
+        }
+
         if(request.tipo() == TipoUsuario.FUNCIONARIO){
             String codigoCorreto = System.getenv("CODIGO_FUNCIONARIO");
 
@@ -198,6 +203,12 @@ public class UsuarioService {
                             + "Conclua a retirada antes de excluir a conta.");
         }
 
+        Usuario salvo = anonimizar(usuario);
+        logService.registrarLog(salvo.getId(), salvo.getEmail(), "EXCLUSAO_USUARIO", "Conta excluída e dados anonimizados");
+        return salvo;
+    }
+
+    private Usuario anonimizar(Usuario usuario) {
         usuario.setNome("Usuário removido");
         usuario.setEmail("removido-" + usuario.getId() + "@anonimizado.local");
         usuario.setSenha(passwordEncoder.encode(UUID.randomUUID().toString()));
@@ -207,9 +218,55 @@ public class UsuarioService {
         usuario.setExpiracaoCodigo(null);
         usuario.getFavoritos().clear();
         usuario.setAtivo(false);
-        Usuario salvo = repository.save(usuario);
-        logService.registrarLog(salvo.getId(), salvo.getEmail(), "EXCLUSAO_USUARIO", "Conta excluída e dados anonimizados");
+        return repository.save(usuario);
+    }
+
+    private Usuario membroDaEquipe(UUID id, Usuario gerente, String acao) {
+        Usuario alvo = repository.findById(id)
+                .filter(Usuario::isAtivo)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado"));
+        if (alvo.getId().equals(gerente.getId())) {
+            logService.registrarLog(gerente.getId(), gerente.getEmail(), "ACESSO_NEGADO", "Tentativa de " + acao + " da própria conta");
+            throw new RegraDeNegocioException("Você não pode " + acao + " da sua própria conta");
+        }
+        if (alvo.getTipo() == TipoUsuario.ESTUDANTE) {
+            throw new RegraDeNegocioException("Esta ação só vale para funcionários e gerentes");
+        }
+        return alvo;
+    }
+
+    @Transactional
+    public Usuario alterarPerfil(UUID id, TipoUsuario novoTipo) {
+        Usuario gerente = usuarioLogado();
+        Usuario alvo = membroDaEquipe(id, gerente, "alterar o perfil");
+        if (novoTipo != TipoUsuario.FUNCIONARIO && novoTipo != TipoUsuario.GERENTE) {
+            throw new RegraDeNegocioException("O perfil deve ser Funcionário ou Gerente");
+        }
+        if (alvo.getTipo() == novoTipo) {
+            return alvo;
+        }
+        if (alvo.getTipo() == TipoUsuario.GERENTE && repository.countByTipoAndAtivoTrue(TipoUsuario.GERENTE) <= 1) {
+            throw new ConflitoException("O sistema precisa ter pelo menos um gerente");
+        }
+        TipoUsuario anterior = alvo.getTipo();
+        alvo.setTipo(novoTipo);
+        Usuario salvo = repository.save(alvo);
+        logService.registrarLog(gerente.getId(), gerente.getEmail(), "ALTERACAO_PERFIL",
+                "Perfil de " + salvo.getEmail() + " alterado de " + anterior + " para " + novoTipo);
         return salvo;
+    }
+
+    @Transactional
+    public void excluirFuncionario(UUID id) {
+        Usuario gerente = usuarioLogado();
+        Usuario alvo = membroDaEquipe(id, gerente, "excluir");
+        if (alvo.getTipo() != TipoUsuario.FUNCIONARIO) {
+            throw new RegraDeNegocioException("Para excluir um gerente, altere o perfil dele para Funcionário antes");
+        }
+        String email = alvo.getEmail();
+        anonimizar(alvo);
+        logService.registrarLog(gerente.getId(), gerente.getEmail(), "EXCLUSAO_FUNCIONARIO",
+                "Conta do funcionário " + email + " excluída e dados anonimizados");
     }
     @Transactional
     public void adicionarFavorito(UUID usuarioId, UUID livroId){
