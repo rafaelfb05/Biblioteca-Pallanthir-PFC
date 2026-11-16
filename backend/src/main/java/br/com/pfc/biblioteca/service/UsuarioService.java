@@ -252,6 +252,11 @@ public class UsuarioService {
             throw new RegraDeNegocioException("Você só pode excluir sua própria conta");
         }
 
+        if (usuario.getTipo() == TipoUsuario.GERENTE && repository.travarAtivosPorTipo(TipoUsuario.GERENTE).size() <= 1) {
+            logService.registrarLog(usuario.getId(), usuario.getEmail(), "FALHA_EXCLUSAO_USUARIO", "Último gerente ativo tentou excluir a própria conta");
+            throw new ConflitoException("Você é o único gerente do sistema. Promova outro funcionário a gerente na página Equipe antes de excluir a sua conta.");
+        }
+
         if(reservaRepository.existsByUsuarioIdAndStatusIn(id, List.of(StatusReserva.RESERVADO, StatusReserva.ENTREGUE))){
             logService.registrarLog(usuario.getId(), usuario.getEmail(), "FALHA_EXCLUSAO_USUARIO", "Conta possui reservas em aberto ou livros não devolvidos");
             throw new ConflitoException("Não é possível excluir a conta enquanto houver livros reservados ou não devolvidos. Cancele as reservas ou devolva os livros na biblioteca.");
@@ -314,7 +319,7 @@ public class UsuarioService {
         if (alvo.getTipo() == novoTipo) {
             return alvo;
         }
-        if (alvo.getTipo() == TipoUsuario.GERENTE && repository.countByTipoAndAtivoTrue(TipoUsuario.GERENTE) <= 1) {
+        if (alvo.getTipo() == TipoUsuario.GERENTE && repository.travarAtivosPorTipo(TipoUsuario.GERENTE).size() <= 1) {
             throw new ConflitoException("O sistema precisa ter pelo menos um gerente");
         }
         TipoUsuario anterior = alvo.getTipo();

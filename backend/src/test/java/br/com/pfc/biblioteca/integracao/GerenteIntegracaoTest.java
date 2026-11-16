@@ -192,4 +192,56 @@ class GerenteIntegracaoTest extends TesteIntegracaoBase {
 
         put(caminho, token, Map.of("conteudo", original));
     }
+
+    private void deixarSoEstesGerentes(Usuario... gerentes) {
+        java.util.Set<UUID> manter = java.util.Arrays.stream(gerentes).map(Usuario::getId).collect(java.util.stream.Collectors.toSet());
+        usuarioRepository.findAll().stream()
+                .filter(u -> u.getTipo() == TipoUsuario.GERENTE && u.isAtivo() && !manter.contains(u.getId()))
+                .forEach(u -> {
+                    u.setTipo(TipoUsuario.FUNCIONARIO);
+                    usuarioRepository.save(u);
+                });
+    }
+
+    @Test
+    void ultimoGerenteNaoExcluiAPropriaConta() {
+        Usuario unico = criarGerente();
+        deixarSoEstesGerentes(unico);
+
+        Resposta recusada = delete("/usuarios/deletar/" + unico.getId(), token(unico));
+        assertThat(recusada.status()).isEqualTo(409);
+        assertThat(recusada.mensagem()).contains("único gerente");
+        assertThat(usuarioRepository.findById(unico.getId()).orElseThrow().isAtivo()).isTrue();
+
+        criarGerente();
+        assertThat(delete("/usuarios/deletar/" + unico.getId(), token(unico)).status()).isEqualTo(204);
+    }
+
+    @Test
+    void doisGerentesRebaixandoUmAoOutroAoMesmoTempoNaoZeramOsGerentes() throws Exception {
+        Usuario primeiro = criarGerente();
+        Usuario segundo = criarGerente();
+        deixarSoEstesGerentes(primeiro, segundo);
+        String tokenPrimeiro = token(primeiro);
+        String tokenSegundo = token(segundo);
+        java.util.concurrent.CountDownLatch largada = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.ExecutorService executor = java.util.concurrent.Executors.newFixedThreadPool(2);
+
+        java.util.concurrent.Future<Resposta> a = executor.submit(() -> {
+            largada.await();
+            return put("/usuarios/" + segundo.getId() + "/perfil", tokenPrimeiro, Map.of("tipo", "FUNCIONARIO"));
+        });
+        java.util.concurrent.Future<Resposta> b = executor.submit(() -> {
+            largada.await();
+            return put("/usuarios/" + primeiro.getId() + "/perfil", tokenSegundo, Map.of("tipo", "FUNCIONARIO"));
+        });
+        largada.countDown();
+        int statusA = a.get().status();
+        int statusB = b.get().status();
+        executor.shutdown();
+
+        assertThat(usuarioRepository.countByTipoAndAtivoTrue(TipoUsuario.GERENTE)).isGreaterThanOrEqualTo(1);
+        assertThat(java.util.List.of(statusA, statusB)).contains(200);
+    }
 }
+

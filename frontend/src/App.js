@@ -3636,13 +3636,15 @@ function App() {
               >
                 Entendi
               </button>
-              <button
-                type="button"
-                className="dialogo-principal"
-                onClick={verReservasAntesDeExcluir}
-              >
-                Ver minhas reservas
-              </button>
+              {ehEstudante && (
+                <button
+                  type="button"
+                  className="dialogo-principal"
+                  onClick={verReservasAntesDeExcluir}
+                >
+                  Ver minhas reservas
+                </button>
+              )}
             </>
           ) : (
             <>
