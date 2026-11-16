@@ -44,16 +44,10 @@ public class EmailService {
                           <p style="margin:0 0 26px 0;font-size:14px;line-height:1.6;color:#96969d;">%s</p>
                           <table role="presentation" width="100%%" cellpadding="0" cellspacing="0" border="0">
                             <tr>
-                              <td align="center" style="background-color:#09090b;border:1px dashed #e51d2a;border-radius:10px;padding:18px 10px;font-family:'Courier New',monospace;font-size:34px;font-weight:700;letter-spacing:8px;color:#ffffff;">%s</td>
+                              <td align="center" style="background-color:#09090b;border:1px dashed #e51d2a;border-radius:10px;padding:18px 10px;font-family:'Courier New',monospace;font-size:34px;font-weight:700;letter-spacing:8px;color:#ffffff;-webkit-user-select:all;user-select:all;">%s</td>
                             </tr>
                           </table>
-                          <table role="presentation" width="100%%" cellpadding="0" cellspacing="0" border="0" style="margin-top:18px;">
-                            <tr>
-                              <td align="center" style="border-radius:8px;background-color:#e51d2a;">
-                                <a href="%s" target="_blank" style="display:block;padding:13px 20px;font-size:14px;font-weight:700;color:#ffffff;text-decoration:none;">Copiar código</a>
-                              </td>
-                            </tr>
-                          </table>
+                          <p style="margin:12px 0 0 0;font-size:12px;line-height:1.5;text-align:center;color:#77777f;">Para copiar, dê dois cliques no código (computador) ou toque e segure sobre ele (celular).</p>
                           <p style="margin:22px 0 0 0;font-size:13px;line-height:1.5;color:#96969d;">O código vale por <strong style="color:#ffffff;">%d minutos</strong>.</p>
                         </td>
                       </tr>
@@ -73,14 +67,11 @@ public class EmailService {
     private final RestClient restClient;
     private final String apiKey;
     private final String remetente;
-    private final String frontendUrl;
 
     public EmailService(@Value("${brevo.api-key}") String apiKey,
-                        @Value("${brevo.remetente}") String remetente,
-                        @Value("${app.frontend-url}") String frontendUrl) {
+                        @Value("${brevo.remetente}") String remetente) {
         this.apiKey = apiKey;
         this.remetente = remetente;
-        this.frontendUrl = frontendUrl.replaceAll("/+$", "");
 
         HttpClient httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(5))
@@ -95,14 +86,11 @@ public class EmailService {
     }
 
     public void enviarCodigo(String destinatario, String assunto, String titulo, String mensagem, String codigo, int minutosValidade){
-        String linkCopiar = frontendUrl + "/?copiar=" + codigo;
-
         String texto = titulo + "\n\n" + mensagem + "\n\nSeu código: " + codigo +
                 "\nO código vale por " + minutosValidade + " minutos." +
-                "\n\nPara copiar o código, acesse: " + linkCopiar +
                 "\n\nSe você não fez essa solicitação, ignore este e-mail.";
 
-        String html = TEMPLATE_CODIGO.formatted(titulo, mensagem, codigo, linkCopiar, minutosValidade);
+        String html = TEMPLATE_CODIGO.formatted(titulo, mensagem, codigo, minutosValidade);
 
         enviar(destinatario, assunto, texto, html);
     }

@@ -10,10 +10,10 @@ import java.util.stream.Collectors;
 
 public record PedidoRetiradaDTO(UUID id, String nomeEstudante, BigDecimal total,
                                 LocalDateTime dataCriacao, List<ItemPedidoDTO> itens,
-                                UUID usuarioId, String emailEstudante) {
+                                UUID usuarioId, String emailEstudante, LocalDateTime prazoRetirada) {
     public PedidoRetiradaDTO(Pedido p) {
         this(p.getId(), p.getUsuario().getNome(), p.getTotal(), p.getDataCriacao(),
                 p.getItens().stream().map(ItemPedidoDTO::new).collect(Collectors.toList()),
-                p.getUsuario().getId(), p.getUsuario().getEmail());
+                p.getUsuario().getId(), p.getUsuario().getEmail(), p.getPrazoRetirada());
     }
 }

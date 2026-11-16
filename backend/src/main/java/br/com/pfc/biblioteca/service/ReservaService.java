@@ -18,6 +18,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -117,6 +118,34 @@ public class ReservaService {
         reserva.setStatus(StatusReserva.DEVOLVIDO);
         repository.save(reserva);
         logService.registrarLogUsuarioLogado("DEVOLUCAO_LIVRO", "Reserva " + reservaId + " do usuário " + reserva.getUsuario().getId() + " devolvida");
+    }
+
+    public List<UUID> reservasComPrazoVencido() {
+        return repository.findByStatusAndDataReservaBefore(StatusReserva.RESERVADO,
+                        LocalDateTime.now().minusDays(Reserva.DIAS_PARA_RETIRADA))
+                .stream()
+                .map(Reserva::getId)
+                .toList();
+    }
+
+    @Transactional
+    public void cancelarPorPrazo(UUID reservaId) {
+        Reserva reserva = repository.buscarComLock(reservaId).orElse(null);
+        if (reserva == null || reserva.getStatus() != StatusReserva.RESERVADO
+                || reserva.getPrazoRetirada() == null || reserva.getPrazoRetirada().isAfter(LocalDateTime.now())) {
+            return;
+        }
+
+        Livro livro = livroRepository.buscarComLock(reserva.getLivro().getId()).orElse(reserva.getLivro());
+        int atual = livro.getEstoqueReserva() == null ? 0 : livro.getEstoqueReserva();
+        livro.setEstoqueReserva(atual + 1);
+        livroRepository.save(livro);
+
+        reserva.setStatus(StatusReserva.CANCELADO);
+        repository.save(reserva);
+        logService.registrarLog(reserva.getUsuario().getId(), reserva.getUsuario().getEmail(), "RESERVA_EXPIRADA",
+                "Reserva " + reserva.getId() + " cancelada automaticamente: o livro não foi retirado em "
+                        + Reserva.DIAS_PARA_RETIRADA + " dias");
     }
 
     public List<ReservaGestaoDTO> listarReservasEmAberto() {
