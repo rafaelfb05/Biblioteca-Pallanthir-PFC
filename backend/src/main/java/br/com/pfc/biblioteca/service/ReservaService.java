@@ -232,7 +232,7 @@ public class ReservaService {
             }
         }
 
-        return repository.findByUsuarioId(usuarioId).stream()
+        return repository.findByUsuarioIdOrderByDataReservaDesc(usuarioId).stream()
                 .map(ReservaDTO::new)
                 .collect(Collectors.toList());
     }

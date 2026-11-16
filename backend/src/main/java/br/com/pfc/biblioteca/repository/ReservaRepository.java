@@ -18,6 +18,8 @@ import java.util.Optional;
 public interface ReservaRepository extends JpaRepository<Reserva, UUID> {
     List<Reserva> findByUsuarioId(UUID usuarioId);
 
+    List<Reserva> findByUsuarioIdOrderByDataReservaDesc(UUID usuarioId);
+
     List<Reserva> findByUsuarioIdAndStatus(UUID usuarioId, StatusReserva status);
 
     List<Reserva> findByLivroId(UUID livroId);
