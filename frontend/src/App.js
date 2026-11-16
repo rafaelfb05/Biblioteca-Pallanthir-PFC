@@ -2551,6 +2551,31 @@ function App() {
     filtroLogs.de && filtroLogs.ate && filtroLogs.de > filtroLogs.ate
   );
 
+  const nomesDosUsuarios = useMemo(
+    () => new Map(usuariosGestao.map((item) => [String(item.id).toLowerCase(), item.nome])),
+    [usuariosGestao]
+  );
+
+  const titulosDosLivros = useMemo(
+    () => new Map(livros.map((item) => [String(item.id).toLowerCase(), item.titulo])),
+    [livros]
+  );
+
+  const descricaoDoLog = useCallback(
+    (texto) =>
+      String(texto || "").replace(UUID_NO_TEXTO, (id) => {
+      const chave = id.toLowerCase();
+      if (nomesDosUsuarios.has(chave)) {
+        return nomesDosUsuarios.get(chave);
+      }
+      if (titulosDosLivros.has(chave)) {
+        return "\u201c" + titulosDosLivros.get(chave) + "\u201d";
+      }
+        return id;
+      }),
+    [nomesDosUsuarios, titulosDosLivros]
+  );
+
   const logsExibidos = useMemo(() => {
     const termo = filtroLogs.texto.trim().toLowerCase();
     return logs.filter((log) => {
@@ -2566,12 +2591,26 @@ function App() {
       }
       return (
         !termo ||
-        [log.acao, log.descricao, log.usuarioEmail]
+        [
+          log.acao,
+          log.descricao,
+          descricaoDoLog(log.descricao),
+          log.usuarioEmail,
+          log.usuarioId ? nomesDosUsuarios.get(String(log.usuarioId).toLowerCase()) : "",
+        ]
           .map((valor) => String(valor || "").toLowerCase())
           .some((valor) => valor.includes(termo))
       );
     });
-  }, [logs, filtroLogs.texto, filtroLogs.acao, filtroLogs.de, filtroLogs.ate]);
+  }, [
+    logs,
+    filtroLogs.texto,
+    filtroLogs.acao,
+    filtroLogs.de,
+    filtroLogs.ate,
+    descricaoDoLog,
+    nomesDosUsuarios,
+  ]);
 
   useEffect(() => {
     setPaginaLogs(1);
@@ -2583,28 +2622,6 @@ function App() {
     (paginaLogsAtual - 1) * LOGS_POR_PAGINA,
     paginaLogsAtual * LOGS_POR_PAGINA
   );
-
-  const nomesDosUsuarios = useMemo(
-    () => new Map(usuariosGestao.map((item) => [String(item.id).toLowerCase(), item.nome])),
-    [usuariosGestao]
-  );
-
-  const titulosDosLivros = useMemo(
-    () => new Map(livros.map((item) => [String(item.id).toLowerCase(), item.titulo])),
-    [livros]
-  );
-
-  const descricaoDoLog = (texto) =>
-    String(texto || "").replace(UUID_NO_TEXTO, (id) => {
-      const chave = id.toLowerCase();
-      if (nomesDosUsuarios.has(chave)) {
-        return nomesDosUsuarios.get(chave);
-      }
-      if (titulosDosLivros.has(chave)) {
-        return "\u201c" + titulosDosLivros.get(chave) + "\u201d";
-      }
-      return id;
-    });
 
   const irParaPaginaDeLogs = (numero) => {
     setPaginaLogs(numero);
@@ -4646,9 +4663,8 @@ function App() {
                       ))}
                     </ul>
 
-                    <PrazoDeRetirada prazo={pedido.prazoRetirada} />
-
                     <div className="retirada-acoes">
+                      <PrazoDeRetirada prazo={pedido.prazoRetirada} />
                       <button
                         type="button"
                         className="cadastro-button"
@@ -4737,18 +4753,17 @@ function App() {
                       </li>
                     </ul>
 
-                    {reserva.status === "RESERVADO" && (
-                      <PrazoDeRetirada prazo={reserva.prazoRetirada} />
-                    )}
-                    {reserva.status === "ENTREGUE" && (
-                      <PrazoDeRetirada
-                        prazo={reserva.prazoDevolucao}
-                        rotulo="Devolução até"
-                        textoVencido="devolução atrasada"
-                      />
-                    )}
-
                     <div className="retirada-acoes">
+                      {reserva.status === "RESERVADO" && (
+                        <PrazoDeRetirada prazo={reserva.prazoRetirada} />
+                      )}
+                      {reserva.status === "ENTREGUE" && (
+                        <PrazoDeRetirada
+                          prazo={reserva.prazoDevolucao}
+                          rotulo="Devolução até"
+                          textoVencido="devolução atrasada"
+                        />
+                      )}
                       {reserva.status === "RESERVADO" ? (
                         <button
                           type="button"
@@ -5051,7 +5066,7 @@ function App() {
                     Buscar
                     <input
                       type="text"
-                      placeholder="Palavra da descrição ou e-mail do usuário"
+                      placeholder="Nome, e-mail ou palavra da descrição"
                       value={filtroLogs.texto}
                       onChange={(e) =>
                         setFiltroLogs({ ...filtroLogs, texto: e.target.value })

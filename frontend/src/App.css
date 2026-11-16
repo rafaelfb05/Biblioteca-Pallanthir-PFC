@@ -3850,6 +3850,7 @@ html {
 
 .retirada-itens {
   display: flex;
+  flex: 1;
   flex-direction: column;
   gap: 10px;
   margin: 0;
@@ -3859,6 +3860,7 @@ html {
 
 .retirada-itens li {
   display: flex;
+  flex: 1;
   align-items: center;
   gap: 16px;
   padding: 12px 14px;
@@ -3888,8 +3890,14 @@ html {
 
 .retirada-acoes {
   display: flex;
-  justify-content: flex-end;
-  margin-top: auto;
+  flex-wrap: wrap;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.retirada-acoes > button {
+  margin-left: auto;
 }
 
 .retirada-acoes .cadastro-button {
@@ -4106,10 +4114,8 @@ html {
 }
 
 .retirada-card .prazo-retirada {
-  box-sizing: border-box;
-  width: 100%;
   margin-top: 0;
-  padding: 12px 14px;
+  padding: 10px 14px;
   font-size: 14px;
 }
 

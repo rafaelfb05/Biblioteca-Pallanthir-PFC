@@ -365,7 +365,17 @@ test("acervo com até 18 livros não mostra a paginação", async () => {
 });
 
 test("cadastrar livro aparece só na tela principal do funcionário", async () => {
-  simularApi({ "GET /logs": () => [200, []], "GET /usuarios": () => [200, []] });
+  simularApi({
+    "GET /dashboard": () => [
+      200,
+      {
+        estoque: { titulosAtivos: 0, exemplaresParaReserva: 0, exemplaresParaCompra: 0, esgotadosParaReserva: 0 },
+        reservas: { reservadas: 0, entregues: 0, devolvidas: 0, canceladas: 0 },
+        materiasMaisReservadas: [],
+        materiasMaisCompradas: [],
+      },
+    ],
+  });
   entrarComo("FUNCIONARIO");
   render(<App />);
 
@@ -1102,6 +1112,16 @@ test("logs mostram o nome do usuário no lugar do id e são divididos em página
 
   const tabela = screen.getByRole("table");
   expect(within(tabela).getAllByRole("row")).toHaveLength(51);
+
+  const busca = screen.getByPlaceholderText("Nome, e-mail ou palavra da descrição");
+  fireEvent.change(busca, { target: { value: "bruno aluno" } });
+  expect(await screen.findByText("120 registros com os filtros escolhidos")).toBeInTheDocument();
+  fireEvent.change(busca, { target: { value: "ana gerente" } });
+  expect(await screen.findByText("120 registros com os filtros escolhidos")).toBeInTheDocument();
+  fireEvent.change(busca, { target: { value: "ninguém" } });
+  expect(await screen.findByText("Nenhum registro encontrado.")).toBeInTheDocument();
+  fireEvent.change(busca, { target: { value: "" } });
+  await screen.findByText("Mostrando 1–50 de 120 registros");
   expect(screen.getByText("Mostrando 1–50 de 120 registros")).toBeInTheDocument();
 
   const paginas = screen.getByRole("navigation", { name: "Páginas de logs" });
