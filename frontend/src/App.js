@@ -719,6 +719,26 @@ function PrazoDeRetirada({
   );
 }
 
+const QUEBRA_OPCIONAL = "­";
+
+const permitirQuebraEmPalavrasLongas = (texto) =>
+  String(texto || "")
+    .split(" ")
+    .map((palavra) => {
+      if (palavra.length <= 12) {
+        return palavra;
+      }
+      const partes = [];
+      for (let inicio = 0; inicio < palavra.length; inicio += 8) {
+        partes.push(palavra.slice(inicio, inicio + 8));
+      }
+      if (partes.length > 1 && partes[partes.length - 1].length < 4) {
+        partes[partes.length - 2] += partes.pop();
+      }
+      return partes.join(QUEBRA_OPCIONAL);
+    })
+    .join(" ");
+
 function CapaGenerica({ titulo, tamanho }) {
   return (
     <div
@@ -726,7 +746,10 @@ function CapaGenerica({ titulo, tamanho }) {
       role="img"
       aria-label={"Capa genérica de " + titulo}
     >
-      <span className="capa-generica-titulo">{titulo}</span>
+      <span className="capa-generica-detalhe" aria-hidden="true" />
+      <span className="capa-generica-titulo" lang="pt-BR">
+        {permitirQuebraEmPalavrasLongas(titulo)}
+      </span>
       <span className="capa-generica-marca">Pallanthir</span>
     </div>
   );
@@ -2397,6 +2420,46 @@ function App() {
       await Promise.all([carregarLivros(), carregarMaterias()]);
       limparFiltro();
     } catch (e) {
+      if (e.status === 409) {
+        const tituloRepetido = (String(e.message).match(/"([^"]+)"/) || [])[1];
+        const existente = livros.find((item) => item.titulo === tituloRepetido);
+        setMostrarCadastroLivro(false);
+        setErro(null);
+        setConfirmacao({
+          tom: "alerta",
+          titulo: "Esse livro já está no acervo",
+          conteudo: (
+            <>
+              {existente && (
+                <div className="dialogo-livro">
+                  <div className="dialogo-livro-capa">
+                    <CapaDoItem capaUrl={existente.capaUrl} titulo={existente.titulo} />
+                  </div>
+                  <div className="dialogo-livro-info">
+                    <strong>{existente.titulo}</strong>
+                    <span>
+                      {formatarEstoque(existente.estoqueReserva)} para reserva ·{" "}
+                      {formatarEstoque(existente.estoqueCompra)} à venda
+                    </span>
+                  </div>
+                </div>
+              )}
+              <p>
+                Para ter mais exemplares, abra o livro e aumente o estoque em
+                Atualizar livro, em vez de cadastrá-lo de novo.
+              </p>
+            </>
+          ),
+          textoConfirmar: existente ? "Abrir o livro" : "Entendi",
+          textoCancelar: "Fechar",
+          acao: async () => {
+            if (existente) {
+              abrirLivro(existente);
+            }
+          },
+        });
+        return;
+      }
       setErro(
         mensagemDeErro(
           e,

@@ -1243,3 +1243,27 @@ test("funcionário cola o link da capa na edição do livro", async () => {
   expect(chamadasPara("PUT", "/livros/atualizar/" + ID_LIVRO)[1].corpo.capaUrl).toBe("https://m.media-amazon.com/images/I/capa.jpg");
 });
 
+test("cadastrar um livro que já existe mostra a janela com o livro do acervo", async () => {
+  simularApi({
+    "POST /livros/cadastro": () => [409, { mensagem: '"Clean Code" já está no acervo. Para ter mais exemplares, edite o estoque do livro que já existe.' }],
+    ["GET /avaliacoes/livro/" + ID_LIVRO]: () => [200, { media: 0, total: 0, avaliacoes: [] }],
+  });
+  entrarComo("FUNCIONARIO");
+  render(<App />);
+
+  await screen.findByRole("heading", { name: "Clean Code" });
+  fireEvent.click(screen.getByRole("button", { name: "+ Cadastrar livro" }));
+  fireEvent.change(screen.getByPlaceholderText("Título do livro"), { target: { value: "Clean Code" } });
+  const materia = document.querySelector(".modal-box select");
+  fireEvent.change(materia, { target: { value: materia.options[materia.options.length - 1].value } });
+  fireEvent.submit(document.querySelector(".modal-box form"));
+
+  const dialogo = await screen.findByRole("alertdialog");
+  expect(dialogo).toHaveTextContent("Esse livro já está no acervo");
+  expect(dialogo).toHaveTextContent("Clean Code");
+  fireEvent.click(within(dialogo).getByRole("button", { name: "Abrir o livro" }));
+
+  expect(await screen.findByText("ISBN-10")).toBeInTheDocument();
+  expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+});
+
