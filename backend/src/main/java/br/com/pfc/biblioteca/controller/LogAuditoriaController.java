@@ -2,7 +2,7 @@ package br.com.pfc.biblioteca.controller;
 
 import java.time.LocalDate;
 import java.util.UUID;
-import br.com.pfc.biblioteca.entity.mongo.LogAuditoria;
+import br.com.pfc.biblioteca.dto.log.LogAuditoriaDTO;
 import br.com.pfc.biblioteca.service.LogAuditoriaService;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -24,12 +24,12 @@ public class LogAuditoriaController {
     }
 
     @GetMapping
-    public List<LogAuditoria> listar(@RequestParam(required = false) UUID usuarioId,
+    public List<LogAuditoriaDTO> listar(@RequestParam(required = false) UUID usuarioId,
                                      @RequestParam(required = false) String acao,
                                      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate de,
                                      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate ate,
                                      @RequestParam(required = false) Integer limite){
-        return service.buscar(usuarioId, acao, de, ate, limite);
+        return service.buscar(usuarioId, acao, de, ate, limite).stream().map(LogAuditoriaDTO::oculto).toList();
     }
 
     @GetMapping("/acoes")
@@ -38,7 +38,12 @@ public class LogAuditoriaController {
     }
 
     @GetMapping("/usuarios/{usuarioId}")
-    public List<LogAuditoria> listarPorUsuario(@PathVariable UUID usuarioId) {
-        return service.listarPorUsuario(usuarioId);
+    public List<LogAuditoriaDTO> listarPorUsuario(@PathVariable UUID usuarioId) {
+        return service.listarPorUsuario(usuarioId).stream().map(LogAuditoriaDTO::oculto).toList();
+    }
+
+    @GetMapping("/{id}/email")
+    public LogAuditoriaDTO revelarEmail(@PathVariable String id) {
+        return LogAuditoriaDTO.completo(service.revelarEmail(id));
     }
 }

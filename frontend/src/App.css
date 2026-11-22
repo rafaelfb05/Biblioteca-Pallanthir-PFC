@@ -5051,6 +5051,41 @@ html {
   font-size: 12px;
 }
 
+.logs-email {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.logs-ver-email {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #8a8a93;
+  cursor: pointer;
+}
+
+.logs-ver-email:hover:not(:disabled) {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.logs-ver-email:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+.logs-ver-email svg {
+  width: 16px;
+  height: 16px;
+}
+
 .logs-paginacao-resumo {
   text-align: center;
 }

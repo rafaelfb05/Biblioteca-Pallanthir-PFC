@@ -424,6 +424,41 @@ test("logs podem ser filtrados por ação e por período", async () => {
   expect(await screen.findByText("3 registros")).toBeInTheDocument();
 });
 
+test("gerente vê o e-mail escondido nos logs e revela pelo olho", async () => {
+  simularApi({
+    "GET /logs": () => [
+      200,
+      [{ id: "7", acao: "SUCESSO_LOGIN", dataHora: "2026-11-14T09:00:00", descricao: "Login de an•••@teste.com", usuarioEmail: "an•••@teste.com", emailOculto: true, chavesDeEmail: [versaoDosTermos("ana@teste.com")] }],
+    ],
+    "GET /logs/7/email": () => [
+      200,
+      { id: "7", acao: "SUCESSO_LOGIN", dataHora: "2026-11-14T09:00:00", descricao: "Login de ana@teste.com", usuarioEmail: "ana@teste.com", emailOculto: false },
+    ],
+    "GET /usuarios": () => [200, []],
+  });
+  entrarComo("GERENTE");
+  render(<App />);
+
+  fireEvent.click(await screen.findByRole("button", { name: "Logs" }));
+  expect(await screen.findByText("Login de an•••@teste.com")).toBeInTheDocument();
+  expect(screen.queryByText("ana@teste.com")).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: "Mostrar e-mail" }));
+  expect(await screen.findByText("ana@teste.com")).toBeInTheDocument();
+  expect(screen.getByText("Login de ana@teste.com")).toBeInTheDocument();
+  expect(chamadasPara("GET", "/logs/7/email")).toHaveLength(1);
+
+  fireEvent.click(screen.getByRole("button", { name: "Ocultar e-mail" }));
+  expect(await screen.findByText("an•••@teste.com")).toBeInTheDocument();
+  expect(chamadasPara("GET", "/logs/7/email")).toHaveLength(1);
+
+  const busca = screen.getByPlaceholderText("Nome, e-mail ou palavra da descrição");
+  fireEvent.change(busca, { target: { value: "andre@teste.com" } });
+  expect(await screen.findByText("Nenhum registro encontrado.")).toBeInTheDocument();
+  fireEvent.change(busca, { target: { value: " ANA@teste.com " } });
+  expect(await screen.findByText("Login de an•••@teste.com")).toBeInTheDocument();
+});
+
 test("usuário precisa ler e aceitar os termos quando eles mudam", async () => {
   simularApi({
     "GET /usuarios/termos": () => [200, { versaoAceita: "versao-antiga", dataAceite: "2026-01-01T10:00:00" }],

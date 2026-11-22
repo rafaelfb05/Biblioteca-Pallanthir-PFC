@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 import ModalDocumento from "./Componentes/ModalDocumento";
 import ModalPoliticaReserva from "./Componentes/ModalPoliticaReserva";
-import { carregarVersaoDosTermos } from "./services/termos";
+import { carregarVersaoDosTermos, versaoDosTermos } from "./services/termos";
 import PainelVendas from "./Componentes/PainelVendas";
 import GestaoEquipe from "./Componentes/GestaoEquipe";
 import EditorDocumentos from "./Componentes/EditorDocumentos";
@@ -464,6 +464,26 @@ const limitarEscala = (valor) =>
     Math.max(ESCALA_MINIMA, Math.round(valor * 100) / 100)
   );
 
+function IconeOlho({ riscado }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="18"
+      height="18"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" />
+      <circle cx="12" cy="12" r="3" />
+      {riscado && <path d="M4 4l16 16" />}
+    </svg>
+  );
+}
+
 function CampoSenha({ rotulo, valor, aoMudar, autoComplete }) {
   const [visivel, setVisivel] = useState(false);
 
@@ -485,21 +505,7 @@ function CampoSenha({ rotulo, valor, aoMudar, autoComplete }) {
           aria-label={visivel ? "Ocultar senha" : "Mostrar senha"}
           title={visivel ? "Ocultar senha" : "Mostrar senha"}
         >
-          <svg
-            viewBox="0 0 24 24"
-            width="18"
-            height="18"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" />
-            <circle cx="12" cy="12" r="3" />
-            {visivel && <path d="M4 4l16 16" />}
-          </svg>
+          <IconeOlho riscado={visivel} />
         </button>
       </div>
     </label>
@@ -1016,6 +1022,8 @@ function App() {
   const [alunoReservas, setAlunoReservas] = useState("");
   const [alunoCompras, setAlunoCompras] = useState("");
   const [logs, setLogs] = useState([]);
+  const [emailsRevelados, setEmailsRevelados] = useState({});
+  const [revelandoEmail, setRevelandoEmail] = useState(null);
   const [paginaLogs, setPaginaLogs] = useState(1);
   const [acoesRegistradas, setAcoesRegistradas] = useState([]);
   const [dashboard, setDashboard] = useState(null);
@@ -1695,6 +1703,27 @@ function App() {
     ]);
   };
 
+  const alternarEmailDoLog = async (log) => {
+    if (emailsRevelados[log.id]) {
+      setEmailsRevelados((atuais) => {
+        const restantes = { ...atuais };
+        delete restantes[log.id];
+        return restantes;
+      });
+      return;
+    }
+    try {
+      setRevelandoEmail(log.id);
+      const completo = await logsApi.revelarEmail(log.id);
+      setEmailsRevelados((atuais) => ({ ...atuais, [log.id]: completo }));
+    } catch (e) {
+      setErro(mensagemDeErro(e, "Não foi possível mostrar o e-mail."));
+      console.error(e);
+    } finally {
+      setRevelandoEmail(null);
+    }
+  };
+
   const carregarLogs = async (filtro) => {
     if (filtro.de && filtro.ate && filtro.de > filtro.ate) {
       return;
@@ -1702,6 +1731,7 @@ function App() {
     try {
       setCarregandoPainel(true);
       setErro(null);
+      setEmailsRevelados({});
       setLogs(
         (await logsApi.listar({
           usuarioId: filtro.usuarioId,
@@ -2866,6 +2896,7 @@ function App() {
 
   const logsExibidos = useMemo(() => {
     const termo = filtroLogs.texto.trim().toLowerCase();
+    const chaveDoEmail = termo.includes("@") ? versaoDosTermos(termo) : null;
     return logs.filter((log) => {
       const dia = String(log.dataHora || "").slice(0, 10);
       if (filtroLogs.acao && log.acao !== filtroLogs.acao) {
@@ -2877,13 +2908,15 @@ function App() {
       if (filtroLogs.ate && dia > filtroLogs.ate) {
         return false;
       }
+      if (chaveDoEmail && (log.chavesDeEmail || []).includes(chaveDoEmail)) {
+        return true;
+      }
       return (
         !termo ||
         [
           log.acao,
           log.descricao,
           descricaoDoLog(log.descricao),
-          log.usuarioEmail,
           log.usuarioId ? nomesDosUsuarios.get(String(log.usuarioId).toLowerCase()) : "",
         ]
           .map((valor) => String(valor || "").toLowerCase())
@@ -4329,7 +4362,7 @@ function App() {
     (reserva) =>
       (!alunoReservas || reserva.usuarioId === alunoReservas) &&
       (!termoDaBuscaDeReservas ||
-        [reserva.nomeEstudante, reserva.emailEstudante, reserva.tituloLivro]
+        [reserva.nomeEstudante, reserva.tituloLivro]
           .map((valor) => String(valor || "").toLowerCase())
           .some((valor) => valor.includes(termoDaBuscaDeReservas)))
   );
@@ -4349,7 +4382,7 @@ function App() {
     (multa) =>
       (!alunoMultas || multa.usuarioId === alunoMultas) &&
       (!termoDaBuscaDeMultas ||
-        [multa.nomeEstudante, multa.emailEstudante, multa.tituloLivro]
+        [multa.nomeEstudante, multa.tituloLivro]
           .map((valor) => String(valor || "").toLowerCase())
           .some((valor) => valor.includes(termoDaBuscaDeMultas)))
   );
@@ -4874,7 +4907,7 @@ function App() {
                 <input
                   type="text"
                   className="gestao-busca"
-                  placeholder="Buscar por estudante, e-mail ou livro"
+                  placeholder="Buscar por estudante ou livro"
                   value={buscaMultas}
                   onChange={(e) => setBuscaMultas(e.target.value)}
                 />
@@ -5044,7 +5077,7 @@ function App() {
                 <input
                   type="text"
                   className="gestao-busca"
-                  placeholder="Buscar por estudante, e-mail ou livro"
+                  placeholder="Buscar por estudante ou livro"
                   value={buscaReservasAbertas}
                   onChange={(e) => setBuscaReservasAbertas(e.target.value)}
                 />
@@ -5468,30 +5501,47 @@ function App() {
                       </tr>
                     </thead>
                     <tbody>
-                      {logsDaPagina.map((log) => (
-                        <tr key={log.id}>
-                          <td className="logs-data">{formatarData(log.dataHora)}</td>
-                          <td>
-                            <span className={classeDaAcao(log.acao)}>
-                              {log.acao}
-                            </span>
-                          </td>
-                          <td>
-                            {log.usuarioId &&
-                            nomesDosUsuarios.has(String(log.usuarioId).toLowerCase()) ? (
-                              <span className="logs-usuario">
-                                <strong>
-                                  {nomesDosUsuarios.get(String(log.usuarioId).toLowerCase())}
-                                </strong>
-                                <small>{log.usuarioEmail}</small>
+                      {logsDaPagina.map((log) => {
+                        const nome = log.usuarioId
+                          ? nomesDosUsuarios.get(String(log.usuarioId).toLowerCase())
+                          : null;
+                        const revelado = emailsRevelados[log.id];
+                        const email = revelado ? revelado.usuarioEmail : log.usuarioEmail;
+                        return (
+                          <tr key={log.id}>
+                            <td className="logs-data">{formatarData(log.dataHora)}</td>
+                            <td>
+                              <span className={classeDaAcao(log.acao)}>
+                                {log.acao}
                               </span>
-                            ) : (
-                              log.usuarioEmail || "—"
-                            )}
-                          </td>
-                          <td>{descricaoDoLog(log.descricao)}</td>
-                        </tr>
-                      ))}
+                            </td>
+                            <td>
+                              <span className="logs-usuario">
+                                {nome && <strong>{nome}</strong>}
+                                {(email || log.emailOculto) && (
+                                  <span className="logs-email">
+                                    {email && (nome ? <small>{email}</small> : <span>{email}</span>)}
+                                    {log.emailOculto && (
+                                      <button
+                                        type="button"
+                                        className="logs-ver-email"
+                                        onClick={() => alternarEmailDoLog(log)}
+                                        disabled={revelandoEmail === log.id}
+                                        aria-label={revelado ? "Ocultar e-mail" : "Mostrar e-mail"}
+                                        title={revelado ? "Ocultar e-mail" : "Mostrar e-mail"}
+                                      >
+                                        <IconeOlho riscado={Boolean(revelado)} />
+                                      </button>
+                                    )}
+                                  </span>
+                                )}
+                                {!nome && !email && !log.emailOculto && "—"}
+                              </span>
+                            </td>
+                            <td>{descricaoDoLog(revelado ? revelado.descricao : log.descricao)}</td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

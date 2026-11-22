@@ -75,7 +75,7 @@ public class UsuarioService {
         return usuario.stream()
                 .map(u -> new UsuarioDTO(
                         u.getId(), u.getNome(),
-                        u.getEmail(), u.getTipo(), null))
+                        MascaraDeEmail.mascarar(u.getEmail()), u.getTipo(), null))
                 .collect(Collectors.toList());
     }
 

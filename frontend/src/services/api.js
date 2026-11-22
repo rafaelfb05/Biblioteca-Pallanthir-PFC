@@ -280,6 +280,7 @@ export const logsApi = {
   },
   acoes: () => request("/logs/acoes"),
   listarPorUsuario: (usuarioId) => request(`/logs/usuarios/${usuarioId}`),
+  revelarEmail: (id) => request(`/logs/${id}/email`),
 };
 
 export { API_URL };

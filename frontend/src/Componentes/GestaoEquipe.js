@@ -95,7 +95,7 @@ export default function GestaoEquipe({ usuarioAtualId }) {
   const termo = busca.trim().toLowerCase();
   const filtrados = equipe.filter(
     (membro) =>
-      !termo || membro.nome.toLowerCase().includes(termo) || membro.email.toLowerCase().includes(termo)
+      !termo || membro.nome.toLowerCase().includes(termo)
   );
   const gerentes = equipe.filter((membro) => membro.tipo === "GERENTE").length;
 
@@ -105,7 +105,7 @@ export default function GestaoEquipe({ usuarioAtualId }) {
         <input
           type="search"
           className="equipe-busca"
-          placeholder="Buscar por nome ou e-mail"
+          placeholder="Buscar por nome"
           aria-label="Buscar na equipe"
           value={busca}
           onChange={(e) => setBusca(e.target.value)}

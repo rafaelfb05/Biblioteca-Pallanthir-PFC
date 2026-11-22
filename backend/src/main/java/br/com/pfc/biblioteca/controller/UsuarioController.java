@@ -10,6 +10,7 @@ import br.com.pfc.biblioteca.dto.usuario.TermosDTO;
 import br.com.pfc.biblioteca.dto.usuario.UsuarioDTO;
 import br.com.pfc.biblioteca.dto.usuario.UsuarioRequest;
 import br.com.pfc.biblioteca.entity.jpa.Usuario;
+import br.com.pfc.biblioteca.service.MascaraDeEmail;
 import br.com.pfc.biblioteca.service.UsuarioService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -51,7 +52,8 @@ public class UsuarioController {
 
     @PutMapping("/{id}/perfil")
     public ResponseEntity<UsuarioDTO> alterarPerfil(@PathVariable UUID id, @RequestBody @Valid AlterarPerfilRequest request) {
-        return ResponseEntity.ok(new UsuarioDTO(service.alterarPerfil(id, request.tipo())));
+        Usuario alterado = service.alterarPerfil(id, request.tipo());
+        return ResponseEntity.ok(new UsuarioDTO(alterado.getId(), alterado.getNome(), MascaraDeEmail.mascarar(alterado.getEmail()), alterado.getTipo(), null));
     }
 
     @DeleteMapping("/funcionarios/{id}")

@@ -243,5 +243,32 @@ class GerenteIntegracaoTest extends TesteIntegracaoBase {
         assertThat(usuarioRepository.countByTipoAndAtivoTrue(TipoUsuario.GERENTE)).isGreaterThanOrEqualTo(1);
         assertThat(java.util.List.of(statusA, statusB)).contains(200);
     }
+
+    @Test
+    void emailsAparecemEscondidosEOGerenteRevelaPeloLog() {
+        Usuario estudante = criarEstudante();
+        String funcionario = token(criarFuncionario());
+        String gerente = token(criarGerente());
+        br.com.pfc.biblioteca.entity.mongo.LogAuditoria log = new br.com.pfc.biblioteca.entity.mongo.LogAuditoria(
+                estudante.getId(), "felipe.miranda@gmail.com", "LOGIN", "Login de felipe.miranda@gmail.com");
+        org.mockito.Mockito.when(logService.buscar(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(java.util.List.of(log));
+        org.mockito.Mockito.when(logService.revelarEmail("abc")).thenReturn(log);
+
+        JsonNode oculto = get("/logs", gerente).corpo().get(0);
+        assertThat(oculto.path("usuarioEmail").asText()).isEqualTo("fe•••@gmail.com");
+        assertThat(oculto.path("descricao").asText()).isEqualTo("Login de fe•••@gmail.com");
+        assertThat(oculto.path("emailOculto").asBoolean()).isTrue();
+
+        assertThat(get("/logs/abc/email", funcionario).status()).isEqualTo(403);
+        Resposta revelado = get("/logs/abc/email", gerente);
+        assertThat(revelado.corpo().path("usuarioEmail").asText()).isEqualTo("felipe.miranda@gmail.com");
+        org.mockito.Mockito.verify(logService).revelarEmail("abc");
+
+        for (JsonNode usuario : get("/usuarios", funcionario).corpo()) {
+            assertThat(usuario.path("email").asText()).contains("•••");
+        }
+    }
 }
 

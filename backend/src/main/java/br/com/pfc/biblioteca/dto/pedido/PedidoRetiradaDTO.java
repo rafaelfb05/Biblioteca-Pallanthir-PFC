@@ -1,6 +1,7 @@
 package br.com.pfc.biblioteca.dto.pedido;
 
 import br.com.pfc.biblioteca.entity.jpa.Pedido;
+import br.com.pfc.biblioteca.service.MascaraDeEmail;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -14,6 +15,6 @@ public record PedidoRetiradaDTO(UUID id, String nomeEstudante, BigDecimal total,
     public PedidoRetiradaDTO(Pedido p) {
         this(p.getId(), p.getUsuario().getNome(), p.getTotal(), p.getDataCriacao(),
                 p.getItens().stream().map(ItemPedidoDTO::new).collect(Collectors.toList()),
-                p.getUsuario().getId(), p.getUsuario().getEmail(), p.getPrazoRetirada());
+                p.getUsuario().getId(), MascaraDeEmail.mascarar(p.getUsuario().getEmail()), p.getPrazoRetirada());
     }
 }

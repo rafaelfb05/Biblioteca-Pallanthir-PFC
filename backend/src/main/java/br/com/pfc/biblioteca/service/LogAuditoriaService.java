@@ -3,6 +3,7 @@ package br.com.pfc.biblioteca.service;
 import java.util.UUID;
 import br.com.pfc.biblioteca.entity.jpa.Usuario;
 import br.com.pfc.biblioteca.entity.mongo.LogAuditoria;
+import br.com.pfc.biblioteca.infra.exception.RecursoNaoEncontradoException;
 import br.com.pfc.biblioteca.repository.LogAuditoriaRepository;
 import br.com.pfc.biblioteca.repository.UsuarioRepository;
 import org.slf4j.Logger;
@@ -92,5 +93,27 @@ public class LogAuditoriaService {
 
     public List<LogAuditoria> listarPorUsuario(UUID usuarioId){
         return buscar(usuarioId, null, null, null, LIMITE_PADRAO);
+    }
+
+    public LogAuditoria revelarEmail(String logId) {
+        LogAuditoria log = repository.findById(logId)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Registro de log não encontrado"));
+        String dono = nomeDoUsuario(log.getUsuarioId());
+        String descricao = "Visualizou o e-mail do registro " + log.getAcao()
+                + (dono == null ? "" : " de " + dono)
+                + " (log " + log.getId() + ")";
+        registrarLogUsuarioLogado("VISUALIZOU_EMAIL", descricao);
+        return log;
+    }
+
+    private String nomeDoUsuario(String usuarioId) {
+        if (usuarioId == null) {
+            return null;
+        }
+        try {
+            return usuarioRepository.findById(UUID.fromString(usuarioId)).map(Usuario::getNome).orElse(null);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 }
