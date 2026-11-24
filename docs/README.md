@@ -432,15 +432,4 @@ Ao atualizar um banco da v2.0 para a v3.0, rode a migração dos estoques descri
 
 ---
 
-## Checklist final
-
-- [ ] Projeto criado na Supabase e credenciais JDBC anotadas
-- [ ] Cluster MongoDB dos logs criado, usuário cadastrado e acesso externo liberado
-- [ ] Conta na Brevo com remetente verificado e chave de API gerada
-- [ ] `JWT_SECRET` e `CODIGO_FUNCIONARIO` definidos
-- [ ] Chave da Google Books API gerada
-- [ ] Aplicação criada no Mercado Pago, Access Token copiado e webhook configurado com o evento **Order (Mercado Pago)**
-- [ ] Web Service na Render com todas as variáveis obrigatórias cadastradas e build concluído
-- [ ] Migração dos estoques executada, se o banco veio da v2.0
-- [ ] `REACT_APP_API_URL` na Vercel apontando para a URL da Render
-- [ ] URL da Vercel liberada em `CORS_ALLOWED_ORIGINS` e em `FRONTEND_URL`, se for diferente do padrão
+_ALLOWED_ORIGINS` e em `FRONTEND_URL`, se for diferente do padrão
