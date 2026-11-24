@@ -2,7 +2,7 @@
 
 Um sistema de biblioteca criado para ajudar estudantes de diversas áreas.
 
-Os estudantes podem navegar pelo catálogo organizado por matérias, avaliar os livros e conferir os mais bem avaliados, salvar os preferidos na aba de favoritos, reservar livros para retirada e comprar exemplares pagando pelo Mercado Pago. Os funcionários cuidam do acervo, das entregas e devoluções e acompanham tudo pela dashboard e pelos logs de auditoria.
+Os estudantes podem navegar pelo catálogo organizado por matérias, avaliar os livros e conferir os mais bem avaliados, salvar os preferidos na aba de favoritos, reservar livros para retirada, comprar exemplares pagando pelo Mercado Pago e pedir um aviso por e-mail quando um livro esgotado voltar ao estoque. Os funcionários cuidam do acervo, das entregas, devoluções, retiradas e multas e acompanham tudo pela dashboard. O gerente cuida da equipe, dos documentos legais, da dashboard de vendas e dos logs de auditoria.
 
 O sistema não oferece os livros digitalmente: as reservas e as compras são de exemplares físicos da biblioteca.
 
@@ -11,29 +11,39 @@ O sistema não oferece os livros digitalmente: as reservas e as compras são de 
 ## Funcionalidades
 
 ### Estudante
-- Catálogo de livros com busca por título, filtro por matéria e ranking dos 10 mais bem avaliados.
-- Página de detalhes do livro com capa ampliável, preço, estoque para reserva e estoque à venda.
+- Catálogo de livros em páginas de 18, com busca por título, filtro por matéria e ranking dos 10 mais bem avaliados, também filtrável por matéria.
+- Página de detalhes do livro com capa ampliável, ISBN, preço, estoque para reserva e estoque à venda.
 - Avaliação dos livros com nota de 1 a 5 e comentário opcional.
 - Favoritos.
-- Reserva de livros, cancelamento e histórico em "Minhas reservas".
+- Reserva de livros com aceite da Política de Uso de Reservas, prazos de retirada (3 dias) e de devolução (7 dias), limite de 3 reservas em aberto, cancelamento e histórico em "Minhas reservas".
 - Carrinho de compras e pagamento pelo **Mercado Pago (Checkout Pro)**.
-- Página "Meus pedidos", com o status de cada compra.
+- Página "Meus pedidos", com o status de cada compra, cancelamento de pedidos não pagos, prazo de retirada e pedido de reembolso.
+- Pagamento de multas por dano pelo Mercado Pago.
+- Aviso de disponibilidade: um sino em cada estoque esgotado envia um e-mail, com a capa do livro, quando o estoque volta.
 
 ### Funcionário
-- Cadastro de livros a partir do título, com dados e capa preenchidos pela Google Books API.
+- Cadastro de livros a partir do título, com dados da Google Books API e capa da Open Library (pelo ISBN ou pelo título e autor), link manual da capa e capa genérica quando nada é encontrado.
+- Bloqueio do cadastro de livros que já estão no acervo.
 - Edição e exclusão de livros, com estoques separados para reserva e para venda.
-- Gestão de usuários e reservas, com registro de entrega e devolução.
+- Gestão das reservas, das compras para retirar e das multas, com registro de entrega, devolução (com ou sem dano) e retirada.
 - Dashboard com os números do acervo, das reservas e das matérias mais reservadas e mais compradas.
-- Consulta dos logs de auditoria, com filtro por usuário e por texto.
+
+### Gerente
+- Todos os acessos do funcionário.
+- **Equipe:** promover funcionários a gerente, rebaixar gerentes e excluir contas de funcionários. O sistema nunca fica sem gerente.
+- **Documentos:** edição dos Termos de Uso, da Política de Privacidade e da Política de Reservas pelo site, com histórico de versões.
+- **Vendas:** dashboard de vendas por período.
+- **Logs:** consulta dos logs de auditoria com filtros por usuário, ação e período, busca e páginas de 50 registros. Os e-mails aparecem escondidos, e o gerente pode ver o e-mail completo pelo ícone de olho, com a visualização registrada.
 
 ### Conta e segurança
-- Cadastro como Estudante ou Funcionário (este último com código de acesso).
+- Cadastro como Estudante ou Funcionário (este último com código de acesso). Gerentes são promovidos por outro gerente.
 - Login com **verificação em duas etapas**: um código de 6 dígitos é enviado por e-mail.
-- Bloqueio da conta por 15 minutos após 3 tentativas de senha incorreta.
+- Bloqueio da conta por 15 minutos após 3 tentativas de senha incorreta, e códigos invalidados após 5 tentativas erradas.
 - Recuperação de senha por código enviado por e-mail.
 - Sessão encerrada automaticamente após 15 minutos sem atividade.
-- Página "Minha conta" para editar os dados, trocar a senha e excluir a conta com anonimização dos dados.
-- Termos de Uso e Política de Privacidade (LGPD) exibidos na aplicação, com aceite obrigatório no cadastro.
+- Página "Minha conta" para editar os dados, trocar o e-mail com confirmação por código, trocar a senha e excluir a conta com anonimização dos dados.
+- Termos de Uso e Política de Privacidade (LGPD) exibidos na aplicação, com aceite obrigatório no cadastro e novo aceite sempre que mudarem.
+- E-mails parcialmente escondidos em todas as telas, exceto na página da própria conta.
 
 ---
 
@@ -57,14 +67,15 @@ O sistema não oferece os livros digitalmente: as reservas e as compras são de 
 
 ### Banco de dados
 
-- **PostgreSQL** — Banco de dados principal do sistema, hospedado na Supabase. É responsável pela persistência dos usuários, livros, favoritos, reservas, avaliações, carrinhos e pedidos.
-- **MongoDB** — Usado **exclusivamente para os logs de auditoria**, sem nenhum dado de negócio. Armazena registros como logins, reservas, pedidos, pagamentos, alterações de livros e tentativas de acesso negado.
+- **PostgreSQL** — Banco de dados principal do sistema, hospedado na Supabase. É responsável pela persistência dos usuários, livros, favoritos, reservas, avaliações, carrinhos, pedidos, multas, avisos de disponibilidade e documentos legais com as suas versões.
+- **MongoDB** — Usado **exclusivamente para os logs de auditoria**, sem nenhum dado de negócio. Armazena registros como logins, reservas, pedidos, pagamentos, alterações de livros e tentativas de acesso negado, apagados automaticamente após 12 meses.
 
 ### Integrações externas
 
 - **Google Books API** — API externa utilizada para obter informações dos livros adicionados ao sistema.
-- **Brevo** — Serviço de envio de e-mails transacionais, utilizado para enviar os códigos de verificação em duas etapas e de recuperação de senha.
-- **Mercado Pago** — Processa os pagamentos das compras pela API de Orders (Checkout Pro) e avisa o sistema por webhook quando um pagamento muda de status.
+- **Open Library** — Fonte das capas dos livros, buscadas pelo ISBN ou pelo título e autor. Não exige chave.
+- **Brevo** — Serviço de envio de e-mails transacionais, utilizado para enviar os códigos de verificação em duas etapas, de recuperação de senha e de troca de e-mail, e os avisos de disponibilidade.
+- **Mercado Pago** — Processa os pagamentos das compras e das multas e os reembolsos pela API de Orders (Checkout Pro) e avisa o sistema por webhook quando um pagamento muda de status.
 
 ### Hospedagem
 
@@ -79,9 +90,11 @@ O sistema não oferece os livros digitalmente: as reservas e as compras são de 
 ```
 Biblioteca-Pallanthir-PFC/
 ├── Dockerfile          -> build do back-end (usado pelo Render)
+├── .github/workflows/  -> integração contínua (GitHub Actions)
 ├── backend/            -> API em Java 24 + Spring Boot (Maven)
-│   └── src/main/resources/application.properties
-├── docs/               -> README, Release Notes, Requisitos, Segurança, Termos de Uso e Política de Privacidade
+│   ├── src/main/resources/application.properties
+│   └── src/main/resources/documentos/ -> versão inicial dos documentos legais
+├── docs/               -> README, manuais, Release Notes, Requisitos, Segurança, documentos legais e scripts da migração para UUID
 └── frontend/           -> aplicação React (Create React App)
     ├── scripts/copiar-docs.js
     ├── .env.development
@@ -89,7 +102,9 @@ Biblioteca-Pallanthir-PFC/
     └── vercel.json
 ```
 
-O script `frontend/scripts/copiar-docs.js` roda automaticamente antes do `npm start` e do `npm run build`, copiando os Termos de Uso e a Política de Privacidade da pasta `docs/` para `frontend/public/docs/`, de onde são exibidos na aplicação.
+Os Termos de Uso, a Política de Privacidade e a Política de Reservas ficam guardados no banco de dados e são carregados pela API (`/documentos`). Na primeira inicialização, se o banco ainda não tiver os documentos, eles são criados a partir de `backend/src/main/resources/documentos/`. Depois disso, as alterações são feitas pelo gerente na página **Documentos** do site, e os arquivos em `docs/` servem de cópia de referência.
+
+O script `frontend/scripts/copiar-docs.js` ainda roda antes do `npm start` e do `npm run build` e copia os documentos de `docs/` para `frontend/public/docs/`, mas a aplicação não usa mais esses arquivos.
 
 ---
 
@@ -121,7 +136,7 @@ O script `frontend/scripts/copiar-docs.js` roda automaticamente antes do `npm st
 | `CODIGO_FUNCIONARIO` | Sim | Código exigido para criar uma conta do tipo Funcionário |
 | `BREVO_API_KEY` | Sim | Chave da API da Brevo, usada para enviar os e-mails |
 | `EMAIL_REMETENTE` | Sim | E-mail remetente verificado na Brevo |
-| `FRONTEND_URL` | Não | URL do front-end, usada no link "Copiar código" dos e-mails e nos endereços de retorno do pagamento. Padrão: `https://pallanthir.vercel.app` |
+| `FRONTEND_URL` | Não | URL do front-end, usada no link "Copiar código" dos e-mails, no link do livro dos avisos de disponibilidade e nos endereços de retorno do pagamento. Padrão: `https://pallanthir.vercel.app` |
 | `BOOK_API` | Sim | Chave da Google Books API, usada pelo `LivroService` |
 | `MP_ACCESS_TOKEN` | Sim | Access Token da aplicação no Mercado Pago, usado para criar e consultar os pedidos |
 | `MP_WEBHOOK_SECRET` | Sim | Assinatura secreta do webhook do Mercado Pago, usada para validar as notificações |
@@ -156,6 +171,8 @@ O front-end já traz `.env.development` e `.env.production` versionados. Para so
 
 Não é necessário criar as tabelas manualmente: o Hibernate está com `ddl-auto=update` e gera o esquema no primeiro start.
 
+Depois do primeiro start, ative o **Row Level Security** em todas as tabelas (*Table Editor → RLS*), sem criar políticas. O back-end continua acessando normalmente, e as chaves públicas da Supabase deixam de ler os dados.
+
 ### 2. MongoDB (somente logs de auditoria)
 
 O MongoDB não guarda usuários, livros nem reservas; esses dados ficam no PostgreSQL da Supabase. Ele recebe apenas os logs de auditoria.
@@ -169,7 +186,7 @@ O MongoDB não guarda usuários, livros nem reservas; esses dados ficam no Postg
    ```
 5. Esse valor, com o usuário e a senha do passo 2, é o `MONGODB_URI`.
 
-O banco (`MONGODB_DATABASE`, padrão `pallanthir`) e a coleção `logs_auditoria` são criados automaticamente no primeiro log gravado.
+O banco (`MONGODB_DATABASE`, padrão `pallanthir`) e a coleção `logs_auditoria` são criados automaticamente no primeiro log gravado. Na inicialização, o back-end cria o índice `expiracao_dos_logs`, que apaga cada log 12 meses depois do registro.
 
 ### 3. Brevo (envio de e-mails)
 
@@ -188,6 +205,16 @@ Ambos são definidos por você:
   openssl rand -base64 48
   ```
 - `CODIGO_FUNCIONARIO`: escolha um código e repasse apenas aos funcionários da biblioteca. Ele é pedido na tela de cadastro ao escolher o tipo **Funcionário**.
+
+#### 4.1 Primeiro gerente
+
+Não existe cadastro de Gerente. Crie uma conta de Funcionário pelo site e promova-a no **SQL Editor** da Supabase:
+
+```sql
+UPDATE usuarios SET tipo = 'GERENTE' WHERE email = 'email-do-gerente@exemplo.com' AND ativo = true;
+```
+
+Os próximos gerentes são promovidos por ele na página **Equipe**.
 
 ### 5. Google Books API
 
@@ -346,11 +373,15 @@ O fluxo de compra funciona assim:
 3. O estudante paga na página do Mercado Pago e volta ao site em `/compra/sucesso`, `/compra/pendente` ou `/compra/falha`.
 4. O Mercado Pago chama o webhook (`POST /pagamentos/webhook`). O back-end valida a assinatura, consulta a order na API do Mercado Pago e marca o pedido como **Aprovado** quando o pagamento é processado.
 5. Ao abrir "Meus pedidos", o back-end também consulta o Mercado Pago para cada pedido ainda pendente, garantindo o status correto mesmo sem o webhook.
+6. Com o pagamento aprovado, o estudante retira os livros na biblioteca em até **15 dias**, e o funcionário registra a retirada na aba **Compras para retirar** da Gestão.
 
 Regras importantes:
 - Os itens só saem do carrinho quando o pedido é aprovado ou expira.
-- Enquanto houver um pedido aguardando pagamento, o carrinho fica bloqueado e não é possível criar outro pedido.
+- Enquanto houver um pedido aguardando pagamento, o carrinho fica bloqueado e não é possível criar outro pedido. O estudante pode cancelar esse pedido.
 - Pedidos não pagos expiram após 30 minutos; os exemplares voltam ao estoque de venda.
+- Enquanto os livros não forem retirados, o estudante pode pedir o reembolso pelo site. Compras não retiradas em 15 dias são reembolsadas automaticamente.
+- Não é possível comprar com uma multa pendente ou sem ter aceitado a versão atual dos termos.
+- As multas por dano são pagas pelo mesmo fluxo do Mercado Pago, e o link de pagamento vale 60 minutos.
 
 ### Testando com as contas de teste
 
@@ -373,7 +404,7 @@ Se aparecer "Uma das partes com as quais você está tentando efetuar o pagament
    - **Runtime:** Docker (a Render detecta o `../Dockerfile` na raiz)
    - **Root Directory:** deixe em branco (a raiz do repositório)
    - **Branch:** `main`
-   - **Instance Type:** Free já atende (o `../Dockerfile` limita a JVM a 400 MB)
+   - **Instance Type:** Free já atende (o `../Dockerfile` limita o heap da JVM a 256 MB)
 4. Em **Environment → Environment Variables**, cadastre:
    - `SUPABASE_URL`
    - `SUPABASE_USER`
@@ -414,7 +445,13 @@ O `vercel.json` já contém o rewrite que envia todas as rotas para o `index.htm
 
 Não há passo extra de deploy: o PostgreSQL já está hospedado na Supabase desde a criação do projeto, e o MongoDB dos logs também. Basta garantir que as credenciais cadastradas na Render estejam corretas e que o MongoDB aceite conexões externas (**Network Access**).
 
-Ao atualizar um banco da v2.0 para a v3.0, rode a migração dos estoques descrita nas [Release Notes v3.0](RELEASE_NOTES_V3.0.md#migração-do-banco-de-dados).
+Ao atualizar um banco da v2.0 para a v3.0, rode a migração dos estoques descrita nas [Release Notes v3.0](RELEASE_NOTES_V3.0.md#migração-do-banco-de-dados). Ao atualizar da v3.0 para a v4.0, siga a migração da [v4.0](RELEASE_NOTES_v4.0.md): identificadores UUID, primeiro gerente e RLS.
+
+---
+
+## Integração contínua
+
+O workflow `.github/workflows/ci.yml` roda a cada push e a cada pull request para a `main`: compila e testa o back-end com `./mvnw -B verify` e roda os testes e o build do front-end.
 
 ---
 
@@ -426,8 +463,29 @@ Ao atualizar um banco da v2.0 para a v3.0, rode a migração dos estoques descri
 | [Release Notes v1.0](RELEASE_NOTES_v1.0.md) | Primeira versão do sistema |
 | [Release Notes v2.0](RELEASE_NOTES_V2.0.md) | Segurança, 2FA, logs e LGPD |
 | [Release Notes v3.0](RELEASE_NOTES_V3.0.md) | Avaliações, carrinho, pagamentos com Mercado Pago e dashboard |
+| [Release Notes v4.0](RELEASE_NOTES_v4.0.md) | Perfil Gerente, política e prazos das reservas, multas, reembolsos, avisos de disponibilidade, capas pela Open Library e e-mails escondidos |
 | [Política de Segurança](SECURITY.md) | Mecanismos de segurança e como relatar vulnerabilidades |
 | [Termos de Uso](TERMOS_DE_USO.md) | Regras de uso do sistema |
 | [Política de Privacidade](POLITICA_DE_PRIVACIDADE.md) | Tratamento de dados pessoais conforme a LGPD |
+| [Política de Reservas](POLITICA_DE_RESERVAS.md) | Prazos, limites, danos e multas das reservas |
+| [Política de Reembolso](POLITICA_DE_REEMBOLSO.md) | Cancelamentos, reembolsos, arrependimento e como o dinheiro volta |
+| [Manual do Usuário](MANUAL_DO_USUARIO.md) | Passo a passo do estudante: conta, catálogo, reservas, compras, multas e avisos |
+| [Manual do Funcionário](MANUAL_DO_FUNCIONARIO.md) | Passo a passo da equipe: acervo, gestão do balcão, multas, dashboard e área do gerente |
 
 ---
+
+## Checklist final
+
+- [ ] Projeto criado na Supabase e credenciais JDBC anotadas
+- [ ] Cluster MongoDB dos logs criado, usuário cadastrado e acesso externo liberado
+- [ ] Conta na Brevo com remetente verificado e chave de API gerada
+- [ ] `JWT_SECRET` e `CODIGO_FUNCIONARIO` definidos
+- [ ] Chave da Google Books API gerada
+- [ ] Aplicação criada no Mercado Pago, Access Token copiado e webhook configurado com o evento **Order (Mercado Pago)**
+- [ ] Web Service na Render com todas as variáveis obrigatórias cadastradas e build concluído
+- [ ] Migração dos estoques executada, se o banco veio da v2.0
+- [ ] Migração para UUID executada, se o banco veio da v3.0
+- [ ] Primeiro gerente promovido pelo SQL Editor da Supabase
+- [ ] Row Level Security ativado em todas as tabelas da Supabase
+- [ ] `REACT_APP_API_URL` na Vercel apontando para a URL da Render
+- [ ] URL da Vercel liberada em `CORS_ALLOWED_ORIGINS` e em `FRONTEND_URL`, se for diferente do padrão
