@@ -431,5 +431,3 @@ Ao atualizar um banco da v2.0 para a v3.0, rode a migração dos estoques descri
 | [Política de Privacidade](POLITICA_DE_PRIVACIDADE.md) | Tratamento de dados pessoais conforme a LGPD |
 
 ---
-
-_ALLOWED_ORIGINS` e em `FRONTEND_URL`, se for diferente do padrão
