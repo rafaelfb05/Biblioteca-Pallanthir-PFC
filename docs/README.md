@@ -473,19 +473,3 @@ O workflow `.github/workflows/ci.yml` roda a cada push e a cada pull request par
 | [Manual do Funcionário](MANUAL_DO_FUNCIONARIO.md) | Passo a passo da equipe: acervo, gestão do balcão, multas, dashboard e área do gerente |
 
 ---
-
-## Checklist final
-
-- [ ] Projeto criado na Supabase e credenciais JDBC anotadas
-- [ ] Cluster MongoDB dos logs criado, usuário cadastrado e acesso externo liberado
-- [ ] Conta na Brevo com remetente verificado e chave de API gerada
-- [ ] `JWT_SECRET` e `CODIGO_FUNCIONARIO` definidos
-- [ ] Chave da Google Books API gerada
-- [ ] Aplicação criada no Mercado Pago, Access Token copiado e webhook configurado com o evento **Order (Mercado Pago)**
-- [ ] Web Service na Render com todas as variáveis obrigatórias cadastradas e build concluído
-- [ ] Migração dos estoques executada, se o banco veio da v2.0
-- [ ] Migração para UUID executada, se o banco veio da v3.0
-- [ ] Primeiro gerente promovido pelo SQL Editor da Supabase
-- [ ] Row Level Security ativado em todas as tabelas da Supabase
-- [ ] `REACT_APP_API_URL` na Vercel apontando para a URL da Render
-- [ ] URL da Vercel liberada em `CORS_ALLOWED_ORIGINS` e em `FRONTEND_URL`, se for diferente do padrão
